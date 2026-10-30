@@ -43,6 +43,12 @@ function scanImage(data){
  assert.equal(cursor,size);return instructions;
 }
 const tone=frequency=>({type:'tone',frequency,ms:200,volume:25});
+test('early whole-program and My Block exits keep all native object and jump boundaries valid',()=>{
+ for(const type of ['programEnd','myblockReturn']){
+  const p={main:[{type:'call',name:'exit',args:[]},tone(880)],procedures:[{name:'exit',params:[],body:[{type:'repeat',count:2,body:[{type:'if',condition:{button:{id:4}},then:[{type}],else:[tone(440)]}]}]}]};
+  const instructions=scanImage(compile(p).data);assert.equal(instructions.filter(x=>x.op===0x0a).length,2);assert.ok(instructions.some(x=>x.op===(type==='programEnd'?2:8)));
+ }
+});
 test('native button PRESSED operands and float conditions have valid object boundaries in My Blocks and loops',()=>{
  const condition={op:'eq',left:{button:{id:7}},right:0};
  const p={main:[{type:'call',name:'buttons',args:[.5]}],procedures:[{name:'buttons',params:['n'],body:[{type:'while',until:true,condition,body:[{type:'waitSeconds',seconds:{param:'n'}}]},tone(880)]}]};

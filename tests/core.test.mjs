@@ -78,6 +78,20 @@ test('brick button states are read on the EV3 repeatedly, handle release, and pr
  for(const id of [0,6,8,1.5,'2'])assert.throws(()=>compile({main:[{type:'set',var:'b',value:button(id)}],procedures:[]}),/本体ボタン/);
 });
 const dv=data=>new DataView(data.buffer,data.byteOffset,data.byteLength);
+test('program termination stops all motors and exits main, loops and nested My Block calls',()=>{
+ const beep=frequency=>({type:'tone',frequency,ms:100,volume:25}),end={type:'programEnd'};
+ const contexts=[{main:[end,beep(440)],procedures:[]},{main:[{type:'repeat',count:10,body:[end,beep(440)]},beep(500)],procedures:[]},{main:[{type:'forever',body:[{type:'if',condition:{button:{id:4}},then:[end],else:[beep(440)]}]}],procedures:[]},{main:[{type:'call',name:'outer',args:[]},beep(500)],procedures:[{name:'outer',params:[],body:[{type:'call',name:'inner',args:[]},beep(440)]},{name:'inner',params:[],body:[end,beep(600)]}]}];
+ for(const p of contexts){p.main.unshift({type:'motorRun',ports:6,speed:20});const driver=new SimulatedMotors(),events=interpret(compile(p).data,{motorDriver:driver,buttonRead:()=>true});assert.equal(driver.busy(15),false);assert.equal(driver.aborted,true);assert.equal(events.filter(x=>x.type==='tone').length,0);}
+});
+
+test('return exits only the current My Block including loops and preserves its caller and running motors',()=>{
+ const p={main:[{type:'motorRun',ports:2,speed:20},{type:'call',name:'outer',args:[]},{type:'waitSeconds',seconds:.5},{type:'stop'}],procedures:[{name:'outer',params:[],body:[{type:'call',name:'inner',args:[]},{type:'tone',frequency:880,ms:100,volume:25}]},{name:'inner',params:[],body:[{type:'repeat',count:10,body:[{type:'myblockReturn'},{type:'tone',frequency:440,ms:100,volume:25}]}]}]};
+ const driver=new SimulatedMotors(),events=interpret(compile(p).data,{motorDriver:driver});assert.deepEqual(events.filter(x=>x.type==='tone').map(x=>x.frequency),[880]);assert.equal(driver.position[1],100);assert.equal(driver.aborted,undefined);
+ assert.throws(()=>compile({main:[{type:'myblockReturn'}],procedures:[]}),/定義の中/);
+ // Early return paths must not borrow variable assignments from later code.
+ const branch={main:[{type:'set',var:'speed',value:200},{type:'call',name:'setup',args:[]},{type:'motorRun',ports:2,speed:{var:'speed'}}],procedures:[{name:'setup',params:[],body:[{type:'if',condition:{button:{id:4}},then:[{type:'myblockReturn'}],else:[]},{type:'set',var:'speed',value:20}]}]};
+ for(const pressed of [false,true]){const driver=new SimulatedMotors();interpret(compile(branch).data,{motorDriver:driver,buttonRead:()=>pressed});assert.equal(driver.aborted,pressed?true:undefined);}
+});
 test('constants use signed EV3 primitive encodings',()=>{
   for(const [value,bytes] of [[0,[0]],[-1,[63]],[31,[31]],[-32,[32]],[32,[129,32]],[-100,[129,156]],[440,[130,184,1]],[-32769,[131,255,127,255,255]]])assert.deepEqual(constant(value),bytes);
   assert.deepEqual(local(0),[64]);assert.deepEqual(local(32),[193,32]);assert.deepEqual(local(128),[194,128,0]);assert.deepEqual(local(32768),[195,0,128,0,0]);assert.throws(()=>constant(1.5));

@@ -38,7 +38,7 @@ function unaryValue(fn,n){
  return finiteNumber(Math.fround(({abs:Math.abs,floor:Math.floor,ceil:Math.ceil,sqrt:Math.sqrt,sin:()=>Math.sin(rad),cos:()=>Math.cos(rad),tan:()=>Math.tan(rad),asin:x=>Math.asin(x)*180/Math.PI,acos:x=>Math.acos(x)*180/Math.PI,atan:x=>Math.atan(x)*180/Math.PI,ln:Math.log,log:Math.log10,exp:Math.exp,pow10:x=>10**x})[fn](n)));
 }
 function floatingConstant(n){const bytes=new Uint8Array(4);new DataView(bytes.buffer).setFloat32(0,finiteNumber(Math.fround(n)),true);return [0x83,...bytes];}
-const GLOBALS=Symbol('globals'),GEOMETRY=Symbol('geometry');
+const GLOBALS=Symbol('globals'),GEOMETRY=Symbol('geometry'),RETURNS=Symbol('return states');
 const arithmetic={add:(a,b)=>a+b,sub:(a,b)=>a-b,mul:(a,b)=>a*b,div:(a,b)=>{if(b===0)throw Error('0では割れません。');return Math.trunc(a/b);},eq:(a,b)=>+(a===b),neq:(a,b)=>+(a!==b),lt:(a,b)=>+(a<b),lte:(a,b)=>+(a<=b),gt:(a,b)=>+(a>b),gte:(a,b)=>+(a>=b),and:(a,b)=>+(!!a&&!!b),or:(a,b)=>+(!!a||!!b)};
 function buttonConfiguration(button){
   if(!button || ![1,2,3,4,5,7].includes(button.id))throw Error('本体ボタンを選んでください。');
@@ -124,17 +124,20 @@ export function validate(program) {
         case 'wheel':if(!Number.isFinite(b.diameter)||b.diameter<10||b.diameter>200)throw Error('タイヤの直径は10〜200 mmにしてください。');geometry.diameter10=Math.round(b.diameter*10);break;
         case 'tread':if(!Number.isFinite(b.mm)||b.mm<10||b.mm>1000)throw Error('トレッドは10〜1000 mmにしてください。');geometry.tread10=Math.round(b.mm*10);break;
         case 'set':case 'change':{const a=val('value'),previous=b.type==='change'?(globals.get(b.var)??0):0,n=a===UNKNOWN||previous===UNKNOWN?UNKNOWN:a+previous;if(floatingMode){finiteNumber(n,'変数の値');globals.set(b.var,n===UNKNOWN?n:Math.fround(n));}else{inRange(n,-2147483648,2147483647,'変数の値');globals.set(b.var,n);}break;}
-        case 'if':{const condition=val('condition');if(condition!==UNKNOWN){walk(condition?b.then:b.else,env,stack);break;}
-          const before=new Map(globals),settings={...geometry};walk(b.then,env,stack);const yes=new Map(globals),yesSettings={...geometry};globals.clear();for(const [k,v]of before)globals.set(k,v);Object.assign(geometry,settings);walk(b.else,env,stack);
+        case 'if':{const condition=val('condition');if(condition!==UNKNOWN){const exit=walk(condition?b.then:b.else,env,stack);if(exit)return exit;break;}
+          const before=new Map(globals),settings={...geometry};const yesExit=walk(b.then,env,stack);const yes=new Map(globals),yesSettings={...geometry};globals.clear();for(const [k,v]of before)globals.set(k,v);Object.assign(geometry,settings);const noExit=walk(b.else,env,stack);
+          if(yesExit&&noExit)return yesExit===noExit?yesExit:'myblockReturn';
+          if(yesExit)break;
+          if(noExit){globals.clear();for(const [k,v]of yes)globals.set(k,v);Object.assign(geometry,yesSettings);break;}
           for(const k of new Set([...yes.keys(),...globals.keys()]))if((yes.get(k)??0)!==(globals.get(k)??0))globals.set(k,UNKNOWN);
           for(const k of Object.keys(geometry))if(geometry[k]!==yesSettings[k])geometry[k]=0;break;}
         case 'forever':{
           // Inspect one conservative iteration; changing globals can have any
           // value on later iterations. Runtime operand guards enforce limits.
           const assignments=x=>{if(x&&typeof x==='object'){if(x.type==='set'||x.type==='change')globals.set(x.var,UNKNOWN);for(const value of Object.values(x))assignments(value);}};
-          assignments(program);for(const key of globals.keys())globals.set(key,UNKNOWN);walk(b.body,env,stack);return;
+          assignments(program);for(const key of globals.keys())globals.set(key,UNKNOWN);return walk(b.body,env,stack);
         }
-        case 'while':{let count=0;while(true){const condition=val('condition');if(condition===UNKNOWN){for(const k of globals.keys())globals.set(k,UNKNOWN);const before={...geometry};walk(b.body,env,stack);for(const k of Object.keys(geometry))if(before[k]!==geometry[k])geometry[k]=0;for(const k of globals.keys())globals.set(k,UNKNOWN);break;}if(!!condition===!!b.until)break;if(++count>1000)throw Error('条件付き繰り返しは1000回以内に終わるようにしてください。変数の更新と条件を確認してください。');walk(b.body,env,stack);}break;}
+        case 'while':{let count=0;while(true){const condition=val('condition');if(condition===UNKNOWN){for(const k of globals.keys())globals.set(k,UNKNOWN);const before={...geometry};walk(b.body,env,stack);for(const k of Object.keys(geometry))if(before[k]!==geometry[k])geometry[k]=0;for(const k of globals.keys())globals.set(k,UNKNOWN);break;}if(!!condition===!!b.until)break;if(++count>1000)throw Error('条件付き繰り返しは1000回以内に終わるようにしてください。変数の更新と条件を確認してください。');const exit=walk(b.body,env,stack);if(exit)return exit;}break;}
         case 'tank':if(![1,2,4,8].includes(b.leftPort)||![1,2,4,8].includes(b.rightPort)||b.leftPort===b.rightPort)throw Error('左右には異なるモーターポートを選んでください。');inRange(val('leftSpeed'),-100,100,'左モーターの速さ');inRange(val('rightSpeed'),-100,100,'右モーターの速さ');break;
         case 'motorRun':inRange(b.ports,1,15,'モーターポート');if(b.ports.toString(2).split('1').length-1>2)throw Error('モーターポートは2個まで指定できます。');inRange(val('speed'),-100,100,'速度');break;
         case 'motor': inRange(b.ports,1,15,'モーターポート'); inRange(val('speed'),-100,100,'速度');
@@ -152,14 +155,21 @@ export function validate(program) {
         case 'motorTimed': inRange(b.ports,1,15,'モーターポート');if(b.ports.toString(2).split('1').length-1>2)throw Error('モーターポートは2個まで指定できます。');inRange(val('speed'),-100,100,'モーターの速さ');if(val('speed')===0)throw Error('モーターの速さは0以外にしてください。');{const seconds=val('seconds');if(seconds!==UNKNOWN&&(!Number.isFinite(seconds)||seconds<=0||seconds>60))throw Error('モーターの時間は0より大きく60秒以下にしてください。');} break;
         case 'timerReset':break;
         case 'encoderReset':inRange(b.port,1,4,'リセットするモーターポート');break;
+        case 'programEnd':return 'programEnd';
+        case 'myblockReturn':if(!stack.length)throw Error('マイブロックの終了は定義の中だけで使えます。');env[RETURNS].push({globals:new Map(globals),geometry:{...geometry}});return 'myblockReturn';
         case 'stop': if(b.ports!==undefined)inRange(b.ports,1,15,'停止するモーターポート');break;
-        case 'repeat': {const n=val('count'); inRange(n,0,1000,'繰り返し回数'); if(n===UNKNOWN){for(const k of globals.keys())globals.set(k,UNKNOWN);const before={...geometry};walk(b.body,env,stack);for(const k of Object.keys(geometry))if(before[k]!==geometry[k])geometry[k]=0;for(const k of globals.keys())globals.set(k,UNKNOWN);}else for(let i=0;i<n;i++)walk(b.body,env,stack); break;}
+        case 'repeat': {const n=val('count'); inRange(n,0,1000,'繰り返し回数'); if(n===UNKNOWN){for(const k of globals.keys())globals.set(k,UNKNOWN);const before={...geometry};walk(b.body,env,stack);for(const k of Object.keys(geometry))if(before[k]!==geometry[k])geometry[k]=0;for(const k of globals.keys())globals.set(k,UNKNOWN);}else for(let i=0;i<n;i++){const exit=walk(b.body,env,stack);if(exit)return exit;} break;}
         case 'call': {
           const p=map.get(b.name); if(!p)throw Error(`マイブロック「${b.name}」の定義がありません。`);
           if(stack.includes(p.name))throw Error('試作版ではマイブロックの再帰呼び出しは使えません。');
           if(b.args.length!==p.params.length)throw Error(`「${p.name}」の引数の数が一致しません。`);
           const args=b.args.map(x=>evaluate(x,env)); args.forEach(n=>floatingMode?finiteNumber(n,'引数'):inRange(n,-2147483648,2147483647,'引数'));
-          const next=Object.fromEntries(p.params.map((n,i)=>[n,args[i]]));next[GLOBALS]=globals;next[GEOMETRY]=geometry;next[FLOATS]=floatingMode;walk(p.body,next,[...stack,p.name]); break;
+          const next=Object.fromEntries(p.params.map((n,i)=>[n,args[i]]));next[GLOBALS]=globals;next[GEOMETRY]=geometry;next[FLOATS]=floatingMode;next[RETURNS]=[];const exit=walk(p.body,next,[...stack,p.name]);if(exit==='programEnd')return exit;
+          // Merge every early return with the fall-through state. A branch
+          // that returned did not execute the remainder of this definition.
+          const states=next[RETURNS];if(exit!=='myblockReturn')states.push({globals:new Map(globals),geometry:{...geometry}});
+          if(states.length){globals.clear();for(const state of states)for(const k of state.globals.keys())globals.set(k,0);for(const k of globals.keys()){const value=states[0].globals.get(k)??0;globals.set(k,states.every(s=>(s.globals.get(k)??0)===value)?value:UNKNOWN);}for(const k of Object.keys(geometry)){const value=states[0].geometry[k];geometry[k]=states.every(s=>s.geometry[k]===value)?value:0;}}
+          break;
         }
         default: throw Error(`未対応のブロック: ${b.type}`);
       }
@@ -539,6 +549,8 @@ export function compile(program,folder='EV3Lab') {
           case 'wait': emit(OP.WAIT,expr(b.ms),local(timer)); emit(OP.READY,local(timer)); break;
           case 'timerReset':emit(OP.TIMER_READ,globalVar(timerOffset));break;
           case 'encoderReset':integerExpr({sensor:{kind:'encoder',port:b.port}});emit(OP.MOTOR_CLEAR_COUNT,constant(0),constant(1<<(b.port-1)));break;
+          case 'programEnd':emit(OP.STOP,constant(0),constant(15),constant(1));emit(OP.PROGRAM_STOP,constant(-1));return;
+          case 'myblockReturn':if(!index)throw Error('マイブロックの終了は定義の中だけで使えます。');emit(OP.RETURN);return;
           case 'stop': emit(OP.STOP,constant(0),constant(b.ports??15),constant(1)); break;
           case 'call': {const id=ids.get(b.name); if(!id)throw Error(`「${b.name}」の定義がありません。`); emit(OP.CALL,constant(id),constant(b.args.length),...b.args.map(usesFloat?floatExpr:expr)); break;}
           case 'repeat': {

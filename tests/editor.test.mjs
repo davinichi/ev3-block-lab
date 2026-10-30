@@ -40,6 +40,15 @@ test('brick button palette and saved definitions retain selected buttons and rel
  compile(result.program);
 });
 
+test('control exit blocks are caps, retain saved behavior and reject My Block return in main',()=>{
+ const context=editor();
+ const result=JSON.parse(vm.runInContext(`
+ Blockly.Events.disable();const start=workspace.newBlock('ev3_start'),end=workspace.newBlock('ev3_program_end'),ret=workspace.newBlock('ev3_myblock_return');start.nextConnection.connect(end.previousConnection);const def=saveMyBlock(workspace,'途中で戻る',[]);def.getInput('STACK').connection.connect(ret.previousConnection);const caps=!end.nextConnection&&!ret.nextConnection;
+ const saved=Blockly.serialization.workspaces.save(workspace);Blockly.serialization.workspaces.load(saved,workspace);const first=program();const restored=workspace.getAllBlocks(false).find(b=>b.type==='ev3_myblock_return');const returned=chain(restored);
+ restored.previousConnection.disconnect();workspace.getAllBlocks(false).find(b=>b.type==='ev3_program_end').dispose();workspace.getAllBlocks(false).find(b=>b.type==='ev3_start').nextConnection.connect(restored.previousConnection);let error='';try{program();}catch(e){error=e.message;}Blockly.Events.enable();JSON.stringify({caps,first,returned,error,types:toolbox.contents.find(c=>c.name==='制御').contents.map(x=>x.type)});`,context));
+ assert.equal(result.caps,true);assert.deepEqual(result.first.main,[{type:'programEnd'}]);assert.deepEqual(result.returned,[{type:'myblockReturn'}]);assert.match(result.error,/定義の中/);assert.ok(result.types.includes('ev3_program_end'));assert.ok(result.types.includes('ev3_myblock_return'));compile(result.first);
+});
+
 test('program names determine saved filenames and preserve EV3 destinations across legacy load, save and reload',()=>{
  const context=editor();context.programFileName=programFileName;context.inspectBlocks=()=>{};
  vm.runInContext(`let loading=false,dirty=true;function check(){};const downloads=[];let error='';function download(data,name,type){downloads.push({data:JSON.parse(data),name,type});}function feedback(message){error=message;}let focused=false;$('programName').focus=()=>focused=true;`,context);
