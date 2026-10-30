@@ -93,3 +93,11 @@ test('tank control emits one combined start after both speed settings and keeps 
  const p={main:[{type:'tank',leftPort:2,rightPort:4,leftSpeed:50,rightSpeed:-25},{type:'waitSeconds',seconds:1}],procedures:[]};
  const instructions=scanImage(compile(p).data),start=instructions.filter(x=>x.op===0xa6),speeds=instructions.filter(x=>x.op===0xa5);assert.equal(start.length,1);assert.equal(speeds.length,2);assert.ok(speeds.every(x=>x.at<start[0].at));
 });
+
+
+test('timer reads, resets and shared My Block clocks retain native boundaries with geometry and ramps',()=>{
+ for(const settings of [[],[{type:'wheel',diameter:56},{type:'tread',mm:112},{type:'ramp',mode:'scurve',upSeconds:.5,downSeconds:.5}]]){
+  const p={main:[...settings,{type:'timerReset'},{type:'call',name:'time',args:[]}],procedures:[{name:'time',params:[],body:[{type:'set',var:'seconds',value:{timer:true}},{type:'while',until:true,condition:{op:'gt',left:{timer:true},right:.5},body:[]},{type:'timerReset'}]}]};
+  const instructions=scanImage(compile(p).data);assert.equal(instructions.filter(x=>x.op===0x0a).length,2);assert.ok(instructions.filter(x=>x.op===0x87).length>=4);assert.ok(instructions.some(x=>x.op===0x1f));
+ }
+});

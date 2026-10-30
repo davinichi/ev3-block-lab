@@ -1,7 +1,7 @@
 import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.js'; import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from './library.js';
 const $=id=>document.getElementById(id);
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.11.1';
+const VERSION='0.12.0';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -82,6 +82,8 @@ Blockly.defineBlocksWithJsonArray([
 const irChannel=()=>({type:'field_dropdown',name:'CHANNEL',options:[['1','1'],['2','2'],['3','3'],['4','4']]});
 const irButtons=[['押されていない','0'],['左上','1'],['左下','2'],['右上','3'],['右下','4'],['左上＋右上','5'],['左上＋右下','6'],['左下＋右上','7'],['左下＋右下','8'],['ビーコン','9'],['左上＋左下','10'],['右上＋右下','11']];
 Blockly.defineBlocksWithJsonArray([
+ {type:'ev3_timer',message0:'タイマー（秒）',output:'Number',colour:'#34ccf1',tooltip:'プログラム開始または最後のリセットからの経過秒数。0.5秒などの小数で取得します。すべてのマイブロックで同じタイマーを使います。'},
+ {type:'ev3_timer_reset',message0:'タイマーをリセット',previousStatement:null,nextStatement:null,colour:'#34ccf1',tooltip:'タイマーを0秒に戻します。モーターや待ち時間の制御は変更しません。'},
  {type:'ev3_encoder_reset',message0:'モーター %1 の回転角度を0にする',args0:[{type:'field_dropdown',name:'PORT',options:singlePorts.map(([label],i)=>[label,String(i+1)])}],previousStatement:null,nextStatement:null,colour:'#34ccf1',tooltip:'L・M共通。選んだポートのエンコーダだけを0に戻します。ほかのポートの角度や、回転・停止の状態は変えません。'},
  {type:'ev3_encoder',message0:'モーター %1 の回転角度（度）',args0:[{type:'field_dropdown',name:'PORT',options:singlePorts.map(([label],i)=>[label,String(i+1)])}],output:'Number',colour:'#34ccf1',tooltip:'L・M共通のエンコーダ値。符号付きの累積角度で、0〜359には折り返しません。読み取りでリセットはしません。開始値を変数に記録し、現在値から引くと今回の回転量になります。'},
  {type:'ev3_touch',message0:'タッチセンサ %1 が %2',args0:[sensorPort(),{type:'field_dropdown',name:'STATE',options:[['押された','1'],['離された','0']]}],output:'Boolean',inputsInline:true,colour:'#34ccf1',tooltip:'EV3タッチセンサの現在の状態を判定します。押した瞬間を記憶する機能ではありません。'},
@@ -153,7 +155,7 @@ const toolbox={kind:'categoryToolbox',contents:[
  {kind:'category',name:'スタート',colour:'#d3a238',contents:[{kind:'block',type:'ev3_start'}]},
  {kind:'category',name:'モーター',colour:'#0090f5',contents:classroomMotorToolbox()},
  {kind:'category',name:'動き',colour:'#ff4ccd',contents:[{kind:'block',type:'ev3_wheel'},{kind:'block',type:'ev3_tread'},{kind:'block',type:'ev3_tank',inputs:{LEFT_SPEED:shadow(20),RIGHT_SPEED:shadow(20)}},{kind:'block',type:'ev3_spin_right',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_spin_left',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_pivot_right',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_pivot_left',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_drive_forward',inputs:{SPEED:shadow(20),CM:shadow(20)}},{kind:'block',type:'ev3_drive_backward',inputs:{SPEED:shadow(20),CM:shadow(20)}}]},
- {kind:'category',name:'センサー',colour:'#34ccf1',contents:[{kind:'label',text:'モーターのエンコーダ'},{kind:'block',type:'ev3_encoder'},{kind:'block',type:'ev3_encoder_reset'},{kind:'label',text:'EV3 タッチセンサ'},{kind:'block',type:'ev3_touch'},{kind:'block',type:'ev3_touch_value'},{kind:'label',text:'EV3 赤外線センサ'},{kind:'block',type:'ev3_ir_proximity'},{kind:'block',type:'ev3_ir_compare',inputs:{VALUE:shadow(20)}},{kind:'block',type:'ev3_ir_button'},{kind:'block',type:'ev3_ir_remote'},{kind:'block',type:'ev3_ir_beacon_detected'},{kind:'block',type:'ev3_ir_beacon_heading'},{kind:'block',type:'ev3_ir_beacon_distance'},{kind:'label',text:'EV3 カラーセンサ'},{kind:'block',type:'ev3_color_is'},{kind:'block',type:'ev3_color_value'},{kind:'block',type:'ev3_reflected_compare',inputs:{VALUE:shadow(50)}},{kind:'block',type:'ev3_reflected'},{kind:'label',text:'EV3 超音波センサ'},{kind:'block',type:'ev3_distance_compare',inputs:{VALUE:shadow(15)}},{kind:'block',type:'ev3_distance'}]},
+ {kind:'category',name:'センサー',colour:'#34ccf1',contents:[{kind:'label',text:'タイマー'},{kind:'block',type:'ev3_timer'},{kind:'block',type:'ev3_timer_reset'},{kind:'label',text:'モーターのエンコーダ'},{kind:'block',type:'ev3_encoder'},{kind:'block',type:'ev3_encoder_reset'},{kind:'label',text:'EV3 タッチセンサ'},{kind:'block',type:'ev3_touch'},{kind:'block',type:'ev3_touch_value'},{kind:'label',text:'EV3 赤外線センサ'},{kind:'block',type:'ev3_ir_proximity'},{kind:'block',type:'ev3_ir_compare',inputs:{VALUE:shadow(20)}},{kind:'block',type:'ev3_ir_button'},{kind:'block',type:'ev3_ir_remote'},{kind:'block',type:'ev3_ir_beacon_detected'},{kind:'block',type:'ev3_ir_beacon_heading'},{kind:'block',type:'ev3_ir_beacon_distance'},{kind:'label',text:'EV3 カラーセンサ'},{kind:'block',type:'ev3_color_is'},{kind:'block',type:'ev3_color_value'},{kind:'block',type:'ev3_reflected_compare',inputs:{VALUE:shadow(50)}},{kind:'block',type:'ev3_reflected'},{kind:'label',text:'EV3 超音波センサ'},{kind:'block',type:'ev3_distance_compare',inputs:{VALUE:shadow(15)}},{kind:'block',type:'ev3_distance'}]},
  {kind:'category',name:'音',colour:'#a570b3',contents:[{kind:'block',type:'ev3_tone',inputs:{FREQUENCY:shadow(440),MS:shadow(200)}}]},
  {kind:'category',name:'制御',colour:controlColour,contents:[{kind:'block',type:'ev3_wait_seconds',inputs:{SECONDS:shadow(1)}},{kind:'block',type:'controls_if'},{kind:'block',type:'controls_if',extraState:{hasElse:true}},{kind:'block',type:'ev3_forever'},{kind:'block',type:'controls_repeat_ext',inputs:{TIMES:shadow(10)}},{kind:'block',type:'controls_whileUntil',fields:{MODE:'UNTIL'}},{kind:'block',type:'controls_whileUntil',fields:{MODE:'WHILE'}},{kind:'block',type:'ev3_wait_until'}]},
  {kind:'category',name:'演算',colour:operatorColour,contents:[num(0),...['add','sub','mul','div'].map(op=>({kind:'block',type:'ev3_op_'+op,inputs:{A:shadow(1),B:shadow(1)}})),{kind:'block',type:'ev3_math_function',inputs:{VALUE:shadow(1)}},...['lt','eq','gt','lte','gte','neq'].map(op=>({kind:'block',type:'ev3_op_'+op,inputs:{A:shadow(0),B:shadow(100)}})),...['and','or'].map(op=>({kind:'block',type:'ev3_op_'+op})),{kind:'block',type:'logic_negate'},{kind:'block',type:'logic_boolean'}]},
@@ -329,6 +331,7 @@ function expression(x){
    return root.type==='procedures_defnoreturn' && root.getVarModels().some(m=>m.getId()===model.getId())?{param:model.name}:{var:model.name};
  }
 
+ if(x.type==='ev3_timer')return {timer:true};
  if(x.type==='ev3_encoder')return {sensor:{kind:'encoder',port:Number(x.getFieldValue('PORT'))}};
  if(['ev3_touch','ev3_touch_value'].includes(x.type)){const reading={sensor:{kind:'touch',port:Number(x.getFieldValue('PORT'))}};return x.type==='ev3_touch'?{op:'eq',left:reading,right:Number(x.getFieldValue('STATE'))}:reading;}
  const infraredKinds={ev3_ir_proximity:'infrared',ev3_ir_compare:'infrared',ev3_ir_remote:'irRemote',ev3_ir_button:'irRemote',ev3_ir_beacon_detected:'irBeaconDetected',ev3_ir_beacon_heading:'irBeaconHeading',ev3_ir_beacon_distance:'irBeaconDistance'};
@@ -385,6 +388,7 @@ function chain(block){
       case 'ev3_drive_forward':case 'ev3_drive_backward':out.push({type:'drive',ports:Number(b.getFieldValue('PORTS')),speed:value(b,'SPEED'),cm:value(b,'CM'),direction:b.type==='ev3_drive_forward'?'forward':'backward',mode:$('pairMode').value});break;
       case 'ev3_tone':out.push({type:'tone',frequency:value(b,'FREQUENCY'),ms:value(b,'MS'),volume:Number(b.getFieldValue('VOLUME'))});break;
       case 'ev3_wait':out.push({type:'wait',ms:value(b,'MS')});break;
+      case 'ev3_timer_reset':out.push({type:'timerReset'});break;
       case 'ev3_encoder_reset':out.push({type:'encoderReset',port:Number(b.getFieldValue('PORT'))});break;
       case 'ev3_stop_port':out.push({type:'stop',ports:Number(b.getFieldValue('PORTS'))});break;
       case 'ev3_stop':out.push({type:'stop'});break;

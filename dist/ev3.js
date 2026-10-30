@@ -26,7 +26,7 @@ const UNKNOWN=Symbol('runtime sensor value');
 const inRange = (v,a,b,label) => {if(v===UNKNOWN)return;if (!Number.isInteger(v) || v<a || v>b) throw Error(`${label}は ${a}〜${b} の整数にしてください。`);};
 const FLOATS=Symbol('floating-point expressions'),MAX_FLOAT=3.4028234663852886e38;
 const unaryCodes={abs:6,floor:3,ceil:4,sqrt:8,sin:11,cos:12,tan:13,asin:14,acos:15,atan:16,ln:10,log:9,exp:1,pow10:20};
-function hasUnary(x){return !!(x&&typeof x==='object'&&(x.math||Object.values(x).some(hasUnary)));}
+function hasUnary(x){return !!(x&&typeof x==='object'&&(x.math||x.timer===true||Object.values(x).some(hasUnary)));}
 function finiteNumber(n,label='計算結果'){if(n!==UNKNOWN&&(!Number.isFinite(n)||Math.abs(n)>MAX_FLOAT))throw Error(label+'が計算できる範囲を超えています。');return n;}
 function unaryValue(fn,n){
  if(!Object.hasOwn(unaryCodes,fn))throw Error('未対応の数値関数です。');if(n===UNKNOWN)return UNKNOWN;
@@ -52,6 +52,7 @@ function sensorConfiguration(sensor){
 function evaluate(x, env) {
   if (typeof x==='number') {if(!Number.isFinite(x))throw Error('数値を確認してください。');return env[FLOATS]?finiteNumber(Math.fround(x)):x;}
   if(x?.math)return unaryValue(x.math.fn,evaluate(x.math.value,env));
+  if(x?.timer!==undefined){if(x.timer!==true)throw Error('タイマーの指定が不正です。');return UNKNOWN;}
   if(x?.sensor){sensorConfiguration(x.sensor);return UNKNOWN;}
   if(x?.geometry){
     const geometry=env[GEOMETRY],diameter=geometry?.diameter10;
@@ -144,6 +145,7 @@ export function validate(program) {
         case 'tone': inRange(val('frequency'),250,10000,'周波数'); inRange(val('ms'),1,30000,'音の長さ'); inRange(b.volume,0,100,'音量'); break;
         case 'wait': if(b.secondsSource!==undefined){const seconds=evaluate(b.secondsSource,env);if(seconds!==UNKNOWN&&(!Number.isFinite(seconds)||seconds<0||seconds>60))throw Error('待ち時間は0〜60秒にしてください。');} inRange(val('ms'),0,60000,'待ち時間'); break;
         case 'motorTimed': inRange(b.ports,1,15,'モーターポート');if(b.ports.toString(2).split('1').length-1>2)throw Error('モーターポートは2個まで指定できます。');inRange(val('speed'),-100,100,'モーターの速さ');if(val('speed')===0)throw Error('モーターの速さは0以外にしてください。');{const seconds=val('seconds');if(seconds!==UNKNOWN&&(!Number.isFinite(seconds)||seconds<=0||seconds>60))throw Error('モーターの時間は0より大きく60秒以下にしてください。');} break;
+        case 'timerReset':break;
         case 'encoderReset':inRange(b.port,1,4,'リセットするモーターポート');break;
         case 'stop': if(b.ports!==undefined)inRange(b.ports,1,15,'停止するモーターポート');break;
         case 'repeat': {const n=val('count'); inRange(n,0,1000,'繰り返し回数'); if(n===UNKNOWN){for(const k of globals.keys())globals.set(k,UNKNOWN);const before={...geometry};walk(b.body,env,stack);for(const k of Object.keys(geometry))if(before[k]!==geometry[k])geometry[k]=0;for(const k of globals.keys())globals.set(k,UNKNOWN);}else for(let i=0;i<n;i++)walk(b.body,env,stack); break;}
@@ -165,11 +167,12 @@ export function compile(program,folder='EV3Lab') {
   const directory=projectDirectory(folder),usesFloat=hasUnary(program);
   program=prepareProgram(program);
   validate(program);
-  const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false;
-  const collect=x=>{if(x&&typeof x==='object'){if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
+  const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false,usesTimer=false;
+  const collect=x=>{if(x&&typeof x==='object'){if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
   collect(program);if(variableNames.size>32)throw Error('変数は32個までです。');
   const globalOffsets=new Map([...variableNames].map((name,i)=>[name,i*4]));
   const diameterOffset=globalOffsets.size*4,treadOffset=diameterOffset+4,rampOffset=diameterOffset+(usesGeometry?8:0);
+  const timerOffset=rampOffset+(usesRamps?12:0);
   // Bind a diagnostic record to this compiler revision and exact project.
   let diagnosticTag=0x811c9dc5;
   for(const ch of new TextEncoder().encode('timing-v1-0.1.6|'+JSON.stringify(program)))diagnosticTag=Math.imul(diagnosticTag^ch,0x01000193);
@@ -255,6 +258,7 @@ export function compile(program,folder='EV3Lab') {
     const asFloat=value=>{const result=local(alloc());emit(0x3b,value,result);return result;};
     const floatExpr=x=>{
       if(typeof x==='number')return floatingConstant(x);
+      if(x?.timer===true){const elapsed=local(alloc()),seconds=local(alloc());emit(OP.TIMER_READ,elapsed);emit(OP.SUB32,elapsed,globalVar(timerOffset),elapsed);emit(0x1f,asFloat(elapsed),floatingConstant(1000),seconds);return seconds;}
       if(x?.var!==undefined)return globalVar(globalOffsets.get(x.var));
       if(x?.param!==undefined){const i=p.params.indexOf(x.param);if(i<0)throw Error('引数の定義を確認してください。');return local(i*4);}
       if(x?.math){
@@ -517,6 +521,7 @@ export function compile(program,folder='EV3Lab') {
             emit(OP.MOTOR_READY,constant(0),constant(b.ports));if(done!==undefined)patch(done,code.length);break;}
           case 'tone': emit(OP.SOUND,constant(1),constant(b.volume),expr(b.frequency),expr(b.ms)); emit(OP.SOUND_READY); break;
           case 'wait': emit(OP.WAIT,expr(b.ms),local(timer)); emit(OP.READY,local(timer)); break;
+          case 'timerReset':emit(OP.TIMER_READ,globalVar(timerOffset));break;
           case 'encoderReset':integerExpr({sensor:{kind:'encoder',port:b.port}});emit(OP.MOTOR_CLEAR_COUNT,constant(0),constant(1<<(b.port-1)));break;
           case 'stop': emit(OP.STOP,constant(0),constant(b.ports??15),constant(1)); break;
           case 'call': {const id=ids.get(b.name); if(!id)throw Error(`「${b.name}」の定義がありません。`); emit(OP.CALL,constant(id),constant(b.args.length),...b.args.map(usesFloat?floatExpr:expr)); break;}
@@ -532,6 +537,7 @@ export function compile(program,folder='EV3Lab') {
     };
     if(index===0){for(const at of globalOffsets.values())emit(OP.MOVE32,constant(0),globalVar(at));if(usesGeometry)for(const at of [diameterOffset,treadOffset])emit(OP.MOVE32,constant(0),globalVar(at));}
     if(index===0&&usesRamps)for(const at of [rampOffset,rampOffset+4,rampOffset+8])emit(OP.MOVE32,constant(0),globalVar(at));
+    if(index===0&&usesTimer)emit(OP.MOVE32,constant(0),globalVar(timerOffset));
     sequence(p.body);
     if(index)emit(OP.RETURN);else emit(OP.STOP,constant(0),constant(15),constant(1));
     // Firmware validation scans each object sequentially up to its first END.
@@ -544,8 +550,8 @@ export function compile(program,folder='EV3Lab') {
   const headers=[];
   for(const o of objects) {o.offset=offset; headers.push(...u32(offset),...u16(0),...u16(o.trigger),...u32(o.localBytes)); offset+=o.code.length;}
   if(offset>65536)throw Error('プログラムが大きすぎます（上限64KB）。');
-  const data=new Uint8Array([76,69,71,79,...u32(offset),...u16(104),...u16(objects.length),...u32(globalOffsets.size*4+(usesGeometry?8:0)+(usesRamps?12:0)),...headers,...objects.flatMap(o=>o.code)]);
-  return {data,objects,program,usesSensors,usesFloat,usesRamps,diagnosticTag,diagnosticPath:recordsTiming&&!usesRamps?diagnosticPath:null};
+  const data=new Uint8Array([76,69,71,79,...u32(offset),...u16(104),...u16(objects.length),...u32(globalOffsets.size*4+(usesGeometry?8:0)+(usesRamps?12:0)+(usesTimer?4:0)),...headers,...objects.flatMap(o=>o.code)]);
+  return {data,objects,program,usesSensors,usesFloat,usesRamps,usesTimer,diagnosticTag,diagnosticPath:recordsTiming&&!usesRamps?diagnosticPath:null};
 }
 
 export function decodeTimingRecord(data,expectedTag){

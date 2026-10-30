@@ -815,3 +815,21 @@ test('tank speeds can be sensor expressions or My Block arguments and invalid ri
 test('tank control rejects invalid speed ranges and duplicate or non-single ports',()=>{
  for(const block of [tank(101,0),tank(0,-101),tank(.5,20),tank(20,20,2,2),tank(20,20,3,4),tank(20,20,1,0)])assert.throws(()=>compile({main:[block],procedures:[]}));
 });
+
+
+const timerSeconds={timer:true};
+const timerTone=value=>({type:'tone',frequency:{op:'add',left:250,right:{op:'mul',left:value,right:1000}},ms:100,volume:25});
+test('standalone timer reads fractional seconds from program start and shares resets and arguments across My Blocks',()=>{
+ const p={main:[{type:'wait',ms:750},timerTone(timerSeconds),{type:'call',name:'reset',args:[]},{type:'wait',ms:250},{type:'call',name:'report',args:[timerSeconds]},{type:'wait',ms:250},timerTone(timerSeconds)],procedures:[{name:'reset',params:[],body:[{type:'timerReset'}]},{name:'report',params:['elapsed'],body:[timerTone({param:'elapsed'})]}]};
+ const build=compile(p);assert.equal(build.usesTimer,true);assert.equal(build.usesFloat,true);
+ for(let run=0;run<2;run++){const driver=new SimulatedMotors(),events=interpret(build.data,{motorDriver:driver,sensorRead:()=>{throw Error('Timer must not read a hardware port');}});assert.deepEqual(events.filter(x=>x.type==='tone').map(x=>x.frequency),[1000,500,750]);assert.equal(driver.time,1250);assert.equal(driver.aborted,undefined);}
+});
+test('timer condition waits on the brick while paired motors run, then stops both without PC polling',()=>{
+ const driver=new SimulatedMotors([1,1,1,1]);const p={main:[{type:'timerReset'},{type:'motorRun',ports:6,speed:20},{type:'while',until:true,condition:{op:'gte',left:timerSeconds,right:.15},body:[]},{type:'stop'}],procedures:[]};
+ interpret(compile(p).data,{motorDriver:driver});assert.equal(driver.time,160);assert.deepEqual(driver.position,[0,32,32,0]);assert.equal(driver.busy(15),false);assert.equal(driver.aborted,undefined);
+});
+test('timer global does not overwrite variables, wheel geometry or acceleration settings',()=>{
+ const driver=new SimulatedMotors([1,1,1,1]);const p={main:[{type:'wheel',diameter:56},{type:'tread',mm:112},{type:'ramp',mode:'off',upSeconds:.5,downSeconds:.5},{type:'set',var:'n',value:1},{type:'timerReset'},{type:'wait',ms:250},timerTone(timerSeconds),{type:'drive',ports:6,speed:20,cm:10,direction:'forward',mode:'independent'},timerTone({var:'n'})],procedures:[]};
+ const events=interpret(compile(p).data,{motorDriver:driver});assert.deepEqual(events.filter(x=>x.type==='tone').map(x=>x.frequency),[500,1250]);assert.equal(Math.round(driver.position[1]),205);assert.equal(Math.round(driver.position[2]),205);assert.equal(driver.aborted,undefined);
+ assert.throws(()=>compile({main:[timerTone({timer:false})],procedures:[]}),/タイマー/);
+});
