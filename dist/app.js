@@ -1,7 +1,7 @@
 import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.js'; import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from './library.js'; import {sensorReading} from './sensor-monitor.js';
 const $=id=>document.getElementById(id);
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.13.2';
+const VERSION='0.14.0';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -164,6 +164,10 @@ const toolbox={kind:'categoryToolbox',contents:[
  {kind:'category',name:'引数',colour:'#668b6d',custom:'ARGUMENTS'}
 ]};
 
+function argumentModel(block){
+ const root=block.getRootBlock();if(root.type!=='procedures_defnoreturn')return null;
+ const models=root.getVarModels();return models.find(m=>m.getId()===block.parameterId)??models.find(m=>m.getName()===block.getFieldValue('ARG_NAME'))??null;
+}
 function localArgument(block){
  const root=block.getRootBlock(),model=block.getField('VAR')?.getVariable();
  return model && root.type==='procedures_defnoreturn' && root.getVarModels().some(m=>m.getId()===model.getId())?model:null;
@@ -195,17 +199,15 @@ function createOrdinaryVariable(ws,name){
  return ws.getVariableMap().createVariable(name);
 }
 function argumentFlyout(ws){
- const items=[{kind:'label',text:'定義の中だけで使う引数'}];
- for(const def of ws.getAllBlocks(false).filter(b=>b.type==='procedures_defnoreturn')){
-   const models=def.getVarModels();if(!models.length)continue;
-   items.push({kind:'label',text:'「'+def.getFieldValue('NAME')+'」の引数'});
-   items.push(...models.map(m=>({kind:'block',type:'ev3_argument',extraState:{parameterId:m.getId(),name:m.name}})));
- }
- if(items.length===1)items.push({kind:'label',text:'「マイブロックを作る」で引数を追加します'});
+ const items=[{kind:'label',text:'定義の中だけで使う引数'}],names=new Map();
+ for(const def of ws.getAllBlocks(false).filter(b=>b.type==='procedures_defnoreturn'))for(const m of def.getVarModels())if(!names.has(m.getName()))names.set(m.getName(),m);
+ items.push(...[...names.values()].map(m=>({kind:'block',type:'ev3_argument',extraState:{parameterId:m.getId(),name:m.getName()}})));
+ if(!names.size)items.push({kind:'label',text:'「マイブロックを作る」で引数を追加します'});
+ else items.push({kind:'label',text:'同じ名前を定義したマイブロックで使えます'});
  return items;
 }
 Blockly.Blocks.ev3_argument={
- init:function(){this.parameterId='';this.appendDummyInput().appendField(new Blockly.FieldLabelSerializable('名前'),'ARG_NAME');this.setOutput(true,'Number');this.setColour('#aa597e');this.setTooltip('マイブロックの定義の中だけで使う引数です。通常の変数とは別です。');},
+ init:function(){this.parameterId='';this.appendDummyInput().appendField(new Blockly.FieldLabelSerializable('名前'),'ARG_NAME');this.setOutput(true,'Number');this.setColour('#aa597e');this.setTooltip('同じ引数名を定義したマイブロックの中で使えます。値は呼び出しごとに別々です。');},
  saveExtraState:function(){return {parameterId:this.parameterId,name:this.getFieldValue('ARG_NAME')};},
  loadExtraState:function(state){this.parameterId=String(state.parameterId??'');this.setFieldValue(String(state.name??'名前'),'ARG_NAME');}
 };
@@ -243,7 +245,8 @@ function saveMyBlock(ws,name,rows,definitionId=null){
  const oldModels=def?.getVarModels()??[],oldIds=oldModels.map(m=>m.getId());
  if(rows.some(r=>r.id&&!oldIds.includes(r.id))||new Set(rows.filter(r=>r.id).map(r=>r.id)).size!==rows.filter(r=>r.id).length)throw Error('引数の編集情報を確認してください。');
  const body=def?.getDescendants(false)??[];
- for(const b of body){const id=b.type==='ev3_argument'?b.parameterId:['variables_get','variables_set','math_change'].includes(b.type)?b.getFieldValue('VAR'):null;
+ const bodyIds=new Map(body.map(b=>[b.id,b.type==='ev3_argument'?(argumentModel(b)?.getId()??b.parameterId):b.getFieldValue('VAR')]));
+ for(const b of body){const id=bodyIds.get(b.id);
   if(oldIds.includes(id)&&!rows.some(r=>r.id===id))throw Error('使っている引数は削除できません。定義の中の引数ブロックを先に外してください。');
  }
  const backup=Blockly.serialization.workspaces.save(ws),oldName=def?.getFieldValue('NAME');
@@ -257,7 +260,7 @@ function saveMyBlock(ws,name,rows,definitionId=null){
   const target=def??ws.newBlock('procedures_defnoreturn');
   target.setFieldValue(name,'NAME');
   target.loadExtraState({params:models.map(m=>({name:m.getName(),id:m.getId()}))});
-  for(const b of body){const id=b.type==='ev3_argument'?b.parameterId:b.getFieldValue('VAR');const index=rows.findIndex(r=>r.id===id);if(index<0)continue;
+  for(const b of body){const id=bodyIds.get(b.id);const index=rows.findIndex(r=>r.id===id);if(index<0)continue;
    if(b.type==='ev3_argument'){b.parameterId=models[index].getId();b.setFieldValue(rows[index].name,'ARG_NAME');}
    else if(['variables_get','variables_set','math_change'].includes(b.type))b.setFieldValue(models[index].getId(),'VAR');
   }
@@ -323,8 +326,7 @@ function expression(x){
  if(!x)throw Error('数値・条件の空欄にブロックを入れてください。');
  if(x.type==='math_number')return Number(x.getFieldValue('NUM'));
  if(x.type==='ev3_argument'){
-   const root=x.getRootBlock(),name=x.getFieldValue('ARG_NAME');
-   const model=root.type==='procedures_defnoreturn'?root.getVarModels().find(m=>m.getId()===x.parameterId||m.name===name):null;
+   const name=x.getFieldValue('ARG_NAME'),model=argumentModel(x);
    if(!model)throw Error('「引数 '+name+'」は、その引数を定義したマイブロックの中につなげてください。');
    return {param:model.name};
  }
@@ -435,8 +437,8 @@ function ensureArgumentInputs(){
         if(block.getColour()!==colour)block.setColour(colour);
       }
       if(block.type==='ev3_argument'){
-        const root=block.getRootBlock();
-        const model=root.type==='procedures_defnoreturn'?root.getVarModels().find(m=>m.getId()===block.parameterId):null;
+        const model=argumentModel(block);
+        if(model)block.parameterId=model.getId();
         if(model && block.getFieldValue('ARG_NAME')!==model.name)block.setFieldValue(model.name,'ARG_NAME');
       }
       if(block.type!=='procedures_callnoreturn')continue;

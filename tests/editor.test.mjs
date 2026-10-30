@@ -285,6 +285,26 @@ test('argument names are hidden from ordinary variable palette and dropdowns',()
  const x=JSON.parse(result);assert.deepEqual(x.ordinaryNames,['回数']);assert.ok(x.options.includes(x.globalId));assert.ok(!x.options.includes('param-distance'));assert.ok(!x.options.includes('param-speed'));assert.deepEqual(x.argumentNames,['距離','速さ']);assert.deepEqual(x.read,{param:'距離'});assert.deepEqual(x.after,x.read);assert.equal(x.label,'距離');assert.equal(x.colour,'#aa597e');assert.match(x.outsideError,/定義したマイブロック/);
 });
 
+test('one palette argument works in same-name definitions with separate call values and independent renaming',()=>{
+ const context=editor();
+ const result=JSON.parse(vm.runInContext(`
+ Blockly.Events.disable();
+ const first=saveMyBlock(workspace,'前進',[{name:'距離'}]),second=saveMyBlock(workspace,'後退',[{name:'距離'}]);
+ const palette=argumentFlyout(workspace).filter(x=>x.type==='ev3_argument');if(palette.length!==1)throw Error('Duplicate palette arguments');
+ const references=[];for(const def of [first,second]){const wait=workspace.newBlock('ev3_wait_seconds'),arg=workspace.newBlock('ev3_argument');arg.loadExtraState(palette[0].extraState);def.getInput('STACK').connection.connect(wait.previousConnection);wait.getInput('SECONDS').connection.connect(arg.outputConnection);references.push(arg);}
+ // Old library blocks can carry a foreign ID; their name binds to the containing definition.
+ references[0].parameterId='old-import-id';const before=expression(references[0]);
+ let rejected=false;try{saveMyBlock(workspace,'前進',[],first.id);}catch{rejected=true;}
+ const firstId=first.getVarModels()[0].getId();saveMyBlock(workspace,'前進',[{id:firstId,name:'長さ'}],first.id);ensureArgumentInputs();
+ const renamed=expression(references[0]),unchanged=expression(references[1]);
+ const start=workspace.newBlock('ev3_start');let tail=start.nextConnection;
+ for(const [name,value]of [['前進',1],['後退',2],['前進',3]]){const call=workspace.newBlock('procedures_callnoreturn');call.loadExtraState({name,params:[name==='前進'?'長さ':'距離']});tail.connect(call.previousConnection);tail=call.nextConnection;ensureArgumentInputs();call.getInputTargetBlock('ARG0').setFieldValue(value,'NUM');}
+ const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);ensureArgumentInputs();const p=program();Blockly.Events.enable();JSON.stringify({before,rejected,renamed,unchanged,state,p});`,context));
+ assert.deepEqual(result.before,{param:'距離'});assert.equal(result.rejected,true);assert.deepEqual(result.renamed,{param:'長さ'});assert.deepEqual(result.unchanged,{param:'距離'});assert.deepEqual(result.p.main.map(x=>x.args),[[1],[2],[3]]);assert.deepEqual(result.p.procedures.map(x=>x.params),[['長さ'],['距離']]);assert.ok(compile(result.p).data.length>28);
+ const library=createBlockLibrary(result.state,'0.14.0');context.sharedLibrary=JSON.stringify(mergeBlockLibrary({blocks:{languageVersion:0,blocks:[]}},library));
+ assert.deepEqual(JSON.parse(vm.runInContext(`Blockly.Events.disable();workspace.clear();Blockly.serialization.workspaces.load(JSON.parse(sharedLibrary),workspace);ensureArgumentInputs();const result=argumentFlyout(workspace).filter(x=>x.type==='ev3_argument').map(x=>x.extraState.name);Blockly.Events.enable();JSON.stringify(result);`,context)),['長さ','距離']);
+});
+
 test('legacy parameter getters retain their meaning and purple colour without a prefix',()=>{
  const context=editor();
  const result=vm.runInContext(`
