@@ -57,3 +57,10 @@ test('direct monitor and start reject bad replies and oversized USB commands bef
  const {connection,calls}=brick();connection.transport='usb';connection.usbReports={outputSize:64,inputSize:64};await assert.rejects(connection.transferAndRun(Uint8Array.of(1),'P'.repeat(31)+'.rbf',()=>{},'F'.repeat(31)),/短く/);assert.equal(calls.length,0);
  connection.request=async()=>packet(1,5,[]);await assert.rejects(connection.programStatus(),/受け付け/);connection.request=async()=>packet(1,2,[0]);await assert.rejects(connection.readSensorSnapshot(),/受け付け/);
 });
+
+test('CSV exports survive reconnect, exceed the RBF read limit, retain UTF-8 and reject running programs/unsafe names',async()=>{
+ const {connection,files}=brick(),csv='time_s,item,value\r\n'+('1.000,"日本語","12.5"\r\n').repeat(5000);files.set('../prjs/Class1/Log.csv',new TextEncoder().encode(csv));
+ assert.ok(new TextEncoder().encode(csv).length>65536);assert.equal(await connection.readCsv('Class1','Log'),csv);assert.ok(files.has('../prjs/Class1/Log.csv'));
+ await assert.rejects(connection.readCsv('Class1','../Log'),/CSV/);
+ const running=brick({running:true});await assert.rejects(running.connection.readCsv('Class1','Log'),/停止/);assert.ok(!running.calls.some(x=>x.system===0x94));
+});

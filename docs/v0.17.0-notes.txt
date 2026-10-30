@@ -1,0 +1,10 @@
+EV3 Block Lab v0.17.0（2026-10-31）
+接続機器名表示、本体ボタンの一覧非表示、3色ランプ、ステアリング走行、CSV記録・取出し、数値演算・文字列・数値リストを追加。
+使い方と制限：dist/v017-guide.html
+追加の実機テスト：ランプ各色、左右ポート入替、CSVを本体だけで生成→再接続して取り出す、日本語・小数・リスト。
+命令の確認に使用したLEGO公開ファームウェアソース（ミラー）：
+https://github.com/mindboards/ev3sources/blob/master/lms2012/lms2012/source/bytecodes.c
+https://github.com/mindboards/ev3sources/blob/master/lms2012/lms2012/source/lms2012.c
+https://github.com/mindboards/ev3sources/blob/master/lms2012/lms2012/source/c_move.c
+https://github.com/mindboards/ev3sources/blob/master/lms2012/c_memory/source/c_memory.c
+実機テスト完了を意味しません。PC非接続の処理はRBFから独立VMで実行し、ファイル内容と境界を自動検証しています。

@@ -1,3 +1,4 @@
+import {extraLayout,dataEmitter,isText,checkText} from './data.js';
 // EV3 bytecode and system-command implementation. No firmware image is modified.
 // EV3標準ファームウェア用のバイトコード生成と通信を担当する。ファームウェア自体は書き換えない。
 // 上半分は中間データからRBFを作るコンパイラ、下半分はBluetooth/USBの接続とファイル転送。
@@ -65,6 +66,9 @@ function sensorConfiguration(sensor){
 // 転送前の検証用に式を評価する。確定する値は計算し、実測が必要な値はUNKNOWNとして後段の検査へ渡す。
 function evaluate(x, env) {
   if (typeof x==='number') {if(!Number.isFinite(x))throw Error('数値を確認してください。');return env[FLOATS]?finiteNumber(Math.fround(x)):x;}
+  if(x?.numeric){const {op,a,b,low,high}=x.numeric;if(!['mod','random','min','max','clamp','round'].includes(op))throw Error('未対応のデータ演算です。');const values=[a,...(b===undefined?[]:[b]),...(op==='clamp'?[low,high]:[])].map(v=>evaluate(v,env));if(op==='mod'&&values[1]===0)throw Error('0では割れません。');if(op==='random'&&values.every(v=>v!==UNKNOWN)&&(Math.trunc(values[0])>Math.trunc(values[1])||values.some(v=>v< -32767||v>32767)))throw Error('乱数は−32767〜32767の整数範囲で、下限≦上限にしてください。');if(op==='clamp'&&values[1]!==UNKNOWN&&values[2]!==UNKNOWN&&values[1]>values[2])throw Error('範囲の下限を上限以下にしてください。');return UNKNOWN;}
+  if(x?.textData){if(!['length','contains','equal','number'].includes(x.textData.op))throw Error('文字列の演算を確認してください。');checkText(x.textData.value);if(x.textData.other)checkText(x.textData.other);return UNKNOWN;}
+  if(x?.listData){if(!['length','item','contains','sum','average','min','max'].includes(x.listData.op))throw Error('リストの演算を確認してください。');if(x.listData.index!==undefined)evaluate(x.listData.index,env);if(x.listData.value!==undefined)evaluate(x.listData.value,env);return UNKNOWN;}
   if(x?.math)return unaryValue(x.math.fn,evaluate(x.math.value,env));
   if(x?.timer!==undefined){if(x.timer!==true)throw Error('タイマーの指定が不正です。');return UNKNOWN;}
   if(x?.button){buttonConfiguration(x.button);return UNKNOWN;}
@@ -135,6 +139,13 @@ export function validate(program) {
       const sourceInt=x=>{const n=evaluate(x,env);return floatingMode&&n!==UNKNOWN?Math.trunc(n):n;};
       const val=k=>floatingMode&&!['value','condition','seconds'].includes(k)?sourceInt(b[k]):evaluate(b[k],env);
       switch(b.type) {
+        case 'led':inRange(b.color,0,3,'ランプの色');if(!['on','flash','pulse'].includes(b.mode))throw Error('ランプの点灯方法を選んでください。');break;
+        case 'steering':{if(![1,2,4,8].includes(b.leftPort)||![1,2,4,8].includes(b.rightPort)||b.leftPort===b.rightPort)throw Error('ステアリングの左右には異なるポートを選んでください。');inRange(val('speed'),-100,100,'速さ');inRange(val('turn'),-100,100,'ステアリング');if(!['run','angle','time'].includes(b.action))throw Error('ステアリングの動作を選んでください。');if(b.action!=='run'&&val('speed')===0)throw Error('有限走行の速さは0以外にしてください。');if(b.action==='angle')inRange(val('degrees'),1,36000,'外側モーターの角度');if(b.action==='time'){const t=evaluate(b.seconds,env);if(t!==UNKNOWN&&(!Number.isFinite(t)||t<=0||t>60))throw Error('走行時間は0より大きく60秒以下にしてください。');}break;}
+        case 'textSet':checkText(b.value);break;
+        case 'listAdd':case 'listSet':if(b.index!==undefined)inRange(val('index'),1,1000,'リストの番号');evaluate(b.value,env);break;
+        case 'listDelete':inRange(val('index'),1,1000,'リストの番号');break;
+        case 'listClear':case 'logStart':case 'logEnd':break;
+        case 'logValue':checkText({text:b.label});if(isText(b.value))checkText(b.value);else evaluate(b.value,env);break;
         case 'ramp':if(!['off','trapezoid','scurve'].includes(b.mode))throw Error('加減速方式を選んでください。');for(const name of ['upSeconds','downSeconds']){const seconds=evaluate(b[name],env);if(seconds!==UNKNOWN&&(!Number.isFinite(seconds)||seconds<0||seconds>10))throw Error('加速・減速時間は0〜10秒にしてください。');}break;
         case 'wheel':if(!Number.isFinite(b.diameter)||b.diameter<10||b.diameter>200)throw Error('タイヤの直径は10〜200 mmにしてください。');geometry.diameter10=Math.round(b.diameter*10);break;
         case 'tread':if(!Number.isFinite(b.mm)||b.mm<10||b.mm>1000)throw Error('トレッドは10〜1000 mmにしてください。');geometry.tread10=Math.round(b.mm*10);break;
@@ -206,6 +217,8 @@ export function compile(program,folder='EV3Lab') {
   const globalOffsets=new Map([...variableNames].map((name,i)=>[name,i*4]));
   const diameterOffset=globalOffsets.size*4,treadOffset=diameterOffset+4,rampOffset=diameterOffset+(usesGeometry?8:0);
   const timerOffset=rampOffset+(usesRamps?12:0);
+  const baseGlobalBytes=timerOffset+(usesTimer?4:0);
+  const extras=extraLayout(program,baseGlobalBytes,directory);
   // Bind a diagnostic record to this compiler revision and exact project.
   let diagnosticTag=0x811c9dc5;
   for(const ch of new TextEncoder().encode('timing-v1-0.1.6|'+JSON.stringify(program)))diagnosticTag=Math.imul(diagnosticTag^ch,0x01000193);
@@ -305,6 +318,8 @@ export function compile(program,folder='EV3Lab') {
     const floatExpr=x=>{
       if(typeof x==='number')return floatingConstant(x);
       if(x?.timer===true){const elapsed=local(alloc()),seconds=local(alloc());emit(OP.TIMER_READ,elapsed);emit(OP.SUB32,elapsed,globalVar(timerOffset),elapsed);emit(0x1f,asFloat(elapsed),floatingConstant(1000),seconds);return seconds;}
+      if(x?.numeric){const {op,a,b,low,high}=x.numeric,A=floatExpr(a),r=local(alloc());floatGuard(A);if(op==='round'){const t=local(alloc());emit(0x13,A,floatingConstant(.5),t);emit(0x8d,constant(3),t,r);return r;}const B=b===undefined?null:floatExpr(b);if(B)floatGuard(B);if(op==='mod'){floatNonzero(B);emit(0x8d,constant(2),A,B,r);const zero=jump(OP.JR_LT32,[floatCompare(0x53,r,floatingConstant(0)),constant(1)]),positive=local(alloc());emit(0x1b,r,B,positive);const same=jump(0x6b,[positive,floatingConstant(0)]);emit(0x13,r,B,r);patch(zero,code.length);patch(same,code.length);return r;}if(op==='random'){const from=expr(a),to=expr(b);guard(from,-32767,32767);guard(to,-32767,32767);faults.push(jump(OP.JR_GT32,[from,to]));const n=local(alloc());emit(OP.MOVE32,constant(0),n);emit(0x8e,from,to,n);const signed=local(alloc());emit(0x36,n,signed);return asFloat(signed);}if(op==='clamp'){const lo=floatExpr(low),hi=floatExpr(high);floatGuard(lo);floatGuard(hi);faults.push(jump(0x6b,[lo,hi]));emit(0x3f,A,r);const ok=jump(0x6b,[r,lo]);emit(0x3f,lo,r);patch(ok,code.length);const ok2=jump(0x67,[r,hi]);emit(0x3f,hi,r);patch(ok2,code.length);return r;}emit(0x3f,A,r);const keep=jump(op==='min'?0x67:0x6b,[A,B]);emit(0x3f,B,r);patch(keep,code.length);return r;}
+      if(x?.textData||x?.listData)return dataOps.numeric(x);
       if(x?.var!==undefined)return globalVar(globalOffsets.get(x.var));
       if(x?.param!==undefined){const i=p.params.indexOf(x.param);if(i<0)throw Error('引数の定義を確認してください。');return local(i*4);}
       if(x?.math){
@@ -333,6 +348,7 @@ export function compile(program,folder='EV3Lab') {
       if(typeof x==='number')return constant(Math.trunc(finiteNumber(Math.fround(x))));
       const value=floatExpr(x),result=local(alloc());floatGuard(value);emit(OP.MOVEF32,value,result);return result;
     };
+    const dataOps=dataEmitter({emit,alloc,local,globalVar,constant,zstr,floatExpr,expr,asFloat,guard,floatGuard,jump,patch,faults,floatConstant:floatingConstant,position:()=>code.length},extras);
     // 2個のモーターの進み具合をエンコーダで比較し、先行側の速度を調整する試作の補正制御。
     // 目標角度を優先し、停止時刻と途中経過を診断ファイルへ記録する。実行はすべてEV3内で行う。
     const feedbackPair=b=>{
@@ -528,6 +544,9 @@ export function compile(program,folder='EV3Lab') {
           }
         }
         switch(b.type) {
+          case 'led':emit(0x82,constant(27),constant(b.color===0?0:b.color+({on:0,flash:3,pulse:6}[b.mode])));break;
+          case 'steering':{const ports=b.leftPort|b.rightPort,speed=expr(b.speed),turn=expr(b.turn),nativeTurn=local(alloc());guard(speed,-100,100);guard(turn,-100,100);emit(OP.MUL32,turn,constant(b.leftPort<b.rightPort?2:-2),nativeTurn);if(b.action==='run'){emit(OP.MOTOR_SYNC,constant(0),constant(ports),speed,nativeTurn,constant(0),constant(0));}else{nonzero(speed);emit(OP.MOTOR_RESET,constant(0),constant(ports));const amount=b.action==='angle'?expr(b.degrees):expr(scaled(b.seconds,1000));guard(amount,1,b.action==='angle'?36000:60000);emit(b.action==='time'?0xb1:OP.MOTOR_SYNC,constant(0),constant(ports),speed,nativeTurn,amount,constant(1));emit(OP.MOTOR_READY,constant(0),constant(ports));}break;}
+          case 'textSet':case 'listAdd':case 'listSet':case 'listClear':case 'listDelete':case 'logStart':case 'logValue':case 'logEnd':dataOps.statement(b);break;
           case 'ramp':{emit(OP.MOVE32,constant({off:0,trapezoid:1,scurve:2}[b.mode]),globalVar(rampOffset));for(const [i,name]of ['upSeconds','downSeconds'].entries()){const time=expr(scaled(b[name],1000));guard(time,0,10000);emit(OP.MOVE32,time,globalVar(rampOffset+4+i*4));}break;}
           case 'wheel':emit(OP.MOVE32,constant(Math.round(b.diameter*10)),globalVar(diameterOffset));break;
           case 'tread':emit(OP.MOVE32,constant(Math.round(b.mm*10)),globalVar(treadOffset));break;
@@ -594,6 +613,7 @@ export function compile(program,folder='EV3Lab') {
     if(index===0){for(const at of globalOffsets.values())emit(OP.MOVE32,constant(0),globalVar(at));if(usesGeometry)for(const at of [diameterOffset,treadOffset])emit(OP.MOVE32,constant(0),globalVar(at));}
     if(index===0&&usesRamps)for(const at of [rampOffset,rampOffset+4,rampOffset+8])emit(OP.MOVE32,constant(0),globalVar(at));
     if(index===0&&usesTimer)emit(OP.MOVE32,constant(0),globalVar(timerOffset));
+    if(index===0)dataOps.init();
     sequence(p.body);
     if(index)emit(OP.RETURN);else emit(OP.STOP,constant(0),constant(15),constant(1));
     // Firmware validation scans each object sequentially up to its first END.
@@ -608,8 +628,8 @@ export function compile(program,folder='EV3Lab') {
   const headers=[];
   for(const o of objects) {o.offset=offset; headers.push(...u32(offset),...u16(0),...u16(o.trigger),...u32(o.localBytes)); offset+=o.code.length;}
   if(offset>65536)throw Error('プログラムが大きすぎます（上限64KB）。');
-  const data=new Uint8Array([76,69,71,79,...u32(offset),...u16(104),...u16(objects.length),...u32(globalOffsets.size*4+(usesGeometry?8:0)+(usesRamps?12:0)+(usesTimer?4:0)),...headers,...objects.flatMap(o=>o.code)]);
-  return {data,objects,program,usesSensors,usesFloat,usesRamps,usesTimer,diagnosticTag,diagnosticPath:recordsTiming&&!usesRamps?diagnosticPath:null};
+  const data=new Uint8Array([76,69,71,79,...u32(offset),...u16(104),...u16(objects.length),...u32(baseGlobalBytes+extras.bytes),...headers,...objects.flatMap(o=>o.code)]);
+  return {data,objects,program,logFiles:extras.files,usesSensors,usesFloat,usesRamps,usesTimer,diagnosticTag,diagnosticPath:recordsTiming&&!usesRamps?diagnosticPath:null};
 }
 
 // 本体に保存した68バイトの補正記録を復号する。識別タグを照合し、別のプログラムの古い記録を混同しない。
@@ -864,11 +884,12 @@ export class EV3Connection {
     }finally{if(!finished && this.connected)try{await this.system(0x98,[handle]);}catch{}}
   }
   // EOFまで読み戻し、宣言サイズとも照合する。ブロック境界ぴったりのサイズでも最後の読み取りでハンドルを閉じる。
-  async readFile(path){
+  async readCsv(folder,file){if((await this.programStatus()).status!==0x40)throw Error('ログの読み出し前に、EV3の実行を停止してください。');if(!/^[A-Za-z0-9_-]{1,31}$/.test(file??''))throw Error('CSVの名前は半角英数字・-・_で1〜31文字にしてください。');const bytes=await this.readFile(`${projectDirectory(folder)}/${file}.csv`,2*1024*1024);const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);if(!text.startsWith('time_s,item,value\r\n'))throw Error('EV3 Block LabのCSVログではありません。');return text;}
+  async readFile(path,maxSize=65536){
     const first=await this.system(0x94,[...u16(this.chunkSize),...zstr(path)],[0,8]);
     if(first.data.length<5)throw Error('読み戻しの応答が不正です。');
     const size=new DataView(first.data.buffer,first.data.byteOffset).getUint32(0,true);
-    if(size>65536)throw Error('読み戻すファイルのサイズが上限を超えています。');
+    if(size>maxSize){if(first.status!==8&&first.data.length>=5)try{await this.system(0x98,[first.data[4]]);}catch{}throw Error('読み戻すファイルのサイズが上限を超えています。');}
     const handle=first.data[4];let bytes=Array.from(first.data.slice(5)),status=first.status;
     try {
       while(status!==8){

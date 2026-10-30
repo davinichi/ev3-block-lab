@@ -36,7 +36,7 @@ test('brick button palette and saved definitions retain selected buttons and rel
  const numeric=workspace.newBlock('ev3_brick_button_value');numeric.setFieldValue('7','BUTTON');const reading=expression(numeric),saved=Blockly.serialization.workspaces.save(workspace);Blockly.serialization.workspaces.load(saved,workspace);const built=program();const types=toolbox.contents.find(c=>c.name==='センサー').contents.map(x=>x.type);Blockly.Events.enable();JSON.stringify({value:reading,program:built,types});`,context));
  assert.deepEqual(result.value,{button:{id:7}});
  assert.deepEqual(result.program.procedures[0].body[0].condition,{op:'eq',left:{button:{id:4}},right:0});
- assert.ok(result.types.includes('ev3_brick_button'));assert.ok(result.types.includes('ev3_brick_button_value'));
+ assert.ok(!result.types.includes('ev3_brick_button'));assert.ok(!result.types.includes('ev3_brick_button_value'));
  compile(result.program);
 });
 
@@ -551,4 +551,15 @@ test('timer blocks survive project reload and My Block export/import and compile
  const library=createBlockLibrary(JSON.parse(saved),'0.12.0');context.timerLesson=JSON.stringify(mergeBlockLibrary({blocks:{languageVersion:0,blocks:[{type:'ev3_start'}]}},library));
  const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(timerLesson),workspace);const start=workspace.getAllBlocks(false).find(b=>b.type==='ev3_start'),call=workspace.newBlock('procedures_callnoreturn');call.loadExtraState({name:'時間で待つ',params:[]});start.nextConnection.connect(call.previousConnection);const p=program();Blockly.Events.enable();JSON.stringify(p);`,context));
  assert.deepEqual(p.procedures[0].body,[{type:'timerReset'},{type:'while',until:true,condition:{op:'gte',left:{timer:true},right:.5},body:[]}]);assert.equal(compile(p).usesTimer,true);
+});
+
+test('new classroom data and steering samples reload, preserve library types and compile into native images',()=>{
+ for(const name of ['DataLogTest','SteeringTest']){
+  const context=editor(),saved=JSON.parse(readFileSync(new URL('../examples/'+name+'.ev3lab',import.meta.url),'utf8'));inspectBlocks(saved.workspace.blocks);context.newSample=JSON.stringify(saved.workspace);
+  const parsed=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(newSample),workspace);const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);const p=program();Blockly.Events.enable();JSON.stringify(p);`,context));
+  const build=compile(parsed);assert.ok(build.data.length<65536);if(name==='DataLogTest')assert.deepEqual(build.logFiles,['Log']);else assert.equal(parsed.main.filter(x=>x.type==='steering').length,2);
+ }
+});
+test('every newly advertised data block can be saved and restored through the actual allowlist',()=>{
+ const context=editor(),saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();const groups=toolbox.contents.filter(c=>['データ','記録','ランプ'].includes(c.name));for(const item of groups.flatMap(c=>c.contents).filter(x=>x.kind==='block'))Blockly.serialization.blocks.append(item,workspace);const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);const result=Blockly.serialization.workspaces.save(workspace);Blockly.Events.enable();JSON.stringify(result);`,context));inspectBlocks(saved.blocks);assert.ok(saved.blocks.blocks.length>=20);
 });

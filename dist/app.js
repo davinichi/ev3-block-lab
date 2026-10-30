@@ -4,7 +4,7 @@ import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.
 const $=id=>document.getElementById(id);
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.16.1';
+const VERSION='0.17.0';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -18,6 +18,8 @@ Blockly.Blocks.procedures_callnoreturn.init=function(){
   originalCallInit.call(this);
   this.setInputsInline(true);
 };
+const deviceNames={7:'Lモーター',8:'Mモーター',16:'EV3 タッチセンサ',29:'EV3 カラーセンサ',30:'EV3 超音波センサ',33:'EV3 赤外線センサ'};
+const deviceName=type=>deviceNames[type]??([0,125,126,127].includes(type)?'未接続／認識中':'未対応機器（種類 '+type+'）');
 // 出力ポートの選択値はA=1、B=2、C=4、D=8のビットマスク。2個の指定は値を足したもの。
 const singlePorts=[['A','1'],['B','2'],['C','4'],['D','8']];
 const pairPorts=[['B + C','6'],['A + B','3'],['A + C','5'],['A + D','9'],['B + D','10'],['C + D','12']];
@@ -165,6 +167,35 @@ for(const type of ['math_number','ev3_math','logic_compare','logic_operation','l
  Blockly.Blocks[type].init=function(){init.call(this);this.setColour(operatorColour);this.setInputsInline(true);};
 }
 
+// 本体ランプ・ステアリング・記録・データ処理。入力の形で数値と文字列を区別する。
+const numberInput=name=>({type:'input_value',name,check:'Number'}),textInput=name=>({type:'input_value',name,check:'String'}),namedField=(name,value)=>({type:'field_input',name,text:value});
+const dataColour='#00b85b',stmt={previousStatement:null,nextStatement:null,inputsInline:true};
+Blockly.defineBlocksWithJsonArray([
+ {type:'ev3_led',message0:'本体のランプを %1 に %2',args0:[{type:'field_dropdown',name:'COLOR',options:[['緑','1'],['赤','2'],['オレンジ','3']]},{type:'field_dropdown',name:'MODE',options:[['点灯','on'],['点滅','flash'],['ゆっくり点滅','pulse']]}],...stmt,colour:'#9966ff',tooltip:'ランプを変えてすぐ次へ進みます。表示を保つには待つ命令などを続けます。終了後は本体の通常表示へ戻ります。'},
+ {type:'ev3_led_off',message0:'本体のランプを消す',...stmt,colour:'#9966ff'},
+ ...['run','angle','time'].map(action=>({type:'ev3_steering_'+action,message0:'左 %1 右 %2 ステアリング %3 速さ %4 ％で '+({run:'回し続ける',angle:'外側を %5 度回す',time:'%5 秒走る'}[action]),args0:[{type:'field_dropdown',name:'LEFT_PORT',options:[singlePorts[1],singlePorts[0],singlePorts[2],singlePorts[3]]},{type:'field_dropdown',name:'RIGHT_PORT',options:[singlePorts[2],singlePorts[0],singlePorts[1],singlePorts[3]]},numberInput('TURN'),numberInput('SPEED'),...(action==='run'?[]:[numberInput(action==='angle'?'DEGREES':'SECONDS')])],...stmt,colour:'#ff4ccd',tooltip:'L/M共通。ステアリング−100は左スピン、−50は左ピボット、0は直進、50は右ピボット、100は右スピン。角度は外側のモーター軸の角度です。加減速の設定は適用しません。'})),
+ {type:'ev3_log_start',message0:'CSVログ %1 の記録を開始する',args0:[namedField('FILE','Log')],...stmt,colour:'#c58245',tooltip:'EV3のプロジェクトフォルダへ保存。同じログ名は上書き。半角英数字・-・_で31文字以内。1行ごとに閉じて保存します。PCを切り離しても記録できます。'},
+ {type:'ev3_log_value',message0:'項目 %1 値 %2 をCSVに記録する',args0:[namedField('LABEL','値'),{type:'input_value',name:'VALUE',check:['Number','String']}],...stmt,colour:'#c58245',tooltip:'記録開始からの秒数・項目名・値を1行記録。変数、演算、センサ、文字列が使えます。1回の開始につき5000行まで。開始してから使ってください。'},
+ {type:'ev3_log_end',message0:'CSVログの記録を終了する',...stmt,colour:'#c58245'},
+ ...[['mod','%1 を %2 で割った余り'],['random','%1 から %2 までの整数乱数'],['min','%1 と %2 の小さい方'],['max','%1 と %2 の大きい方']].map(([kind,message0])=>({type:'ev3_data_'+kind,message0,args0:[numberInput('A'),numberInput('B')],output:'Number',inputsInline:true,colour:dataColour})),
+ {type:'ev3_data_round',message0:'%1 を四捨五入',args0:[numberInput('A')],output:'Number',colour:dataColour,tooltip:'0.5を足して切り下げます。1.5→2、−1.5→−1。'},
+ {type:'ev3_data_clamp',message0:'%1 を %2 から %3 の範囲に収める',args0:[numberInput('A'),numberInput('LOW'),numberInput('HIGH')],output:'Number',inputsInline:true,colour:dataColour},
+ {type:'ev3_text',message0:'文字列 %1',args0:[namedField('TEXT','こんにちは')],output:'String',colour:dataColour,tooltip:'UTF-8で120バイト以内。日本語は通常40文字以内。'},
+ {type:'ev3_text_join',message0:'%1 と %2 をつなぐ',args0:[textInput('A'),textInput('B')],output:'String',inputsInline:true,colour:dataColour},
+ {type:'ev3_text_length',message0:'%1 の文字数',args0:[textInput('VALUE')],output:'Number',colour:dataColour,tooltip:'日本語も1文字として数えます。結合文字は別に数えます。'},
+ {type:'ev3_text_letter',message0:'%1 の %2 番目の文字',args0:[textInput('VALUE'),numberInput('INDEX')],output:'String',inputsInline:true,colour:dataColour},
+ ...[['contains','%1 に %2 が含まれる'],['equal','%1 と %2 が同じ']].map(([op,message0])=>({type:'ev3_text_'+op,message0,args0:[textInput('A'),textInput('B')],output:'Boolean',inputsInline:true,colour:dataColour})),
+ {type:'ev3_text_number',message0:'数値 %1 を文字列にする',args0:[numberInput('VALUE')],output:'String',colour:dataColour},
+ {type:'ev3_text_to_number',message0:'文字列 %1 を数値にする',args0:[textInput('VALUE')],output:'Number',colour:dataColour,tooltip:'数値として読める文字列を使います。'},
+ {type:'ev3_text_set',message0:'文字列変数 %1 を %2 にする',args0:[namedField('NAME','メッセージ'),textInput('VALUE')],...stmt,colour:'#ff8c1a'},
+ {type:'ev3_text_get',message0:'%1',args0:[namedField('NAME','メッセージ')],output:'String',colour:'#ff8c1a',tooltip:'同じ名前の文字列変数を共有。プログラム開始時は空文字。数値変数とは別です。'},
+ ...[['add','リスト %1 に %2 を追加'],['set','リスト %1 の %2 番目を %3 にする'],['delete','リスト %1 の %2 番目を削除'],['clear','リスト %1 を空にする']].map(([op,message0])=>({type:'ev3_list_'+op,message0,args0:[namedField('LIST','データ'),...(['set','delete'].includes(op)?[numberInput('INDEX')]:[]),...(['set','add'].includes(op)?[numberInput('VALUE')]:[])],...stmt,colour:'#ff8c1a',tooltip:'数値のリスト。名前で共有し、プログラム開始時は空。番号は1から、最大1000項目。'})),
+ {type:'ev3_list_item',message0:'リスト %1 の %2 番目',args0:[namedField('LIST','データ'),numberInput('INDEX')],output:'Number',inputsInline:true,colour:'#ff8c1a'},
+ {type:'ev3_list_length',message0:'リスト %1 の項目数',args0:[namedField('LIST','データ')],output:'Number',colour:'#ff8c1a'},
+ {type:'ev3_list_contains',message0:'リスト %1 に %2 が含まれる',args0:[namedField('LIST','データ'),numberInput('VALUE')],output:'Boolean',inputsInline:true,colour:'#ff8c1a'},
+ {type:'ev3_list_stat',message0:'リスト %1 の %2',args0:[namedField('LIST','データ'),{type:'field_dropdown',name:'OP',options:[['合計','sum'],['平均','average'],['最小値','min'],['最大値','max']]}],output:'Number',colour:'#ff8c1a',tooltip:'平均・最小・最大は1項目以上必要です。空の合計は0です。'}
+]);
+
 const num=(n)=>({kind:'block',type:'math_number',fields:{NUM:n}});
 const shadow=(n)=>({shadow:{type:'math_number',fields:{NUM:n}}});
 // 左側カテゴリの公開一覧。新規ブロック追加時は、定義・chain/expression・library.jsの許可一覧も確認する。
@@ -172,7 +203,7 @@ const toolbox={kind:'categoryToolbox',contents:[
  {kind:'category',name:'スタート',colour:'#d3a238',contents:[{kind:'block',type:'ev3_start'}]},
  {kind:'category',name:'モーター',colour:'#0090f5',contents:classroomMotorToolbox()},
  {kind:'category',name:'動き',colour:'#ff4ccd',contents:[{kind:'block',type:'ev3_wheel'},{kind:'block',type:'ev3_tread'},{kind:'block',type:'ev3_tank',inputs:{LEFT_SPEED:shadow(20),RIGHT_SPEED:shadow(20)}},{kind:'block',type:'ev3_spin_right',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_spin_left',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_pivot_right',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_pivot_left',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_drive_forward',inputs:{SPEED:shadow(20),CM:shadow(20)}},{kind:'block',type:'ev3_drive_backward',inputs:{SPEED:shadow(20),CM:shadow(20)}}]},
- {kind:'category',name:'センサー',colour:'#34ccf1',contents:[{kind:'label',text:'EV3本体のボタン'},{kind:'block',type:'ev3_brick_button'},{kind:'block',type:'ev3_brick_button_value'},{kind:'label',text:'タイマー'},{kind:'block',type:'ev3_timer'},{kind:'block',type:'ev3_timer_reset'},{kind:'label',text:'モーターのエンコーダ'},{kind:'block',type:'ev3_encoder'},{kind:'block',type:'ev3_encoder_reset'},{kind:'label',text:'EV3 タッチセンサ'},{kind:'block',type:'ev3_touch'},{kind:'block',type:'ev3_touch_value'},{kind:'label',text:'EV3 赤外線センサ'},{kind:'block',type:'ev3_ir_proximity'},{kind:'block',type:'ev3_ir_compare',inputs:{VALUE:shadow(20)}},{kind:'block',type:'ev3_ir_button'},{kind:'block',type:'ev3_ir_remote'},{kind:'block',type:'ev3_ir_beacon_detected'},{kind:'block',type:'ev3_ir_beacon_heading'},{kind:'block',type:'ev3_ir_beacon_distance'},{kind:'label',text:'EV3 カラーセンサ'},{kind:'block',type:'ev3_color_is'},{kind:'block',type:'ev3_color_value'},{kind:'block',type:'ev3_reflected_compare',inputs:{VALUE:shadow(50)}},{kind:'block',type:'ev3_reflected'},{kind:'label',text:'EV3 超音波センサ'},{kind:'block',type:'ev3_distance_compare',inputs:{VALUE:shadow(15)}},{kind:'block',type:'ev3_distance'}]},
+ {kind:'category',name:'センサー',colour:'#34ccf1',contents:[{kind:'label',text:'タイマー'},{kind:'block',type:'ev3_timer'},{kind:'block',type:'ev3_timer_reset'},{kind:'label',text:'モーターのエンコーダ'},{kind:'block',type:'ev3_encoder'},{kind:'block',type:'ev3_encoder_reset'},{kind:'label',text:'EV3 タッチセンサ'},{kind:'block',type:'ev3_touch'},{kind:'block',type:'ev3_touch_value'},{kind:'label',text:'EV3 赤外線センサ'},{kind:'block',type:'ev3_ir_proximity'},{kind:'block',type:'ev3_ir_compare',inputs:{VALUE:shadow(20)}},{kind:'block',type:'ev3_ir_button'},{kind:'block',type:'ev3_ir_remote'},{kind:'block',type:'ev3_ir_beacon_detected'},{kind:'block',type:'ev3_ir_beacon_heading'},{kind:'block',type:'ev3_ir_beacon_distance'},{kind:'label',text:'EV3 カラーセンサ'},{kind:'block',type:'ev3_color_is'},{kind:'block',type:'ev3_color_value'},{kind:'block',type:'ev3_reflected_compare',inputs:{VALUE:shadow(50)}},{kind:'block',type:'ev3_reflected'},{kind:'label',text:'EV3 超音波センサ'},{kind:'block',type:'ev3_distance_compare',inputs:{VALUE:shadow(15)}},{kind:'block',type:'ev3_distance'}]},
  {kind:'category',name:'音',colour:'#a570b3',contents:[{kind:'block',type:'ev3_tone',inputs:{FREQUENCY:shadow(440),MS:shadow(200)}}]},
  {kind:'category',name:'制御',colour:controlColour,contents:[{kind:'block',type:'ev3_wait_seconds',inputs:{SECONDS:shadow(1)}},{kind:'block',type:'controls_if'},{kind:'block',type:'controls_if',extraState:{hasElse:true}},{kind:'block',type:'ev3_forever'},{kind:'block',type:'controls_repeat_ext',inputs:{TIMES:shadow(10)}},{kind:'block',type:'controls_whileUntil',fields:{MODE:'UNTIL'}},{kind:'block',type:'controls_whileUntil',fields:{MODE:'WHILE'}},{kind:'block',type:'ev3_wait_until'},{kind:'block',type:'ev3_program_end'},{kind:'block',type:'ev3_myblock_return'}]},
  {kind:'category',name:'演算',colour:operatorColour,contents:[num(0),...['add','sub','mul','div'].map(op=>({kind:'block',type:'ev3_op_'+op,inputs:{A:shadow(1),B:shadow(1)}})),{kind:'block',type:'ev3_math_function',inputs:{VALUE:shadow(1)}},...['lt','eq','gt','lte','gte','neq'].map(op=>({kind:'block',type:'ev3_op_'+op,inputs:{A:shadow(0),B:shadow(100)}})),...['and','or'].map(op=>({kind:'block',type:'ev3_op_'+op})),{kind:'block',type:'logic_negate'},{kind:'block',type:'logic_boolean'}]},
@@ -180,6 +211,16 @@ const toolbox={kind:'categoryToolbox',contents:[
  {kind:'category',name:'マイブロック',colour:'#aa597e',custom:'PROCEDURE'},
  {kind:'category',name:'引数',colour:'#668b6d',custom:'ARGUMENTS'}
 ]};
+
+// 本体ボタンは互換読み込みのため定義を残し、新規の一覧だけから一時的に外す。
+const group=name=>toolbox.contents.find(c=>c.name===name).contents;
+group('動き').splice(2,0,...['run','angle','time'].map(action=>({kind:'block',type:'ev3_steering_'+action,inputs:{TURN:shadow(25),SPEED:shadow(20),...(action==='angle'?{DEGREES:shadow(360)}:action==='time'?{SECONDS:shadow(2)}:{})}})));
+group('演算').push(...['mod','random','min','max'].map(op=>({kind:'block',type:'ev3_data_'+op,inputs:{A:shadow(1),B:shadow(10)}})),{kind:'block',type:'ev3_data_round',inputs:{A:shadow(1.5)}},{kind:'block',type:'ev3_data_clamp',inputs:{A:shadow(120),LOW:shadow(-100),HIGH:shadow(100)}});
+const textShadow=t=>({shadow:{type:'ev3_text',fields:{TEXT:t}}});
+toolbox.contents.splice(toolbox.contents.findIndex(c=>c.name==='変数'),0,
+ {kind:'category',name:'ランプ',colour:'#9966ff',contents:[{kind:'block',type:'ev3_led'},{kind:'block',type:'ev3_led_off'}]},
+ {kind:'category',name:'データ',colour:'#ff8c1a',contents:[{kind:'label',text:'文字列（UTF-8で120バイトまで）'},{kind:'block',type:'ev3_text'},{kind:'block',type:'ev3_text_get'},{kind:'block',type:'ev3_text_set',inputs:{VALUE:textShadow('こんにちは')}},{kind:'block',type:'ev3_text_join',inputs:{A:textShadow('こんにちは'),B:textShadow('EV3')}},{kind:'block',type:'ev3_text_length',inputs:{VALUE:textShadow('こんにちは')}},{kind:'block',type:'ev3_text_letter',inputs:{VALUE:textShadow('こんにちは'),INDEX:shadow(1)}},...['contains','equal'].map(op=>({kind:'block',type:'ev3_text_'+op,inputs:{A:textShadow('こんにちは'),B:textShadow('こん')}})),{kind:'block',type:'ev3_text_number',inputs:{VALUE:shadow(12.5)}},{kind:'block',type:'ev3_text_to_number',inputs:{VALUE:textShadow('12.5')}},{kind:'label',text:'数値リスト（同じ名前で共有）'},...['clear','add','set','delete','item','length','contains','stat'].map(op=>({kind:'block',type:'ev3_list_'+op,inputs:{...(['set','delete','item'].includes(op)?{INDEX:shadow(1)}:{}),...(['add','set','contains'].includes(op)?{VALUE:shadow(0)}:{})}}))]},
+ {kind:'category',name:'記録',colour:'#c58245',contents:[{kind:'block',type:'ev3_log_start'},{kind:'block',type:'ev3_log_value',inputs:{VALUE:shadow(0)}},{kind:'block',type:'ev3_log_end'}]});
 
 // 置かれた定義の中で引数を解決する。IDが異なる同名ブロックも使えるが、実行時の値は呼び出しごとに独立する。
 function argumentModel(block){
@@ -343,7 +384,7 @@ function updateButtons(){
   $('connectionMethod').disabled=busy||connection.connected;
   $('transfer').disabled=busy || !connection.connected || !lastBuild || !validName || !validFolder;
   $('transferRun').disabled=$('transfer').disabled;$('stopProgram').disabled=busy||!connection.connected;
-  $('readSensors').disabled=busy||!connection.connected;$('autoSensors').disabled=!connection.connected;
+  $('exportCsv').disabled=busy||!connection.connected;$('readSensors').disabled=busy||!connection.connected;$('autoSensors').disabled=!connection.connected;
   $('connect').disabled=busy||!isSecureContext||!($('connectionMethod').value==='usb'?navigator.hid:navigator.serial);$('disconnect').disabled=busy;$('downloadRbf').disabled=busy || !lastBuild || !validName || !validFolder;
   $('recordCounts').disabled=busy || !connection.connected;
   $('readCounts').disabled=busy || !connection.connected || !baselineCounts;
@@ -352,6 +393,15 @@ function updateButtons(){
 // 丸い数値ブロック・条件ブロックを中間データへ変換する。センサやボタンの実測はここでは行わない。
 function expression(x){
  if(!x)throw Error('数値・条件の空欄にブロックを入れてください。');
+ if(x.type==='ev3_text')return {text:x.getFieldValue('TEXT')};
+ if(x.type==='ev3_text_get')return {textVar:x.getFieldValue('NAME')};
+ if(x.type==='ev3_text_join')return {textOp:'join',a:value(x,'A'),b:value(x,'B')};
+ if(x.type==='ev3_text_letter')return {textOp:'letter',value:value(x,'VALUE'),index:value(x,'INDEX')};
+ if(x.type==='ev3_text_number')return {textOp:'number',value:value(x,'VALUE')};
+ if(['ev3_text_length','ev3_text_to_number'].includes(x.type))return {textData:{op:x.type==='ev3_text_length'?'length':'number',value:value(x,'VALUE')}};
+ if(['ev3_text_contains','ev3_text_equal'].includes(x.type))return {textData:{op:x.type.slice(9),value:value(x,'A'),other:value(x,'B')}};
+ if(x.type.startsWith('ev3_list_'))return {listData:{op:x.type==='ev3_list_stat'?x.getFieldValue('OP'):x.type.slice(9),list:x.getFieldValue('LIST'),...(x.getInput('INDEX')?{index:value(x,'INDEX')}:{}),...(x.getInput('VALUE')?{value:value(x,'VALUE')}:{})}};
+ if(x.type.startsWith('ev3_data_'))return {numeric:{op:x.type.slice(9),a:value(x,'A'),...(x.getInput('B')?{b:value(x,'B')}:{}),...(x.type==='ev3_data_clamp'?{low:value(x,'LOW'),high:value(x,'HIGH')}:{})}};
  if(x.type==='math_number')return Number(x.getFieldValue('NUM'));
  if(x.type==='ev3_argument'){
    const name=x.getFieldValue('ARG_NAME'),model=argumentModel(x);
@@ -396,6 +446,14 @@ function chain(block){
   for(let b=block;b;b=b.getNextBlock()){
     if(!b.isEnabled())continue;
     switch(b.type){
+      case 'ev3_led':out.push({type:'led',color:Number(b.getFieldValue('COLOR')),mode:b.getFieldValue('MODE')});break;
+      case 'ev3_led_off':out.push({type:'led',color:0,mode:'on'});break;
+      case 'ev3_steering_run':case 'ev3_steering_angle':case 'ev3_steering_time':out.push({type:'steering',action:b.type.slice(13),leftPort:Number(b.getFieldValue('LEFT_PORT')),rightPort:Number(b.getFieldValue('RIGHT_PORT')),turn:value(b,'TURN'),speed:value(b,'SPEED'),...(b.getInput('DEGREES')?{degrees:value(b,'DEGREES')}:{}),...(b.getInput('SECONDS')?{seconds:value(b,'SECONDS')}:{})});break;
+      case 'ev3_text_set':out.push({type:'textSet',name:b.getFieldValue('NAME'),value:value(b,'VALUE')});break;
+      case 'ev3_list_clear':case 'ev3_list_add':case 'ev3_list_set':case 'ev3_list_delete':out.push({type:({clear:'listClear',add:'listAdd',set:'listSet',delete:'listDelete'})[b.type.slice(9)],list:b.getFieldValue('LIST'),...(b.getInput('INDEX')?{index:value(b,'INDEX')}:{}),...(b.getInput('VALUE')?{value:value(b,'VALUE')}:{})});break;
+      case 'ev3_log_start':out.push({type:'logStart',file:b.getFieldValue('FILE')});break;
+      case 'ev3_log_value':out.push({type:'logValue',label:b.getFieldValue('LABEL'),value:value(b,'VALUE')});break;
+      case 'ev3_log_end':out.push({type:'logEnd'});break;
       case 'variables_set':case 'math_change':{
  const variable=b.getField('VAR').getVariable(),root=b.getRootBlock();
  if(root.type==='procedures_defnoreturn' && root.getVarModels().some(m=>m.getId()===variable.getId()))throw Error('マイブロックの引数は変更できません。通常の変数を選んでください。');
@@ -768,15 +826,25 @@ document.addEventListener('keydown',event=>{
 
 
 function stopSensorMonitor(){clearTimeout(monitorTimer);monitorTimer=null;$('autoSensors').checked=false;}
-function clearSensorValues(){for(let p=1;p<=4;p++){$('sensorValue'+p).textContent='—';$('sensorLabel'+p).textContent='未取得';}for(const p of 'ABCD')$('motorValue'+p).textContent='—';$('sensorMonitorStatus').textContent='接続して「値を読む」を押してください。';}
+function clearSensorValues(){for(let p=1;p<=4;p++){$('sensorValue'+p).textContent='—';$('sensorLabel'+p).textContent='未取得';$('sensorDevice'+p).textContent='';}for(const p of 'ABCD'){$('motorValue'+p).textContent='—';$('motorLabel'+p).textContent='未取得';}$('sensorMonitorStatus').textContent='接続して「値を読む」を押してください。';}
 // 監視も転送と同じ通信経路を使うためbusyで排他する。読み取り完了後に次回を予約し、通信を重ねない。
 // この表示更新は接続中だけの機能。転送したプログラム内のセンサ判定はEV3本体で独立して動く。
 async function refreshSensorValues(){
  if(!connection.connected||busy){if($('autoSensors').checked)monitorTimer=setTimeout(refreshSensorValues,500);return;}
  busy=true;updateButtons();$('sensorMonitorStatus').textContent='読み取っています…';
- try{const snapshot=await connection.readSensorSnapshot();for(const input of snapshot.inputs){const reading=sensorReading(input);$('sensorLabel'+input.port).textContent=reading.label;$('sensorValue'+input.port).textContent=reading.text;}for(const motor of snapshot.motors)$('motorValue'+motor.port).textContent=motor.value===null?'—':motor.value+'°';$('sensorMonitorStatus').textContent='更新 '+new Date().toLocaleTimeString();}
+ try{const snapshot=await connection.readSensorSnapshot();for(const input of snapshot.inputs){const reading=sensorReading(input);$('sensorDevice'+input.port).textContent=deviceName(input.type);$('sensorLabel'+input.port).textContent=reading.label;$('sensorValue'+input.port).textContent=reading.text;}for(const motor of snapshot.motors){$('motorValue'+motor.port).textContent=motor.value===null?'—':motor.value+'°';$('motorLabel'+motor.port).textContent=deviceName(motor.type);}$('sensorMonitorStatus').textContent='更新 '+new Date().toLocaleTimeString();}
  catch(e){stopSensorMonitor();clearSensorValues();$('sensorMonitorStatus').textContent='読み取れませんでした。'+e.message;}
  finally{busy=false;updateButtons();if($('autoSensors').checked&&connection.connected)monitorTimer=setTimeout(refreshSensorValues,500);}
 }
 $('readSensors').onclick=()=>refreshSensorValues();
 $('autoSensors').onchange=()=>{clearTimeout(monitorTimer);monitorTimer=null;if($('autoSensors').checked)void refreshSensorValues();};
+
+// 本体ログの読み出し中は測定の自動更新を止め、同じ通信経路を順番に使う。
+$('exportCsv').onclick=async()=>{if(busy||!connection.connected)return;stopSensorMonitor();busy=true;updateButtons();$('csvStatus').textContent='EV3からCSVを読み出しています…';try{const file=$('csvName').value.trim(),csv=await connection.readCsv($('ev3ProjectName').value,file);download('\ufeff'+csv,file+'.csv','text/csv;charset=utf-8');$('csvStatus').textContent='CSVを保存しました。EV3本体の記録は残っています。';}catch(e){$('csvStatus').textContent=e.message;}finally{busy=false;updateButtons();}};
+
+async function loadFeatureSample(name){
+ if(dirty&&!confirm('編集内容をサンプルに置き換えます。必要な場合は先に保存してください。'))return;
+ try{const response=await fetch('samples/'+name+'.ev3lab');if(!response.ok)throw Error('サンプルを読み込めません。');restore(await response.json());$('fileMenu').open=false;check();saveLocal();dirty=false;feedback('サンプルを読み込みました。ログ名はLogです。ステアリングの例は転送して実行すると走行します。');}catch(e){feedback(e.message,true);}
+}
+$('sampleData').onclick=()=>loadFeatureSample('DataLogTest');
+$('sampleSteering').onclick=()=>loadFeatureSample('SteeringTest');

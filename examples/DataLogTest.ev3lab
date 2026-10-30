@@ -1,0 +1,255 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "appVersion": "0.17.0",
+  "name": "DataLogTest",
+  "programName": "DataLogTest",
+  "ev3ProjectName": "EV3Lab",
+  "pairMode": "independent",
+  "workspace": {
+    "variables": [
+      {
+        "id": "sample-v017-count",
+        "name": "回数"
+      }
+    ],
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "next": {
+            "block": {
+              "type": "ev3_led",
+              "fields": {
+                "COLOR": "1",
+                "MODE": "on"
+              },
+              "next": {
+                "block": {
+                  "type": "ev3_log_start",
+                  "fields": {
+                    "FILE": "Log"
+                  },
+                  "next": {
+                    "block": {
+                      "type": "ev3_list_clear",
+                      "fields": {
+                        "LIST": "測定"
+                      },
+                      "next": {
+                        "block": {
+                          "type": "variables_set",
+                          "fields": {
+                            "VAR": {
+                              "id": "sample-v017-count"
+                            }
+                          },
+                          "inputs": {
+                            "VALUE": {
+                              "block": {
+                                "type": "math_number",
+                                "fields": {
+                                  "NUM": 0
+                                }
+                              }
+                            }
+                          },
+                          "next": {
+                            "block": {
+                              "type": "controls_repeat_ext",
+                              "inputs": {
+                                "TIMES": {
+                                  "block": {
+                                    "type": "math_number",
+                                    "fields": {
+                                      "NUM": 10
+                                    }
+                                  }
+                                },
+                                "DO": {
+                                  "block": {
+                                    "type": "math_change",
+                                    "fields": {
+                                      "VAR": {
+                                        "id": "sample-v017-count"
+                                      }
+                                    },
+                                    "inputs": {
+                                      "DELTA": {
+                                        "block": {
+                                          "type": "math_number",
+                                          "fields": {
+                                            "NUM": 1
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "next": {
+                                      "block": {
+                                        "type": "ev3_list_add",
+                                        "fields": {
+                                          "LIST": "測定"
+                                        },
+                                        "inputs": {
+                                          "VALUE": {
+                                            "block": {
+                                              "type": "variables_get",
+                                              "fields": {
+                                                "VAR": {
+                                                  "id": "sample-v017-count"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "next": {
+                                          "block": {
+                                            "type": "ev3_log_value",
+                                            "fields": {
+                                              "LABEL": "回数"
+                                            },
+                                            "inputs": {
+                                              "VALUE": {
+                                                "block": {
+                                                  "type": "variables_get",
+                                                  "fields": {
+                                                    "VAR": {
+                                                      "id": "sample-v017-count"
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            "next": {
+                                              "block": {
+                                                "type": "ev3_log_value",
+                                                "fields": {
+                                                  "LABEL": "説明"
+                                                },
+                                                "inputs": {
+                                                  "VALUE": {
+                                                    "block": {
+                                                      "type": "ev3_text_join",
+                                                      "inputs": {
+                                                        "A": {
+                                                          "block": {
+                                                            "type": "ev3_text",
+                                                            "fields": {
+                                                              "TEXT": "回数="
+                                                            }
+                                                          }
+                                                        },
+                                                        "B": {
+                                                          "block": {
+                                                            "type": "ev3_text_number",
+                                                            "inputs": {
+                                                              "VALUE": {
+                                                                "block": {
+                                                                  "type": "variables_get",
+                                                                  "fields": {
+                                                                    "VAR": {
+                                                                      "id": "sample-v017-count"
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                "next": {
+                                                  "block": {
+                                                    "type": "ev3_wait_seconds",
+                                                    "inputs": {
+                                                      "SECONDS": {
+                                                        "block": {
+                                                          "type": "math_number",
+                                                          "fields": {
+                                                            "NUM": 0.1
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "next": {
+                                "block": {
+                                  "type": "ev3_log_value",
+                                  "fields": {
+                                    "LABEL": "平均"
+                                  },
+                                  "inputs": {
+                                    "VALUE": {
+                                      "block": {
+                                        "type": "ev3_list_stat",
+                                        "fields": {
+                                          "LIST": "測定",
+                                          "OP": "average"
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "next": {
+                                    "block": {
+                                      "type": "ev3_log_end",
+                                      "next": {
+                                        "block": {
+                                          "type": "ev3_led",
+                                          "fields": {
+                                            "COLOR": "3",
+                                            "MODE": "flash"
+                                          },
+                                          "next": {
+                                            "block": {
+                                              "type": "ev3_wait_seconds",
+                                              "inputs": {
+                                                "SECONDS": {
+                                                  "block": {
+                                                    "type": "math_number",
+                                                    "fields": {
+                                                      "NUM": 1
+                                                    }
+                                                  }
+                                                }
+                                              },
+                                              "next": {
+                                                "block": {
+                                                  "type": "ev3_led_off"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

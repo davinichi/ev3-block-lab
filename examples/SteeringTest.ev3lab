@@ -1,0 +1,143 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "appVersion": "0.17.0",
+  "name": "SteeringTest",
+  "programName": "SteeringTest",
+  "ev3ProjectName": "EV3Lab",
+  "pairMode": "independent",
+  "workspace": {
+    "variables": [],
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "next": {
+            "block": {
+              "type": "ev3_led",
+              "fields": {
+                "COLOR": "1",
+                "MODE": "on"
+              },
+              "next": {
+                "block": {
+                  "type": "ev3_steering_time",
+                  "fields": {
+                    "LEFT_PORT": "2",
+                    "RIGHT_PORT": "4"
+                  },
+                  "inputs": {
+                    "TURN": {
+                      "block": {
+                        "type": "math_number",
+                        "fields": {
+                          "NUM": 25
+                        }
+                      }
+                    },
+                    "SPEED": {
+                      "block": {
+                        "type": "math_number",
+                        "fields": {
+                          "NUM": 20
+                        }
+                      }
+                    },
+                    "SECONDS": {
+                      "block": {
+                        "type": "math_number",
+                        "fields": {
+                          "NUM": 2
+                        }
+                      }
+                    }
+                  },
+                  "next": {
+                    "block": {
+                      "type": "ev3_wait_seconds",
+                      "inputs": {
+                        "SECONDS": {
+                          "block": {
+                            "type": "math_number",
+                            "fields": {
+                              "NUM": 1
+                            }
+                          }
+                        }
+                      },
+                      "next": {
+                        "block": {
+                          "type": "ev3_steering_time",
+                          "fields": {
+                            "LEFT_PORT": "2",
+                            "RIGHT_PORT": "4"
+                          },
+                          "inputs": {
+                            "TURN": {
+                              "block": {
+                                "type": "math_number",
+                                "fields": {
+                                  "NUM": -25
+                                }
+                              }
+                            },
+                            "SPEED": {
+                              "block": {
+                                "type": "math_number",
+                                "fields": {
+                                  "NUM": 20
+                                }
+                              }
+                            },
+                            "SECONDS": {
+                              "block": {
+                                "type": "math_number",
+                                "fields": {
+                                  "NUM": 2
+                                }
+                              }
+                            }
+                          },
+                          "next": {
+                            "block": {
+                              "type": "ev3_led",
+                              "fields": {
+                                "COLOR": "2",
+                                "MODE": "flash"
+                              },
+                              "next": {
+                                "block": {
+                                  "type": "ev3_wait_seconds",
+                                  "inputs": {
+                                    "SECONDS": {
+                                      "block": {
+                                        "type": "math_number",
+                                        "fields": {
+                                          "NUM": 1
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "next": {
+                                    "block": {
+                                      "type": "ev3_led_off"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

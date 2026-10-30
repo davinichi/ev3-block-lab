@@ -110,7 +110,7 @@ test('RBF has LEGO header, correct sizes, real SUBCALL and DATAF argument',()=>{
 // A small independent VM for the subset produced by this compiler. It decodes
 // bytes from the finished RBF, rather than reading the compiler's intermediate tree.
 function interpret(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorDriver=null,files=new Map(),sensorRead=()=>NaN,sensorType=null,sensorMode=null,motorTypes=[7,7,7,7],sensorLog=[],buttonRead=()=>false,waitLimit=Infinity}={}){
-  const handles=new Map();
+  const handles=new Map(),arrays=new Map();let nextArray=10;
   const counts=[...initialCounts],pendingSpeed=[0,0,0,0];
   const shared=dv(new Uint8Array(dv(bytes).getUint32(12,true)));
   const view=dv(bytes),headers=[];for(let i=0;i<view.getUint16(10,true);i++)headers.push({pc:view.getUint32(16+12*i,true),size:view.getUint32(24+12*i,true)});
@@ -130,6 +130,9 @@ function interpret(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorDriver=nul
       if(isVar)return size===1?m.getInt8(val):size===2?m.getInt16(val,true):m.getInt32(val,true);
       return val;
     }
+    const pointer=()=>{if(bytes[pc]===0x84){const data=new TextEncoder().encode(param()+'\0');return {get:i=>data[i],set:()=>{throw Error('constant write');}};}const at=param(1,true);return {get:i=>m.getInt8(at<0?at-i:at+i)&255,set:(i,v)=>m.setInt8(at<0?at-i:at+i,v)};};
+    const string=()=>{const p=pointer();let a=[];for(let i=0;i<124;i++){const b=p.get(i);if(!b)return new TextDecoder().decode(new Uint8Array(a));a.push(b);}throw Error('unterminated string');};
+    const putString=(p,s,max=124)=>{const a=new TextEncoder().encode(s);assert.ok(a.length<max);a.forEach((b,i)=>p.set(i,b));p.set(a.length,0);};
     const floatBits=new DataView(new ArrayBuffer(4));
     const fparam=()=>{floatBits.setInt32(0,param(),true);return floatBits.getFloat32(0,true);};
     const setFloat=(at,n)=>{floatBits.setFloat32(0,n,true);m.setInt32(at,floatBits.getInt32(0,true),true);};
@@ -152,15 +155,27 @@ function interpret(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorDriver=nul
         case 0xb3:{assert.equal(param(1),0);const port=param(1),at=param(4,true);m.setInt32(at,motorDriver?Math.round(motorDriver.position[port]-encoderOffsets[port]):counts[port],true);break;}
         case 0xb2:{assert.equal(param(1),0);const ports=param(1);for(let i=0;i<4;i++)if(ports&(1<<i)){if(motorDriver)encoderOffsets[i]=motorDriver.position[i];else counts[i]=0;}break;}
         case 0xa2:{assert.equal(param(1),0);const ports=param(1);for(let i=0;i<4;i++)if(ports&(1<<i))counts[i]=0;break;}
-        case 0xb0:{assert.equal(param(1),0);const ports=param(1),speed=param(1),turn=param(2),degrees=param();assert.equal(param(1),1);events.push({type:'motorSync',ports,speed,turn,degrees});
+        case 0xb0:{assert.equal(param(1),0);const ports=param(1),speed=param(1),turn=param(2),degrees=param();const brake=param(1);assert.ok([0,1].includes(brake));events.push({type:'motorSync',ports,speed,turn,degrees});
           // Firmware sync compares the two accumulated TachoCnt values. In the
           // ideal equal-count end state, an old offset reduces physical travel.
           for(let i=0;i<4;i++)if(ports&(1<<i)){movementLog.push({port:i,degrees:Math.sign(speed)*degrees-counts[i]});counts[i]=0;}break;}
         case 0xaa:{param(1);const ports=param(1);if(motorDriver){let waits=0;while(motorDriver.busy(ports)){assert.ok(++waits<100000);motorDriver.advance(20);}}break;}
         case 0xa3:{param(1);const ports=param(1);param(1);motorDriver?.stop(ports);break;}
         case 0x02:{assert.equal(param(2),-1);if(motorDriver)motorDriver.aborted=true;throw Error('PROGRAM_STOP');}
+        case 0x82:assert.equal(param(1),27);events.push({type:'led',pattern:param(1)});break;
+        case 0x36:{const n=param(2),at=param(4,true);m.setInt32(at,n,true);break;}
+        case 0x8e:{const lo=param(2),hi=param(2),at=param(2,true);assert.ok(lo<=hi);m.setInt16(at,lo,true);break;}
+        case 0xc8:{const p=pointer(),i=param(1),at=param(1,true);assert.ok(i>=0&&i<=120);m.setInt8(at,p.get(i));break;}
+        case 0xcc:{const value=param(1),i=param(1),p=pointer();assert.ok(i>=0&&i<=120);p.set(i,value);break;}
+        case 0x7d:{const cmd=param(1);if(cmd===11){const n=fparam(),fmt=string(),size=param(1),dest=pointer();putString(dest,fmt==='%.3f'?n.toFixed(3):String(Number(n.toPrecision(7))),size);}else if(cmd===5){const src=string(),dest=pointer();putString(dest,src);}else if(cmd===7){const str=string(),at=param(4,true);setFloat(at,Number(str));}else throw Error('STRINGS '+cmd);break;}
+        case 0xc1:{const cmd=param(1);if(cmd===4){const size=param(),at=param(2,true),id=nextArray++;arrays.set(id,Array(size).fill(0));m.setInt16(at,id,true);}else if(cmd===12){const h=param(2),at=param(4,true);m.setInt32(at,arrays.get(h).length,true);}else if(cmd===5){const h=param(2),n=param();arrays.get(h).length=n;}else throw Error('ARRAY '+cmd);break;}
+        case 0xc2:{const h=param(2),i=param(),v=fparam();assert.ok(i>=0&&i<arrays.get(h).length);arrays.get(h)[i]=v;break;}
+        case 0xc3:{const h=param(2),i=param(),at=param(4,true);assert.ok(i>=0&&i<arrays.get(h).length);setFloat(at,arrays.get(h)[i]);break;}
+        case 0xc4:{const h=param(2),v=fparam();arrays.get(h).push(v);break;}
+        case 0xb1:{assert.equal(param(1),0);events.push({type:'steeringTime',ports:param(1),speed:param(1),turn:param(2),ms:param(),brake:param(1)});break;}
         case 0xc0:{const command=param(1);
-          if(command===2){const path=param(),at=param(2,true);files.set(path,new Uint8Array());handles.set(1,path);m.setInt16(at,1,true);}
+          if(command===2||command===0){const path=string(),at=param(2,true);if(command===2||!files.has(path))files.set(path,new Uint8Array());handles.set(1,path);m.setInt16(at,1,true);}
+          else if(command===6){const handle=param(2);assert.equal(param(1),0);const src=pointer(),raw=[];for(let i=0;i<124&&src.get(i);i++)raw.push(src.get(i));const path=handles.get(handle);assert.ok(path);files.set(path,new Uint8Array([...files.get(path),...raw]));}
           else if(command===29){const handle=param(2),length=param(2),source=param(1,true),path=handles.get(handle);assert.ok(path);assert.ok(source+length<=memory.length);files.set(path,new Uint8Array([...files.get(path),...memory.slice(source,source+length)]));}
           else if(command===7){const handle=param(2);assert.ok(handles.has(handle));handles.delete(handle);}
           else throw Error(`Unsupported FILE command ${command}`);break;}
@@ -873,4 +888,47 @@ test('timer global does not overwrite variables, wheel geometry or acceleration 
  const driver=new SimulatedMotors([1,1,1,1]);const p={main:[{type:'wheel',diameter:56},{type:'tread',mm:112},{type:'ramp',mode:'off',upSeconds:.5,downSeconds:.5},{type:'set',var:'n',value:1},{type:'timerReset'},{type:'wait',ms:250},timerTone(timerSeconds),{type:'drive',ports:6,speed:20,cm:10,direction:'forward',mode:'independent'},timerTone({var:'n'})],procedures:[]};
  const events=interpret(compile(p).data,{motorDriver:driver});assert.deepEqual(events.filter(x=>x.type==='tone').map(x=>x.frequency),[500,1250]);assert.equal(Math.round(driver.position[1]),205);assert.equal(Math.round(driver.position[2]),205);assert.equal(driver.aborted,undefined);
  assert.throws(()=>compile({main:[timerTone({timer:false})],procedures:[]}),/タイマー/);
+});
+
+// v0.17: 実際のRBFを独立VMへ渡し、PC非接続時のデータ処理とCSVバイト列を確かめる。
+const txt=text=>({text}),tdata=(op,value,other)=>({textData:{op,value,other}}),ldata=(op,extra={})=>({listData:{op,list:'測定',...extra}}),ndata=(op,a,b,extra={})=>({numeric:{op,a,b,...extra}});
+const record=(label,value)=>({type:'logValue',label,value});
+function csvRun(main,procedures=[]){const files=new Map(),build=compile({main,procedures},'Class1');interpret(build.data,{files});return {csv:new TextDecoder().decode(files.get('../prjs/Class1/Test.csv')),files,build};}
+const begin={type:'logStart',file:'Test'};
+test('LED patterns and all steering ports preserve native instructions and signed turn orientation',()=>{
+ for(const [leftPort,rightPort] of [[1,2],[2,1],[2,4],[8,4]])for(const turn of [-100,-50,0,25,50,100]){
+  const build=compile({main:[{type:'led',color:3,mode:'flash'},{type:'steering',leftPort,rightPort,turn,speed:20,action:'angle',degrees:360},{type:'led',color:0,mode:'on'}],procedures:[]});
+  const events=interpret(build.data);assert.deepEqual(events.filter(x=>x.type==='led').map(x=>x.pattern),[6,0]);assert.equal(events.find(x=>x.type==='motorSync').turn,turn*2*(leftPort<rightPort?1:-1)||0);
+ }
+ const events=interpret(compile({main:[{type:'steering',leftPort:2,rightPort:4,speed:-20,turn:15,action:'time',seconds:.5},{type:'steering',leftPort:2,rightPort:4,speed:0,turn:0,action:'run'}],procedures:[]}).data);assert.equal(events.find(x=>x.type==='steeringTime').ms,500);
+});
+test('CSV stores decimal values on the brick, escapes commas and quotes, protects spreadsheet formulas and overwrites on restart',()=>{
+ const {csv,files}=csvRun([begin,record('速度,目標',12.5),record('日本語',txt('赤い\"線\",青')),record('=危険',txt('=1+2')),{type:'logEnd'}]);
+ assert.equal(csv,'time_s,item,value\r\n0.000,\"速度,目標\",\"12.5\"\r\n0.000,\"日本語\",\"赤い\"\"線\"\",青\"\r\n0.000,\"\'=危険\",\"\'=1+2\"\r\n');assert.equal(files.size,1);
+ const overwritten=csvRun([begin,record('old',1),begin,record('new',2)]).csv;assert.ok(!overwritten.includes('old'));assert.ok(overwritten.includes('new'));
+});
+test('UTF-8 join, character length, character extraction, equality and contains survive nested My Block calls',()=>{
+ const source={textOp:'join',a:txt('あい'),b:txt('うEV3')};
+ const main=[begin,{type:'textSet',name:'メッセージ',value:source},{type:'call',name:'読む',args:[]},record('letter',{textOp:'letter',value:{textVar:'メッセージ'},index:2}),record('missing',{textOp:'letter',value:source,index:20}),record('eq',tdata('equal',txt('あ'),txt('あ'))),record('ne',tdata('equal',txt('あ'),txt('い'))),record('length',tdata('length',source)),record('has',tdata('contains',source,txt('うE'))),record('no',tdata('contains',source,txt('うX'))),record('empty',tdata('contains',source,txt('')))];
+ const {csv}=csvRun(main,[{name:'読む',params:[],body:[record('message',{textVar:'メッセージ'})]}]);
+ for(const part of ['\"message\",\"あいうEV3\"','\"letter\",\"い\"','\"missing\",\"\"','\"eq\",\"1\"','\"ne\",\"0\"','\"length\",\"6\"','\"has\",\"1\"','\"no\",\"0\"','\"empty\",\"1\"'])assert.ok(csv.includes(part),part+'\n'+csv);
+});
+test('list mutations, membership and statistics use shared DATAF arrays in call order',()=>{
+ const {csv}=csvRun([begin,{type:'listAdd',list:'測定',value:1.5},{type:'call',name:'追加',args:[]},record('count',ldata('length')),record('sum',ldata('sum')),record('average',ldata('average')),record('min',ldata('min')),record('max',ldata('max')),record('has',ldata('contains',{value:2.5})),{type:'listSet',list:'測定',index:2,value:9},{type:'listDelete',list:'測定',index:1},record('first',ldata('item',{index:1})),{type:'listClear',list:'測定'},record('empty',ldata('length'))],[{name:'追加',params:[],body:[{type:'listAdd',list:'測定',value:2.5},{type:'listAdd',list:'測定',value:-1}]}]);
+ for(const part of ['\"count\",\"3\"','\"sum\",\"3\"','\"average\",\"1\"','\"min\",\"-1\"','\"max\",\"2.5\"','\"has\",\"1\"','\"first\",\"9\"','\"empty\",\"0\"'])assert.ok(csv.includes(part),part+'\n'+csv);
+});
+test('modulo, bounded random, min/max, clamp and rounding produce usable runtime numbers',()=>{
+ const {csv}=csvRun([begin,record('mod',ndata('mod',-7,3)),record('round',ndata('round',-1.5)),record('min',ndata('min',-3,2)),record('max',ndata('max',-3,2)),record('low',ndata('clamp',-120,undefined,{low:-100,high:100})),record('high',ndata('clamp',120,undefined,{low:-100,high:100})),record('random',ndata('random',-5,5))]);
+ for(const part of ['\"mod\",\"2\"','\"round\",\"-1\"','\"min\",\"-3\"','\"max\",\"2\"','\"low\",\"-100\"','\"high\",\"100\"','\"random\",\"-5\"'])assert.ok(csv.includes(part),part+'\n'+csv);
+});
+test('bad indexes, empty statistics, inactive logs and overflowing text stop before unsafe writes',()=>{
+ for(const node of [record('x',ldata('item',{index:1})),record('x',ldata('average')),record('x',{textOp:'join',a:txt('あ'.repeat(30)),b:txt('い'.repeat(30))})]){const {csv}=csvRun([begin,node]);assert.equal(csv,'time_s,item,value\r\n');}
+ const files=new Map();interpret(compile({main:[record('x',1)],procedures:[]}).data,{files});assert.equal(files.size,0);
+ assert.throws(()=>compile({main:[{type:'logStart',file:'../x'}],procedures:[]}),/ログ名/);assert.throws(()=>compile({main:[begin,record('x',txt('あ'.repeat(41)))],procedures:[]}),/120/);
+});
+
+test('string-to-number validates signed decimal/exponent syntax before calling stock firmware conversion',()=>{
+ const {csv}=csvRun([begin,...['12.5','-2.5','+3','1e2','.5','-0.25e-1'].map((v,i)=>record('n'+i,tdata('number',txt(v))))]);
+ for(const n of ['12.5','-2.5','3','100','0.5','-0.025'])assert.ok(csv.includes('"'+n+'"'),csv);
+ for(const v of ['', 'abc', '1..2', '+-2', '1e', '2junk'])assert.equal(csvRun([begin,record('bad',tdata('number',txt(v)))]).csv,'time_s,item,value\r\n',v);
 });
