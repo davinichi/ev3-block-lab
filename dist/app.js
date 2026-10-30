@@ -1,7 +1,7 @@
 import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.js'; import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from './library.js'; import {sensorReading} from './sensor-monitor.js';
 const $=id=>document.getElementById(id);
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.13.1';
+const VERSION='0.13.2';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -205,7 +205,7 @@ function argumentFlyout(ws){
  return items;
 }
 Blockly.Blocks.ev3_argument={
- init:function(){this.parameterId='';this.appendDummyInput().appendField('引数').appendField(new Blockly.FieldLabelSerializable('名前'),'ARG_NAME');this.setOutput(true,'Number');this.setColour('#aa597e');this.setTooltip('マイブロックの定義の中だけで使う引数です。通常の変数とは別です。');},
+ init:function(){this.parameterId='';this.appendDummyInput().appendField(new Blockly.FieldLabelSerializable('名前'),'ARG_NAME');this.setOutput(true,'Number');this.setColour('#aa597e');this.setTooltip('マイブロックの定義の中だけで使う引数です。通常の変数とは別です。');},
  saveExtraState:function(){return {parameterId:this.parameterId,name:this.getFieldValue('ARG_NAME')};},
  loadExtraState:function(state){this.parameterId=String(state.parameterId??'');this.setFieldValue(String(state.name??'名前'),'ARG_NAME');}
 };
@@ -431,8 +431,7 @@ function ensureArgumentInputs(){
     for(const block of workspace.getAllBlocks(false)){
       if(block.type==='variables_get'){
         const argument=localArgument(block),colour=argument?'#aa597e':'#c58245';
-        if(argument&&!block.getField('EV3_KIND'))block.inputList[0].insertFieldAt(0,'引数','EV3_KIND');
-        if(!argument&&block.getField('EV3_KIND'))block.inputList[0].removeField('EV3_KIND');
+        if(block.getField('EV3_KIND'))block.inputList[0].removeField('EV3_KIND');
         if(block.getColour()!==colour)block.setColour(colour);
       }
       if(block.type==='ev3_argument'){

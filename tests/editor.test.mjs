@@ -285,7 +285,7 @@ test('argument names are hidden from ordinary variable palette and dropdowns',()
  const x=JSON.parse(result);assert.deepEqual(x.ordinaryNames,['回数']);assert.ok(x.options.includes(x.globalId));assert.ok(!x.options.includes('param-distance'));assert.ok(!x.options.includes('param-speed'));assert.deepEqual(x.argumentNames,['距離','速さ']);assert.deepEqual(x.read,{param:'距離'});assert.deepEqual(x.after,x.read);assert.equal(x.label,'距離');assert.equal(x.colour,'#aa597e');assert.match(x.outsideError,/定義したマイブロック/);
 });
 
-test('legacy parameter getters retain their meaning but receive an argument label',()=>{
+test('legacy parameter getters retain their meaning and purple colour without a prefix',()=>{
  const context=editor();
  const result=vm.runInContext(`
  Blockly.Events.disable();
@@ -296,7 +296,7 @@ test('legacy parameter getters retain their meaning but receive an argument labe
  const variable=workspace.getVariableMap().createVariable('回数'),getter=workspace.newBlock('variables_get');getter.setFieldValue(variable.getId(),'VAR');ensureArgumentInputs();
  const ordinary={kind:getter.getFieldValue('EV3_KIND'),colour:getter.getColour(),value:expression(getter)};
  Blockly.Events.enable();JSON.stringify({param,ordinary,variables:ordinaryVariables(workspace).map(m=>m.name)});`,context);
- assert.deepEqual(JSON.parse(result),{param:{kind:'引数',colour:'#aa597e',value:{param:'距離'}},ordinary:{kind:null,colour:'#c58245',value:{var:'回数'}},variables:['回数']});
+ assert.deepEqual(JSON.parse(result),{param:{kind:null,colour:'#aa597e',value:{param:'距離'}},ordinary:{kind:null,colour:'#c58245',value:{var:'回数'}},variables:['回数']});
 });
 
 test('unconnected experiments and uncalled unfinished definitions remain editable but do not block transfer',()=>{
