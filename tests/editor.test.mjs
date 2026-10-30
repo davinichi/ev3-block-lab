@@ -4,6 +4,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {compile,programFileName} from '../dist/ev3.js';
 import {createBlockLibrary,mergeBlockLibrary} from '../dist/library.js';
+import {sensorReading} from '../dist/sensor-monitor.js';
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
 // Blockly's headless shadow serialization still creates XML nodes. Supply
 // only that DOM surface; no browser or rendering is emulated by these tests.
@@ -39,6 +40,24 @@ test('program names determine saved filenames and preserve EV3 destinations acro
  $('programName').value='../bad';dirty=true;$('saveProject').onclick();
  Blockly.Events.enable();JSON.stringify({first,loaded,renamed,count:downloads.length,error,focused,dirty});`,context));
  assert.equal(result.first.name,'LineTrace.ev3lab');assert.equal(result.first.type,'application/json');assert.equal(result.loaded.programName,'LineTrace');assert.equal(result.loaded.ev3ProjectName,'Class1');assert.equal(result.loaded.pairMode,'feedback');assert.equal(result.loaded.name,'LineTrace');assert.equal(result.loaded.workspace.blocks.blocks[0].type,'ev3_start');assert.equal(result.renamed.name,'Turn_90.ev3lab');assert.equal(result.renamed.data.programName,'Turn_90');assert.equal(result.count,2);assert.ok(result.error);assert.equal(result.focused,true);assert.equal(result.dirty,true);
+});
+
+test('transfer buttons keep save-only and verified-run separate and preserve verified files on start failure',async()=>{
+ const context=editor();context.programFileName=programFileName;
+ vm.runInContext(`let busy=false,savedPath='',pollsStopped=0;const sent=[];let failStart=false;const connection={transferWithSignal:async(data,name,progress,folder)=>{sent.push({kind:'save',name,folder});return {path:'../prjs/'+folder+'/'+name,soundError:null};},transferAndRun:async(data,name,progress,folder)=>{sent.push({kind:'run',name,folder});if(failStart){const e=Error('start failed');e.verifiedPath='../prjs/'+folder+'/'+name;throw e;}return {path:'../prjs/'+folder+'/'+name,soundError:null};},stopProgram:async()=>sent.push({kind:'stop'})};function check(){return {data:new Uint8Array([1,2]),program:{}};}function log(){}function feedback(text){$('transferResult').textContent=text;}function updateButtons(){}function stopSensorMonitor(){pollsStopped++;}$('programName').value='Line';$('ev3ProjectName').value='Class1';`,context);
+ vm.runInContext(app.slice(app.indexOf('function fileName(){'),app.indexOf("$('downloadRbf').onclick=")),context);
+ await vm.runInContext(`$('transfer').onclick()`,context);assert.match(vm.runInContext(`$('transferResult').textContent`,context),/本体でこのプログラム/);
+ await vm.runInContext(`$('transferRun').onclick()`,context);assert.match(vm.runInContext(`$('transferResult').textContent`,context),/起動命令/);
+ await vm.runInContext(`failStart=true;$('transferRun').onclick()`,context);assert.match(vm.runInContext(`$('transferResult').textContent`,context),/転送・照合は完了/);assert.equal(vm.runInContext('savedPath',context),'../prjs/Class1/Line.rbf');assert.equal(vm.runInContext('busy',context),false);
+ await vm.runInContext(`$('stopProgram').onclick()`,context);assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(sent.map(x=>x.kind))',context)),['save','run','run','stop']);
+});
+
+test('sensor panel renders current readings and clears them after a failed or disconnected read',async()=>{
+ const context=editor();context.sensorReading=sensorReading;
+ vm.runInContext(`let busy=false,monitorTimer=null;function updateButtons(){}const connection={connected:true,readSensorSnapshot:async()=>({inputs:[{port:1,type:29,mode:0,value:35},{port:2,type:30,mode:0,value:12.5}],motors:[{port:'B',value:-360},{port:'C',value:null}]})};`,context);
+ vm.runInContext(app.slice(app.indexOf('function stopSensorMonitor(){')),context);
+ await vm.runInContext('refreshSensorValues()',context);assert.equal(vm.runInContext(`$('sensorValue1').textContent`,context),'35 %');assert.equal(vm.runInContext(`$('motorValueB').textContent`,context),'-360°');assert.equal(vm.runInContext(`$('motorValueC').textContent`,context),'—');
+ await vm.runInContext(`connection.readSensorSnapshot=async()=>{throw Error('unplugged');};refreshSensorValues()`,context);assert.equal(vm.runInContext(`$('sensorValue1').textContent`,context),'—');assert.equal(vm.runInContext(`$('autoSensors').checked`,context),false);assert.equal(vm.runInContext('busy',context),false);assert.match(vm.runInContext(`$('sensorMonitorStatus').textContent`,context),/unplugged/);
 });
 
 test('plain procedure form creates and edits arguments while retaining callers and scoped references',()=>{

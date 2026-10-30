@@ -25,6 +25,21 @@ function fileServer(device){
   device.reply(packet(id,3,[cmd,status,...data]));
  };return files;
 }
+for(const size of [64,1024])test('USB '+size+' byte reports transfer, verify, launch and observe sensors without changing modes',async()=>{
+ const {device,connection}=setup(size),files=fileServer(device),serveFile=device.respond;let running=false;
+ device.respond=frame=>{
+  if(frame[4]!==0)return serveFile(frame);
+  const id=frame[2]+256*frame[3],out=new Uint8Array(frame[5]+256*frame[6]),op=frame[7];
+  if(op===0x0c){out[0]=running?0x10:0x40;out[1]=running?1:0;}
+  if(op===0xc0){assert.equal(frame[10],0x84);running=true;}
+  if(op===2)running=false;
+  if(op===0x99){out[0]=126;new DataView(out.buffer).setFloat32(4,NaN,true);}
+  device.reply(packet(id,2,out));
+ };
+ await connection.connect('usb');const result=await connection.transferAndRun(Uint8Array.of(76,69,71,79),'Go.rbf',()=>{});
+ assert.equal(running,true);assert.equal(result.started,true);assert.deepEqual(files.get(result.path),Uint8Array.of(76,69,71,79));assert.equal((await connection.readSensorSnapshot()).inputs[0].value,null);assert.equal(running,true);
+ await connection.stopProgram();assert.equal(running,false);await connection.close();
+});
 for(const size of [64,1024])test('USB '+size+' byte reports support identity, padded replies, complete readback and overwrite',async()=>{
  const {device,hid,connection}=setup(size),files=fileServer(device);await connection.connect('usb');
  assert.deepEqual(hid.filters,[{vendorId:0x0694,productId:5,usagePage:0xff00,usage:1}]);assert.equal(await connection.ping(),'V1.09E');

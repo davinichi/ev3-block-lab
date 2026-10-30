@@ -717,6 +717,57 @@ export class EV3Connection {
     const counts={B:view.getInt32(0,true),C:view.getInt32(4,true)};
     this.log('角度読取',JSON.stringify(counts));return counts;
   }
+  async directCommand(code,globalBytes=0,timeout=3000){
+    if(!Number.isInteger(globalBytes)||globalBytes<0||globalBytes>1023)throw Error('読み取りサイズが不正です。');
+    const payload=[...u16(globalBytes),...code];
+    if(this.transport==='usb'&&this.usbReports&&payload.length+5>this.usbReports.outputSize)throw Error('このUSB接続ではプロジェクト名とプログラム名を短くしてください。');
+    const reply=await this.request(0,payload,timeout);
+    if(reply[4]!==2||reply.length!==5+globalBytes)throw Error('EV3が命令を受け付けませんでした。');
+    return reply.slice(5);
+  }
+  async programStatus(){
+    const value=await this.directCommand([0x0c,...constant(22),...constant(1),...globalVar(0),0x0c,...constant(24),...constant(1),...globalVar(1)],2);
+    return {status:value[0],result:value[1]};
+  }
+  async ensureProgramStopped(){
+    if((await this.programStatus()).status!==0x40)throw Error('EV3でプログラムが実行中です。「実行を停止」または本体の戻るボタンで停止してから転送してください。');
+  }
+  programStartCode(path){
+    if(!/^\.\.\/prjs\/[A-Za-z0-9_-]{1,31}\/[A-Za-z0-9_-]{1,31}\.rbf$/.test(path??''))throw Error('起動するプログラムの保存先が不正です。');
+    // USER_SLOT=1; FILE(LOAD_IMAGE, slot, path, size, image), PROGRAM_START.
+    return [0xc0,...constant(8),...constant(1),0x84,...zstr(path),...globalVar(0),...globalVar(4),0x03,...constant(1),...globalVar(0),...globalVar(4),...constant(0)];
+  }
+  async startProgram(path){
+    const code=this.programStartCode(path);await this.ensureProgramStopped();
+    await this.directCommand(code,8);
+    const state=await this.programStatus();if(state.result===2)throw Error('EV3で実行エラーが発生しました。本体の表示とプログラムを確認してください。');
+    this.log('起動',`${path} の起動命令をEV3が受け付けました。`);
+  }
+  async transferAndRun(data,filename,onProgress,folder='EV3Lab'){
+    const path=`${projectDirectory(folder)}/${filename}`,code=this.programStartCode(path);
+    if(this.transport==='usb'&&this.usbReports&&code.length+7>this.usbReports.outputSize)throw Error('このUSB接続ではプロジェクト名とプログラム名を短くしてください。');
+    await this.ensureProgramStopped();
+    const result=await this.transferWithSignal(data,filename,onProgress,folder);
+    try{await this.startProgram(result.path);}catch(error){error.verifiedPath=result.path;throw error;}
+    return {...result,started:true};
+  }
+  async stopProgram(){
+    await this.directCommand([OP.PROGRAM_STOP,...constant(1),OP.STOP,...constant(0),...constant(15),...constant(1)]);
+    this.log('停止','ユーザープログラムとすべてのモーターへ停止命令を送信しました。');
+  }
+  async readSensorSnapshot(){
+    const inputs=[];
+    for(let port=0;port<4;port++){
+      // TYPE_KEEP=0, MODE_KEEP=-1: observe the current mode without switching it.
+      const bytes=await this.directCommand([OP.INPUT_DEVICE,...constant(5),...constant(0),...constant(port),...globalVar(0),...globalVar(1),0x9d,...constant(0),...constant(port),...constant(0),...constant(-1),...globalVar(4)],8);
+      const value=new DataView(bytes.buffer,bytes.byteOffset).getFloat32(4,true);
+      inputs.push({port:port+1,type:bytes[0],mode:bytes[1],value:Number.isFinite(value)?value:null});
+    }
+    const code=[];for(let port=0;port<4;port++)code.push(OP.INPUT_DEVICE,...constant(5),...constant(0),...constant(16+port),...globalVar(port*2),...globalVar(port*2+1),OP.MOTOR_COUNT,...constant(0),...constant(port),...globalVar(8+port*4));
+    const bytes=await this.directCommand(code,24),view=new DataView(bytes.buffer,bytes.byteOffset);
+    const motors=Array.from({length:4},(_,i)=>({port:'ABCD'[i],type:bytes[i*2],value:[7,8].includes(bytes[i*2])?view.getInt32(8+i*4,true):null}));
+    return {inputs,motors};
+  }
   async readTimingRecord(path,tag){
     if(!/^\.\.\/prjs\/[A-Za-z0-9_-]{1,31}\/FB_[0-9a-f]{8}\.bin$/.test(path??''))throw Error('停止タイミング補正モードのプログラムを転送・実行してください。');
     let data;

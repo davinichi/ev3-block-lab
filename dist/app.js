@@ -1,7 +1,7 @@
-import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.js'; import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from './library.js';
+import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.js'; import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from './library.js'; import {sensorReading} from './sensor-monitor.js';
 const $=id=>document.getElementById(id);
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.12.0';
+const VERSION='0.13.0';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -287,7 +287,7 @@ workspace.registerToolboxCategoryCallback('PROCEDURE',ws=>{
  }
  return items;
 });
-let lastBuild=null,busy=false,loading=false,dirty=false,saveTimer,baselineCounts=null,lastTimingSignature=null;
+let lastBuild=null,busy=false,loading=false,dirty=false,saveTimer,baselineCounts=null,lastTimingSignature=null,monitorTimer=null;
 const logs=[];
 function log(type,message){
   const line=`${new Date().toISOString()} [${type}] ${message}`;logs.push(line);if(logs.length>1200)logs.shift();
@@ -295,7 +295,7 @@ function log(type,message){
   $('lastLog').textContent=`${type} · ${message}`;
 }
 const connection=new EV3Connection(log,connected=>{
-  if(!connected){baselineCounts=null;$('countResult').textContent='切断したため計測の開始角度を解除しました。接続後に記録し直してください。';}
+  if(!connected){stopSensorMonitor();clearSensorValues();baselineCounts=null;$('countResult').textContent='切断したため計測の開始角度を解除しました。接続後に記録し直してください。';}
   $('connection').classList.toggle('connected',connected);$('connection').innerHTML=connected?'<i></i>接続済み':'<i></i>未接続';
   if(!connected)$('brickLabel').textContent=($('connectionMethod').value==='usb'?'USB':'Bluetooth')+' / 未接続';
   $('connect').hidden=connected;$('disconnect').hidden=!connected;updateButtons();
@@ -312,6 +312,8 @@ function updateButtons(){
   $('programName').disabled=busy;
   $('connectionMethod').disabled=busy||connection.connected;
   $('transfer').disabled=busy || !connection.connected || !lastBuild || !validName || !validFolder;
+  $('transferRun').disabled=$('transfer').disabled;$('stopProgram').disabled=busy||!connection.connected;
+  $('readSensors').disabled=busy||!connection.connected;$('autoSensors').disabled=!connection.connected;
   $('connect').disabled=busy||!isSecureContext||!($('connectionMethod').value==='usb'?navigator.hid:navigator.serial);$('disconnect').disabled=busy;$('downloadRbf').disabled=busy || !lastBuild || !validName || !validFolder;
   $('recordCounts').disabled=busy || !connection.connected;
   $('readCounts').disabled=busy || !connection.connected || !baselineCounts;
@@ -630,19 +632,22 @@ $('disconnect').onclick=async()=>{busy=true;updateButtons();await connection.clo
 function fileName(){
   return programFileName($('programName').value);
 }
-$('transfer').onclick=async()=>{
+async function transferProgram(run=false){
   const build=check();if(!build)return;
   let filename;try{filename=fileName();}catch(e){feedback(e.message,true);return;}
-  busy=true;updateButtons();$('progress').hidden=false;$('progress').value=0;feedback(`「${filename}」を保存しています。同じ名前のプログラムは上書きされます…`);
+  stopSensorMonitor();busy=true;updateButtons();$('progress').hidden=false;$('progress').value=0;feedback(`「${filename}」を保存しています。同じ名前のプログラムは上書きされます…`);
   try{
     log('プログラム',JSON.stringify({name:$('programName').value,filename,ir:build.program}));
     savedPath='';
-    const result=await connection.transferWithSignal(build.data,filename,p=>{$('progress').value=p;feedback(p===100?'送信完了。EV3から読み戻して照合しています…':`本体に保存しています… ${p}%`);},$('ev3ProjectName').value);
+    const result=await connection[run?'transferAndRun':'transferWithSignal'](build.data,filename,p=>{$('progress').value=p;feedback(p===100?'送信完了。EV3から読み戻して照合しています…':`本体に保存しています… ${p}%`);},$('ev3ProjectName').value);
     savedPath=result.path;
-    $('transferResult').className='result success';$('transferResult').textContent=`✓ 照合完了（${build.data.length}バイト一致）。保存先：${savedPath.split('/').slice(-2).join(' → ')}。${result.soundError?'完了音は確認できませんでしたが、転送・照合は完了しています（'+result.soundError+'）。':'EV3へ完了音を送信しました。'}「切断」後、EV3を再起動して本体から実行してください。`;
-  }catch(e){log('エラー',e.message);feedback(`転送未完了：${e.message}`,true);}
+    $('transferResult').className='result success';$('transferResult').textContent=`✓ 照合完了（${build.data.length}バイト一致）。保存先：${savedPath.split('/').slice(-2).join(' → ')}。${result.soundError?'完了音は確認できませんでしたが、転送・照合は完了しています（'+result.soundError+'）。':'EV3へ完了音を送信しました。'}${run?'今回のプログラムの起動命令を送信しました。止めるときは「実行を停止」を押してください。':'本体でこのプログラムを選んで実行してください。'}`;
+  }catch(e){if(e.verifiedPath)savedPath=e.verifiedPath;log('エラー',e.message);feedback(e.verifiedPath?`転送・照合は完了していますが、起動を確認できません。${e.message}`:`転送未完了：${e.message}`,true);}
   finally{busy=false;$('progress').hidden=true;updateButtons();}
 };
+$('transfer').onclick=()=>transferProgram(false);
+$('transferRun').onclick=()=>transferProgram(true);
+$('stopProgram').onclick=async()=>{stopSensorMonitor();busy=true;updateButtons();try{await connection.stopProgram();feedback('EV3へプログラムと全モーターの停止命令を送信しました。');}catch(e){feedback('停止を確認できません。本体の戻るボタンで停止してください。'+e.message,true);}finally{busy=false;updateButtons();}};
 $('downloadRbf').onclick=()=>{const b=check();if(b){try{download(b.data,fileName());log('ファイル生成',`${b.data.length} bytes / ${hex(b.data.slice(0,28))}`);feedback('.rbfを保存しました。ファイルの保存だけではEV3への転送は完了していません。');}catch(e){feedback(e.message,true);}}};
 $('toggleLog').onclick=()=>{const open=$('logContent').hidden;$('logContent').hidden=!open;$('toggleLog').setAttribute('aria-expanded',String(open));};
 $('clearLog').onclick=()=>{logs.length=0;$('log').textContent='';$('lastLog').textContent='ログを消去しました';};
@@ -715,3 +720,16 @@ document.addEventListener('keydown',event=>{
  if(menu){menu.open=false;menu.querySelector('summary').focus();return;}
  if(!$('connectionPanel').hidden)showConnectionPanel(false);
 });
+
+
+function stopSensorMonitor(){clearTimeout(monitorTimer);monitorTimer=null;$('autoSensors').checked=false;}
+function clearSensorValues(){for(let p=1;p<=4;p++){$('sensorValue'+p).textContent='—';$('sensorLabel'+p).textContent='未取得';}for(const p of 'ABCD')$('motorValue'+p).textContent='—';$('sensorMonitorStatus').textContent='接続して「値を読む」を押してください。';}
+async function refreshSensorValues(){
+ if(!connection.connected||busy){if($('autoSensors').checked)monitorTimer=setTimeout(refreshSensorValues,500);return;}
+ busy=true;updateButtons();$('sensorMonitorStatus').textContent='読み取っています…';
+ try{const snapshot=await connection.readSensorSnapshot();for(const input of snapshot.inputs){const reading=sensorReading(input);$('sensorLabel'+input.port).textContent=reading.label;$('sensorValue'+input.port).textContent=reading.text;}for(const motor of snapshot.motors)$('motorValue'+motor.port).textContent=motor.value===null?'—':motor.value+'°';$('sensorMonitorStatus').textContent='更新 '+new Date().toLocaleTimeString();}
+ catch(e){stopSensorMonitor();clearSensorValues();$('sensorMonitorStatus').textContent='読み取れませんでした。'+e.message;}
+ finally{busy=false;updateButtons();if($('autoSensors').checked&&connection.connected)monitorTimer=setTimeout(refreshSensorValues,500);}
+}
+$('readSensors').onclick=()=>refreshSensorValues();
+$('autoSensors').onchange=()=>{clearTimeout(monitorTimer);monitorTimer=null;if($('autoSensors').checked)void refreshSensorValues();};
