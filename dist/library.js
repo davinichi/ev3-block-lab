@@ -1,7 +1,10 @@
+// 編集ファイルとマイブロック集の検証・結合を担当する。EV3用RBFの生成や通信は行わない。
+// 独自ブロックを追加したときは、この許可一覧にも型名を登録して保存ファイルから復元できるようにする。
 const types=new Set(['add','sub','mul','div','lt','eq','gt','lte','gte','neq','and','or'].map(op=>'ev3_op_'+op));
 for(const type of ['ev3_tank','ev3_pivot_right','ev3_pivot_left','ev3_ramp','ev3_math_function','ev3_forever','ev3_motor_l_run','ev3_motor_m_run','ev3_color_is','ev3_color_value','ev3_reflected','ev3_reflected_compare','ev3_distance','ev3_distance_compare','ev3_wait_until','ev3_argument','ev3_math','logic_compare','logic_operation','logic_negate','logic_boolean','controls_if','controls_whileUntil','variables_set','math_change','ev3_start','ev3_motor','ev3_motor_m','ev3_motor_m_time','ev3_wait_seconds','ev3_tread','ev3_spin_right','ev3_spin_left','ev3_wheel','ev3_drive_forward','ev3_drive_backward','ev3_tone','ev3_wait','ev3_stop_port','ev3_stop','math_number','variables_get','controls_repeat_ext','procedures_defnoreturn','procedures_callnoreturn'])types.add(type);
 for(const kind of ['l','m'])for(const group of ['single','pair'])for(const action of ['run','angle','time'])types.add('ev3_motor_'+kind+'_'+group+'_'+action);
 for(const type of ['ev3_timer','ev3_timer_reset','ev3_encoder','ev3_encoder_reset','ev3_touch','ev3_touch_value','ev3_ir_proximity','ev3_ir_compare','ev3_ir_remote','ev3_ir_button','ev3_ir_beacon_detected','ev3_ir_beacon_heading','ev3_ir_beacon_distance'])types.add(type);
+// 外部ファイルのブロック種類・個数・入れ子の深さを検査する。Blocklyへ読み込む前に呼び出す。
 export function inspectBlocks(blocks){
   let count=0;
   function inspect(value,depth=0){
@@ -14,6 +17,7 @@ export function inspectBlocks(blocks){
   }
   inspect(blocks);
 }
+// 通常変数・引数の参照IDを集め、書き出しや読み込みに必要な変数情報をそろえる。
 function references(nodes){
   const ids=new Set();
   function visit(value){
@@ -26,6 +30,7 @@ function references(nodes){
   visit(nodes);return ids;
 }
 const definitionName=block=>String(block.fields?.NAME??'').trim();
+// 定義だけを取り出して.ev3blocks用データにする。現在の作品を変更しないように複製を返す。
 export function createBlockLibrary(state,appVersion){
   const definitions=(state.blocks?.blocks??[]).filter(b=>b.type==='procedures_defnoreturn');
   if(!definitions.length)throw Error('書き出すマイブロックがありません。');
@@ -33,6 +38,7 @@ export function createBlockLibrary(state,appVersion){
   const refs=references(definitions);
   return {format:'ev3-block-lab-library',version:1,appVersion,definitions:structuredClone(definitions),variables:structuredClone((state.variables??[]).filter(v=>refs.has(v.id)))};
 }
+// 既存作品を残したまま定義を追加する。同名定義は上書きせずエラーにし、通常の同名変数は共有する。
 export function mergeBlockLibrary(current,library,makeId=()=>crypto.randomUUID()){
   if(library?.format!=='ev3-block-lab-library'||library.version!==1||!Array.isArray(library.definitions)||!library.definitions.length||library.definitions.length>32||!Array.isArray(library.variables))throw Error('マイブロックを書き出したファイルを選んでください。');
   inspectBlocks(library.definitions);
@@ -54,6 +60,7 @@ export function mergeBlockLibrary(current,library,makeId=()=>crypto.randomUUID()
   }
   for(const id of references(library.definitions))if(!mapping.has(id))throw Error('引数または変数の情報が不足しています。');
   const imported=structuredClone(library.definitions);
+  // 元のブロックIDを持ち込まず、変数・引数の参照先を結合後のIDへ付け替える。
   function remap(value){
     if(!value||typeof value!=='object')return;
     if(types.has(value.type))delete value.id;
@@ -63,6 +70,7 @@ export function mergeBlockLibrary(current,library,makeId=()=>crypto.randomUUID()
     for(const child of Object.values(value))remap(child);
   }
   remap(imported);
+  // 読み込んだ定義を既存のブロック群の下へ並べ、重なって見失わないようにする。
   const existing=merged.blocks?.blocks??[],bottom=Math.max(0,...existing.map(b=>Number(b.y)||0))+200;
   imported.forEach((block,i)=>{block.x=40+420*(i%2);block.y=bottom+300*Math.floor(i/2);});
   merged.variables=variables;merged.blocks={...(merged.blocks??{}),languageVersion:0,blocks:[...existing,...imported]};

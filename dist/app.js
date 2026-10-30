@@ -1,5 +1,8 @@
 import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.js'; import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from './library.js'; import {sensorReading} from './sensor-monitor.js';
+// 画面とBlocklyを結び付ける入口。ブロック定義 → 中間データ → ev3.jsでRBF生成 → 接続・転送の順に処理する。
+// 外部ライブラリのdist/vendorは編集せず、独自ブロックと画面側の振る舞いをここに記述する。
 const $=id=>document.getElementById(id);
+// 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
 const VERSION='0.16.0';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
@@ -15,6 +18,7 @@ Blockly.Blocks.procedures_callnoreturn.init=function(){
   originalCallInit.call(this);
   this.setInputsInline(true);
 };
+// 出力ポートの選択値はA=1、B=2、C=4、D=8のビットマスク。2個の指定は値を足したもの。
 const singlePorts=[['A','1'],['B','2'],['C','4'],['D','8']];
 const pairPorts=[['B + C','6'],['A + B','3'],['A + C','5'],['A + D','9'],['B + D','10'],['C + D','12']];
 Blockly.defineBlocksWithJsonArray([
@@ -54,6 +58,7 @@ for(const [kind,label] of [['l','L'],['m','M']])for(const paired of [false,true]
  classroomMotorBlocks.push({type,message0:label+'モーター'+(paired?'2個':'1個')+' %1 '+suffix,args0:[{type:'field_dropdown',name:'PORTS',options:ports},{type:'input_value',name:'SPEED',check:'Number'},...(action==='run'?[]:[{type:'input_value',name:action==='angle'?'DEGREES':'SECONDS',check:'Number'}])],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:tooltip+(paired?(action==='angle'?' 同期・停止タイミング補正の方式は「先生用の設定・計測」で選べます。':' 2個を同時に同じ速さの指定で始動します。角度同期の補正はしません。'):'')});
 }
 Blockly.defineBlocksWithJsonArray(classroomMotorBlocks);
+// L/Mそれぞれを単独・2個に分け、連続回転／角度／時間を同じ順番で表示する。
 function classroomMotorToolbox(){
  const items=[{kind:'label',text:'加速・減速（L・M共通）'},{kind:'block',type:'ev3_ramp',inputs:{UP:shadow(.5),DOWN:shadow(.5)}}];
  for(const [kind,label] of [['l','L'],['m','M']])for(const paired of [false,true]){
@@ -63,6 +68,7 @@ function classroomMotorToolbox(){
  return [...items,{kind:'label',text:'モーターを停止（L・M共通）'},{kind:'block',type:'ev3_stop_port'},{kind:'block',type:'ev3_stop'}];
 }
 
+// 入力センサのポート番号は1〜4。モーター出力のビットマスクとは別の番号体系。
 const sensorPorts=[['1','1'],['2','2'],['3','3'],['4','4']];
 const brickButtons=[['中央','2'],['上','1'],['下','3'],['左','5'],['右','4'],['いずれか','7']];
 const colorNames=[['赤','5'],['黒','1'],['青','2'],['緑','3'],['黄','4'],['白','6'],['茶','7'],['色なし','0']];
@@ -98,6 +104,7 @@ Blockly.defineBlocksWithJsonArray([
  ...[['detected','を検出している','Boolean'],['heading','の方向（−25〜25）','Number'],['distance','までの近さ（0〜100）','Number']].map(([kind,label,output])=>({type:'ev3_ir_beacon_'+kind,message0:'赤外線センサ %1 チャンネル %2 のビーコン'+label,args0:[sensorPort(),irChannel()],output,inputsInline:true,colour:'#34ccf1',tooltip:'ビーコンモードをオンにして使います。方向は負が左、0が正面、正が右の相対値。距離はcmではありません。未検出なら検出条件は偽、方向0、近さ100です。数値を使う前に検出条件で確かめてください。'}))
 ]);
 // Keep existing block types and input names so saved lessons retain their wiring.
+// 制御ブロックの見た目を調整する層。既存作品を読み込めるよう、保存上の型名と入力名は保つ。
 const controlColour='#f5a400';
 Blockly.defineBlocksWithJsonArray([
  {type:'ev3_program_end',message0:'プログラムを終了する',previousStatement:null,colour:controlColour,tooltip:'すべてのモーターをブレーキ停止し、プログラム全体を終了します。繰り返しやマイブロックの中からでも終了します。'},
@@ -106,6 +113,7 @@ Blockly.defineBlocksWithJsonArray([
 function controlFooter(block){
  if(!block.getInput('EV3_LOOP_ICON'))block.appendDummyInput('EV3_LOOP_ICON').setAlign(Blockly.inputs.Align.RIGHT).appendField('↻');
 }
+// 「でなければ」は2つの処理欄の間の仕切りに置き、処理欄の横位置をそろえる。
 function controlIfShape(block){
  block.setColour(controlColour);block.setInputsInline(true);
  for(let i=0;block.getInput('IF'+i);i++){
@@ -141,6 +149,7 @@ for(const type of ['controls_repeat_ext','ev3_forever','ev3_wait_until','ev3_wai
  Blockly.Blocks[type].init=function(){init.call(this);this.setColour(controlColour);this.setInputsInline(true);if(['controls_repeat_ext','ev3_forever'].includes(type))controlFooter(this);};
 }
 
+// 演算の表示を定義する。実際の計算方法と小数の精度はev3.jsの検証・命令生成が担当する。
 const operatorColour='#00b84a';
 const operatorKinds={add:['＋','Number'],sub:['−','Number'],mul:['×','Number'],div:['÷','Number'],lt:['＜','Boolean'],eq:['＝','Boolean'],gt:['＞','Boolean'],lte:['≦','Boolean'],gte:['≧','Boolean'],neq:['≠','Boolean'],and:['かつ','Boolean'],or:['または','Boolean']};
 Blockly.defineBlocksWithJsonArray(Object.entries(operatorKinds).map(([op,[label,output]])=>({
@@ -158,6 +167,7 @@ for(const type of ['math_number','ev3_math','logic_compare','logic_operation','l
 
 const num=(n)=>({kind:'block',type:'math_number',fields:{NUM:n}});
 const shadow=(n)=>({shadow:{type:'math_number',fields:{NUM:n}}});
+// 左側カテゴリの公開一覧。新規ブロック追加時は、定義・chain/expression・library.jsの許可一覧も確認する。
 const toolbox={kind:'categoryToolbox',contents:[
  {kind:'category',name:'スタート',colour:'#d3a238',contents:[{kind:'block',type:'ev3_start'}]},
  {kind:'category',name:'モーター',colour:'#0090f5',contents:classroomMotorToolbox()},
@@ -171,14 +181,17 @@ const toolbox={kind:'categoryToolbox',contents:[
  {kind:'category',name:'引数',colour:'#668b6d',custom:'ARGUMENTS'}
 ]};
 
+// 置かれた定義の中で引数を解決する。IDが異なる同名ブロックも使えるが、実行時の値は呼び出しごとに独立する。
 function argumentModel(block){
  const root=block.getRootBlock();if(root.type!=='procedures_defnoreturn')return null;
  const models=root.getVarModels();return models.find(m=>m.getId()===block.parameterId)??models.find(m=>m.getName()===block.getFieldValue('ARG_NAME'))??null;
 }
+// 以前の作品で通常の変数ブロックとして保存されていた引数も、その定義内では引数として扱う。
 function localArgument(block){
  const root=block.getRootBlock(),model=block.getField('VAR')?.getVariable();
  return model && root.type==='procedures_defnoreturn' && root.getVarModels().some(m=>m.getId()===model.getId())?model:null;
 }
+// 引数だけに使う名前を通常の変数一覧から除外する。プログラム全体で使っている同名変数は残す。
 function ordinaryVariables(ws){
  const parameters=new Set(),usedGlobally=new Set();
  for(const b of ws.getAllBlocks(false)){
@@ -187,6 +200,7 @@ function ordinaryVariables(ws){
  }
  return ws.getVariableMap().getAllVariables().filter(m=>!parameters.has(m.getId())||usedGlobally.has(m.getId()));
 }
+// 変数の取得ブロックは名前ごとに並べ、代入・増減のブロックでは変数名を選択できるようにする。
 function variableFlyout(ws){
  const variables=ordinaryVariables(ws);
  const items=[{kind:'label',text:'プログラム全体で使う変数'},{kind:'button',text:'変数をつくる',callbackKey:'EV3_CREATE_VARIABLE'}];
@@ -205,6 +219,7 @@ function createOrdinaryVariable(ws,name){
  if(ws.getVariableMap().getAllVariables().some(m=>Blockly.Names.equals(m.getName(),name)))throw Error('同じ名前の変数または引数があります。別の名前を付けてください。');
  return ws.getVariableMap().createVariable(name);
 }
+// 同名の引数を一覧では1個にまとめる。どの定義の値かは、配置後にargumentModelが判断する。
 function argumentFlyout(ws){
  const items=[{kind:'label',text:'定義の中だけで使う引数'}],names=new Map();
  for(const def of ws.getAllBlocks(false).filter(b=>b.type==='procedures_defnoreturn'))for(const m of def.getVarModels())if(!names.has(m.getName()))names.set(m.getName(),m);
@@ -239,6 +254,8 @@ Blockly.Blocks.procedures_defnoreturn.init=function(){
  const menu=this.customContextMenu;
  this.customContextMenu=function(options){menu?.call(this,options);options.unshift({text:'名前・引数を編集',enabled:true,callback:()=>openMyBlockDialog(this.id)});};
 };
+// マイブロックの作成・編集。名前と引数を先に検証し、呼び出し側の入力式を保持したまま更新する。
+// 途中で失敗した場合はワークスペースの控えから復元し、半端な編集状態を残さない。
 function saveMyBlock(ws,name,rows,definitionId=null){
  name=String(name).trim();rows=rows.map(row=>({name:String(row.name).trim(),id:row.id||''}));
  const defs=ws.getAllBlocks(false).filter(b=>b.type==='procedures_defnoreturn');
@@ -282,6 +299,7 @@ function saveMyBlock(ws,name,rows,definitionId=null){
  finally{Blockly.Events.setGroup(false);}
 }
 
+// Blocklyの色・表示・操作を初期化する。独自ブロックの型名は保存データの互換性にも関わる。
 const theme=Blockly.Theme.defineTheme('ev3lab',{base:Blockly.Themes.Classic,fontStyle:{family:'"Yu Gothic UI", Meiryo, sans-serif',size:12},blockStyles:{procedure_blocks:{colourPrimary:'#aa597e'},math_blocks:{colourPrimary:'#668b6d'},variable_blocks:{colourPrimary:'#c58245'},loop_blocks:{colourPrimary:'#d19636'}},componentStyles:{workspaceBackgroundColour:'#fbfcfd',toolboxBackgroundColour:'#f4f7f8',flyoutBackgroundColour:'#eef3f5',flyoutOpacity:1,scrollbarColour:'#b9c9ce',insertionMarkerColour:'#126c67',insertionMarkerOpacity:.3}});
 const workspace=Blockly.inject('blocklyDiv',{toolbox,theme,renderer:'zelos',media:'vendor/media/',trashcan:true,scrollbars:true,grid:{spacing:24,length:2,colour:'#e5ebee',snap:false},zoom:{controls:true,wheel:true,startScale:.85,minScale:.35,maxScale:1.5,scaleSpeed:1.1},move:{scrollbars:true,drag:true,wheel:true},sounds:false});
 workspace.registerToolboxCategoryCallback('ARGUMENTS',argumentFlyout);
@@ -299,6 +317,7 @@ workspace.registerToolboxCategoryCallback('PROCEDURE',ws=>{
 });
 let lastBuild=null,busy=false,loading=false,dirty=false,saveTimer,baselineCounts=null,lastTimingSignature=null,monitorTimer=null;
 const logs=[];
+// 通信と操作の記録を画面に表示する。長時間利用時の増大を防ぐため、直近1200行だけ保持する。
 function log(type,message){
   const line=`${new Date().toISOString()} [${type}] ${message}`;logs.push(line);if(logs.length>1200)logs.shift();
   $('log').textContent=logs.join('\n');$('log').scrollTop=$('log').scrollHeight;
@@ -310,6 +329,7 @@ const connection=new EV3Connection(log,connected=>{
   if(!connected)$('brickLabel').textContent=($('connectionMethod').value==='usb'?'USB':'Bluetooth')+' / 未接続';
   $('connect').hidden=connected;$('disconnect').hidden=!connected;updateButtons();
 });
+// 接続済みだけで転送可能にはしない。有効な名前・生成成功・通信中でないことを合わせて判定する。
 function updateButtons(){
   let validName=true;
   try{programFileName($('programName').value);}catch{validName=false;}
@@ -329,6 +349,7 @@ function updateButtons(){
   $('readCounts').disabled=busy || !connection.connected || !baselineCounts;
   $('readTiming').disabled=busy || !connection.connected || !lastBuild?.diagnosticPath;
 }
+// 丸い数値ブロック・条件ブロックを中間データへ変換する。センサやボタンの実測はここでは行わない。
 function expression(x){
  if(!x)throw Error('数値・条件の空欄にブロックを入れてください。');
  if(x.type==='math_number')return Number(x.getFieldValue('NUM'));
@@ -368,6 +389,8 @@ function expression(x){
  throw Error('未対応の数値・条件ブロックです。');
 }
 function value(b,name){return expression(b.getInputTargetBlock(name));}
+// つながっている命令を上から順に中間データへ変換する。分岐・繰り返しの内部は再帰的にたどる。
+// モーター停止とプログラム終了は別命令。マイブロックのreturnは定義の中だけで許可する。
 function chain(block){
   const out=[];
   for(let b=block;b;b=b.getNextBlock()){
@@ -417,6 +440,7 @@ function chain(block){
   }
   return out;
 }
+// スタートから到達する命令と、そこから呼ばれるマイブロックだけを集める。未接続の試作ブロックは転送対象に含めない。
 function program(){
   const roots=workspace.getTopBlocks(true).filter(b=>b.isEnabled());
   const starts=roots.filter(b=>b.type==='ev3_start');
@@ -436,6 +460,7 @@ function program(){
   gather(main);
   return {main,procedures:[...used.values()]};
 }
+// 読み込み・改名後の引数IDや表示を正規化する。Blocklyのイベントをまとめ、元に戻す操作を崩さない。
 function ensureArgumentInputs(){
   const previousGroup=Blockly.Events.getGroup();
   Blockly.Events.setGroup(previousGroup || true);
@@ -461,6 +486,7 @@ function ensureArgumentInputs(){
     }
   }finally{Blockly.Events.setGroup(previousGroup);}
 }
+// 現在の作品を検証しRBFを生成する。失敗時はlastBuildを消し、以前の生成結果を誤って転送させない。
 function check(){
   try{
     ensureArgumentInputs();
@@ -471,6 +497,7 @@ function check(){
 }
 
 function exportMyBlockLibrary(){return createBlockLibrary(Blockly.serialization.workspaces.save(workspace),VERSION);}
+// ライブラリを現在の作品に追加する。読み込みに失敗しても、既存の作品は控えから復元する。
 function importMyBlockLibrary(data){
  const backup=Blockly.serialization.workspaces.save(workspace),merged=mergeBlockLibrary(backup,data);
  loading=true;
@@ -480,7 +507,9 @@ function importMyBlockLibrary(data){
  workspace.clearUndo();dirty=true;check();saveLocal();
 }
 
+// 編集用保存形式（.ev3lab）。Blocklyの配置や未接続ブロックも含み、EV3用の.rbfとは用途が異なる。
 function project(){return {format:'ev3-block-lab',version:1,appVersion:VERSION,name:$('programName').value,programName:$('programName').value,ev3ProjectName:$('ev3ProjectName').value,pairMode:$('pairMode').value,workspace:Blockly.serialization.workspaces.save(workspace)};}
+// 保存形式を確認して復元する。古い作品の保存先名・プログラム名がない場合は既定値を使う。
 function restore(data){
   if(data?.format!=='ev3-block-lab' || data.version!==1 || !data.workspace?.blocks)throw Error('EV3 Block Labのプロジェクト（バージョン1）を選んでください。');
   inspectBlocks(data.workspace.blocks);
@@ -494,6 +523,7 @@ function restore(data){
   $('pairMode').value=['sync','feedback'].includes(data.pairMode)?data.pairMode:'independent';
   workspace.clearUndo();check();
 }
+// 復元中の一時状態は保存しない。容量不足などで失敗した場合は、ファイル保存を促す表示にする。
 function saveLocal(){
   if(loading)return;
   try{localStorage.setItem(STORAGE,JSON.stringify(project()));$('saveState').textContent='✓ この端末に自動保存済み';}
@@ -505,6 +535,7 @@ function download(data,name,type='application/octet-stream'){
 function feedback(message,error=false){$('transferResult').textContent=message;$('transferResult').className=`result ${error?'error':''}`;}
 const n=(name,val)=>`<value name="${name}"><shadow type="math_number"><field name="NUM">${val}</field></shadow></value>`;
 const arg=(name)=>`<block type="variables_get"><field name="VAR" id="arg-${name}">${name}</field></block>`;
+// 授業・実機確認用のサンプルを生成する。サンプルへの置き換えは呼び出し側で未保存変更を確認する。
 function sample(mode){
   const motor=mode==='motor',proc=motor?'角度を指定して回す':'合図する',params=motor?['角度','速度']:['周波数'];
   const call=(values,next='')=>`<block type="procedures_callnoreturn"><mutation name="${proc}">${params.map(p=>`<arg name="${p}"></arg>`).join('')}</mutation>${values.map((v,i)=>n(`ARG${i}`,v)).join('')}${next?`<next>${next}</next>`:''}</block>`;
@@ -607,6 +638,7 @@ $('libraryFileInput').onchange=async e=>{
  try{if(file.size>2*1024*1024)throw Error('ファイルは2MB以下にしてください。');const data=JSON.parse(await file.text());importMyBlockLibrary(data);feedback(data.definitions.length+'個のマイブロックを追加しました。定義は編集画面の下側にあります。');}
  catch(error){feedback('読み込めませんでした。'+error.message,true);}
 };
+// 台形とS字を同じモーター条件で比較するための編集データを作る。実機ではタイヤ等の構成も確認する。
 function rampSampleState(){
  const number=n=>({shadow:{type:'math_number',fields:{NUM:n}}});
  const motor=()=>({block:{type:'ev3_motor_l_single_angle',fields:{PORTS:'2'},inputs:{SPEED:number(30),DEGREES:number(720)}}});
@@ -640,6 +672,7 @@ $('connect').onclick=async()=>{
   finally{busy=false;updateButtons();}
 };
 $('disconnect').onclick=async()=>{busy=true;updateButtons();await connection.close();feedback(savedPath?`切断しました。EV3を再起動して、${savedPath.split('/').slice(-2).join(' → ')} を選んでください。`:'切断しました。');busy=false;updateButtons();};
+// EV3用ファイル名は入力したプログラム名から作り、拡張子.rbfを自動で付ける。
 function fileName(){
   return programFileName($('programName').value);
 }
@@ -714,6 +747,7 @@ $('variableForm').onsubmit=event=>{
 };
 
 // Classroom layout: connection tools overlay the canvas only when requested.
+// 接続設定は編集領域の上に開く。閉じたときにキャンバスを広く使えるようにする。
 function showConnectionPanel(open){
  $('connectionPanel').hidden=!open;$('toggleConnectionPanel').setAttribute('aria-expanded',String(open));
  if(open)$('closeConnectionPanel').focus();else $('toggleConnectionPanel').focus();
@@ -735,6 +769,8 @@ document.addEventListener('keydown',event=>{
 
 function stopSensorMonitor(){clearTimeout(monitorTimer);monitorTimer=null;$('autoSensors').checked=false;}
 function clearSensorValues(){for(let p=1;p<=4;p++){$('sensorValue'+p).textContent='—';$('sensorLabel'+p).textContent='未取得';}for(const p of 'ABCD')$('motorValue'+p).textContent='—';$('sensorMonitorStatus').textContent='接続して「値を読む」を押してください。';}
+// 監視も転送と同じ通信経路を使うためbusyで排他する。読み取り完了後に次回を予約し、通信を重ねない。
+// この表示更新は接続中だけの機能。転送したプログラム内のセンサ判定はEV3本体で独立して動く。
 async function refreshSensorValues(){
  if(!connection.connected||busy){if($('autoSensors').checked)monitorTimer=setTimeout(refreshSensorValues,500);return;}
  busy=true;updateButtons();$('sensorMonitorStatus').textContent='読み取っています…';

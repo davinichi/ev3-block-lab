@@ -1,7 +1,10 @@
 // EV3 bytecode and system-command implementation. No firmware image is modified.
+// EV3標準ファームウェア用のバイトコード生成と通信を担当する。ファームウェア自体は書き換えない。
+// 上半分は中間データからRBFを作るコンパイラ、下半分はBluetooth/USBの接続とファイル転送。
 export const u16 = n => [n & 255, (n >>> 8) & 255];
 export const u32 = n => [...u16(n), ...u16(n >>> 16)];
 export const zstr = s => [...new TextEncoder().encode(s), 0];
+// 本体のファイル名を制限し、区切り文字や親フォルダ指定が保存先に入り込まないようにする。
 export function programFileName(name) {
   if(typeof name!=='string' || !/^[A-Za-z0-9_-]{1,31}$/.test(name))throw Error('EV3に保存する名前は、半角英数字・「-」「_」で1〜31文字にしてください。');
   return `${name}.rbf`;
@@ -10,6 +13,7 @@ export function projectDirectory(name='EV3Lab') {
   if(typeof name!=='string' || !/^[A-Za-z0-9_-]{1,31}$/.test(name))throw Error('EV3のプロジェクト名は、半角英数字・「-」「_」で1〜31文字にしてください。');
   return `../prjs/${name}`;
 }
+// EV3命令の整数オペランドを可変長で符号化する。ここはユーザー向け小数計算とは別の層。
 export function constant(n) {
   if (!Number.isInteger(n) || n < -2147483648 || n > 2147483647) throw Error('整数の範囲を超えています。');
   if (n >= -32 && n <= 31) return [n & 63];
@@ -17,11 +21,13 @@ export function constant(n) {
   if (n >= -32768 && n <= 32767) return [0x82, ...u16(n)];
   return [0x83, ...u32(n)];
 }
+// 変数の値そのものではなく、VMのローカル／グローバルメモリのアドレスを符号化する。
 export const local = n => n < 32 ? [0x40 | n] : n < 128 ? [0xc1, n] : n < 32768 ? [0xc2, ...u16(n)] : [0xc3,...u32(n)];
 export const globalVar = n => n < 32 ? [0x60 | n] : n < 128 ? [0xe1,n] : [0xe2,...u16(n)];
 export const OP = {END:0x0a, RETURN:0x08, CALL:0x09, PROGRAM_STOP:0x02, JR:0x40, JR_LT32:0x66, JR_GT32:0x6a, MOVE32:0x3a, ADD32:0x12, SUB32:0x16, MUL32:0x1a, DIV32:0x1e,
   INPUT_DEVICE:0x99, MOVEF32:0x3e, TIMER_READ:0x87, MOTOR_COUNT:0xb3, MOTOR_SPEED:0xa5, MOTOR_START:0xa6, MOTOR_TEST:0xa9,
   WAIT:0x85, READY:0x86, SOUND:0x94, SOUND_READY:0x96, MOTOR_RESET:0xa2, MOTOR_CLEAR_COUNT:0xb2, STOP:0xa3, MOTOR:0xae, MOTOR_TIME:0xaf, MOTOR_SYNC:0xb0, MOTOR_READY:0xaa};
+// センサ・ボタンなど実行前に確定しない値を示す。0と区別して、未実行の測定値を決め打ちしない。
 const UNKNOWN=Symbol('runtime sensor value');
 const inRange = (v,a,b,label) => {if(v===UNKNOWN)return;if (!Number.isInteger(v) || v<a || v>b) throw Error(`${label}は ${a}〜${b} の整数にしてください。`);};
 const FLOATS=Symbol('floating-point expressions'),MAX_FLOAT=3.4028234663852886e38;
@@ -37,13 +43,16 @@ function unaryValue(fn,n){
  const rad=n*Math.PI/180;
  return finiteNumber(Math.fround(({abs:Math.abs,floor:Math.floor,ceil:Math.ceil,sqrt:Math.sqrt,sin:()=>Math.sin(rad),cos:()=>Math.cos(rad),tan:()=>Math.tan(rad),asin:x=>Math.asin(x)*180/Math.PI,acos:x=>Math.acos(x)*180/Math.PI,atan:x=>Math.atan(x)*180/Math.PI,ln:Math.log,log:Math.log10,exp:Math.exp,pow10:x=>10**x})[fn](n)));
 }
+// EV3のDATAFは32ビット浮動小数点。検証側もMath.froundを使い、本体と同じ丸めを再現する。
 function floatingConstant(n){const bytes=new Uint8Array(4);new DataView(bytes.buffer).setFloat32(0,finiteNumber(Math.fround(n)),true);return [0x83,...bytes];}
 const GLOBALS=Symbol('globals'),GEOMETRY=Symbol('geometry'),RETURNS=Symbol('return states');
 const arithmetic={add:(a,b)=>a+b,sub:(a,b)=>a-b,mul:(a,b)=>a*b,div:(a,b)=>{if(b===0)throw Error('0では割れません。');return Math.trunc(a/b);},eq:(a,b)=>+(a===b),neq:(a,b)=>+(a!==b),lt:(a,b)=>+(a<b),lte:(a,b)=>+(a<=b),gt:(a,b)=>+(a>b),gte:(a,b)=>+(a>=b),and:(a,b)=>+(!!a&&!!b),or:(a,b)=>+(!!a||!!b)};
+// ボタン番号はEV3固有の並び。いずれか=7は上下左右と中央をまとめ、戻るボタンは停止操作用に残す。
 function buttonConfiguration(button){
   if(!button || ![1,2,3,4,5,7].includes(button.id))throw Error('本体ボタンを選んでください。');
   return button.id===7?[1,2,3,4,5]:[button.id];
 }
+// 種類ごとのEV3デバイス番号・モード・範囲・データ数をまとめる。赤外線は1回の読み取りに複数CHが含まれる。
 function sensorConfiguration(sensor){
  const {kind,port,channel}=sensor;
  if(!Number.isInteger(port)||port<1||port>4)throw Error('センサの種類・ポートを確認してください。');
@@ -53,6 +62,7 @@ function sensorConfiguration(sensor){
  if(config.count&&(!Number.isInteger(channel)||channel<1||channel>4))throw Error('赤外線センサのチャンネルは1〜4から選んでください。');
  return config;
 }
+// 転送前の検証用に式を評価する。確定する値は計算し、実測が必要な値はUNKNOWNとして後段の検査へ渡す。
 function evaluate(x, env) {
   if (typeof x==='number') {if(!Number.isFinite(x))throw Error('数値を確認してください。');return env[FLOATS]?finiteNumber(Math.fround(x)):x;}
   if(x?.math)return unaryValue(x.math.fn,evaluate(x.math.value,env));
@@ -75,6 +85,8 @@ function evaluate(x, env) {
   throw Error(`引数「${x?.param ?? '?'}」は、このマイブロックの中だけで使用できます。`);
 }
 const scaled=(value,factor,divisor=1)=>typeof value==='number'?Math.round(value*factor/divisor):{scaled:{value,factor,divisor}};
+// 移動・旋回などの上位命令をモーター命令へ展開する。タイヤ直径・トレッドの設定は実行順に従う。
+// スピンはトレッド÷直径×旋回角、ピボットはその2倍。秒指定はミリ秒へ換算する。
 function prepareProgram(input){
   if(!input || !Array.isArray(input.main) || !Array.isArray(input.procedures))return input;
   const sequence=nodes=>nodes.flatMap(b=>{
@@ -102,6 +114,8 @@ function prepareProgram(input){
   });
   return {...input,main:sequence(input.main),procedures:input.procedures.map(p=>({...p,body:sequence(p.body)}))};
 }
+// 中間データを実行前に点検する。呼び出し順、変数、寸法、再帰、値の範囲を確認する。
+// 実行時に変化する値はここでは確定できないため、生成するVM命令側にも範囲検査を入れる。
 export function validate(program) {
   const floatingMode=true;
   if (!program || !Array.isArray(program.main) || !program.main.length) throw Error('「スタート」の下にブロックをつなげてください。');
@@ -114,6 +128,7 @@ export function validate(program) {
   }
   let visits=0;
   const globals=new Map(),geometry={diameter10:0,tread10:0};
+  // 検証中の状態を命令順に進める。programEndは全体終了、myblockReturnは呼び出し元へ戻る信号。
   function walk(nodes, env, stack) {
     for (const b of nodes) {
       if (++visits>20000) throw Error('実行する処理が多すぎます。繰り返し回数を減らしてください。');
@@ -178,6 +193,8 @@ export function validate(program) {
   walk(program.main,{[GLOBALS]:globals,[GEOMETRY]:geometry,[FLOATS]:floatingMode},[]);
   return {map,visits};
 }
+// 検証済みの中間データをRBFへ組み立てる。返り値には本体用dataと診断用の補助情報を含む。
+// 通常変数は共有メモリ、引数と作業領域は各オブジェクトのローカルメモリに割り当てる。
 export function compile(program,folder='EV3Lab') {
   const directory=projectDirectory(folder),usesFloat=true;
   program=prepareProgram(program);
@@ -185,6 +202,7 @@ export function compile(program,folder='EV3Lab') {
   const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false,usesTimer=false;
   const collect=x=>{if(x&&typeof x==='object'){if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
   collect(program);if(variableNames.size>32)throw Error('変数は32個までです。');
+  // 通常変数・寸法・加減速設定・共有タイマーを重ならない位置へ配置する。各数値の領域は4バイト。
   const globalOffsets=new Map([...variableNames].map((name,i)=>[name,i*4]));
   const diameterOffset=globalOffsets.size*4,treadOffset=diameterOffset+4,rampOffset=diameterOffset+(usesGeometry?8:0);
   const timerOffset=rampOffset+(usesRamps?12:0);
@@ -203,6 +221,7 @@ export function compile(program,folder='EV3Lab') {
     const timer=alloc();
     const emit=(op,...args)=>code.push(op,...args.flat());
     const faults=[];
+    // 整数を要求するハードウェア命令やセンサ値を扱う層。出力マスクと入力ポート番号の取り違えに注意。
     const integerExpr=x=>{
       if(typeof x==='number')return constant(x);
       if(x?.register!==undefined)return local(x.register);
@@ -268,18 +287,21 @@ export function compile(program,folder='EV3Lab') {
       if(i<0)throw Error(`引数「${x?.param}」はマイブロックの中だけで使用できます。`);
       return local(i*4);
     };
+    // ジャンプ先はまだ決まらないため仮の相対アドレスを入れ、ブロック生成後にpatchで確定する。
     const jump=(op,args,target)=>{code.push(op,...args.flat(),0x83,...u32(target ?? 0)); return code.length-4;};
     const patch=(at,target)=>code.splice(at,4,...u32(target-(at+4)));
     const guard=(value,min,max)=>{faults.push(jump(OP.JR_LT32,[value,constant(min)]),jump(OP.JR_GT32,[value,constant(max)]));};
     const nonzero=value=>{const ok=exprCompare(value,constant(0));faults.push(jump(OP.JR_LT32,[ok,constant(1)]));};
     const exprCompare=(a,b)=>{const result=local(alloc());emit(OP.MOVE32,constant(0),result);emit(0x52,a,b,result);return result;};
     const floatCompare=(op,a,b)=>{const result=local(alloc());emit(OP.MOVE32,constant(0),result);emit(op,a,b,result);return result;};
+    // NaN・無限大・範囲外を検出したら共通エラー処理へ飛ぶ。実行中の異常値をモーターに渡さない。
     const floatGuard=value=>{
       faults.push(jump(OP.JR_LT32,[floatCompare(0x4f,value,value),constant(1)]));
       faults.push(jump(0x67,[value,floatingConstant(-MAX_FLOAT)]),jump(0x6b,[value,floatingConstant(MAX_FLOAT)]));
     };
     const floatNonzero=value=>faults.push(jump(OP.JR_LT32,[floatCompare(0x53,value,floatingConstant(0)),constant(1)]));
     const asFloat=value=>{const result=local(alloc());emit(0x3b,value,result);return result;};
+    // ユーザーの式・変数・引数は常に小数で計算する。ハードウェアへ渡す直前だけexprで整数に変換する。
     const floatExpr=x=>{
       if(typeof x==='number')return floatingConstant(x);
       if(x?.timer===true){const elapsed=local(alloc()),seconds=local(alloc());emit(OP.TIMER_READ,elapsed);emit(OP.SUB32,elapsed,globalVar(timerOffset),elapsed);emit(0x1f,asFloat(elapsed),floatingConstant(1000),seconds);return seconds;}
@@ -311,6 +333,8 @@ export function compile(program,folder='EV3Lab') {
       if(typeof x==='number')return constant(Math.trunc(finiteNumber(Math.fround(x))));
       const value=floatExpr(x),result=local(alloc());floatGuard(value);emit(OP.MOVEF32,value,result);return result;
     };
+    // 2個のモーターの進み具合をエンコーダで比較し、先行側の速度を調整する試作の補正制御。
+    // 目標角度を優先し、停止時刻と途中経過を診断ファイルへ記録する。実行はすべてEV3内で行う。
     const feedbackPair=b=>{
       recordsTiming=true;
       const ports=[0,1,2,3].filter(i=>b.ports&(1<<i));
@@ -399,6 +423,8 @@ export function compile(program,folder='EV3Lab') {
     // 20 ms velocity-command profiles run entirely in the EV3 VM. Native
     // finite STEP_SPEED targets remain active while OUTPUT_SPEED is updated.
     // Position feedback takes priority over the requested ramp duration.
+    // 台形・S字の速度指令を20msごとに本体内で更新する。角度指定では目標位置を優先する。
+    // S字はsmoothstepの速度曲線であり、一定ジャークを段階的に切り替える7区間方式ではない。
     const rampedMotion=b=>{
       const reg=()=>local(alloc()),c=constant;
       const mode=globalVar(rampOffset),up=reg(),down=reg(),base=reg(),sign=reg(),cap=reg(),began=reg(),elapsed=reg(),limit=reg();
@@ -486,6 +512,7 @@ export function compile(program,folder='EV3Lab') {
       emit(OP.STOP,c(0),c(b.ports),c(1));
     };
 
+    // 制御構造をEV3の比較・ジャンプ・呼び出し命令へ展開する。終了命令の後の同じ並びは生成しない。
     const sequence=nodes=>{
       for(const original of nodes) {
         let b=original;
@@ -563,6 +590,7 @@ export function compile(program,folder='EV3Lab') {
         }
       }
     };
+    // 実行開始時だけ共有領域を初期化する。マイブロックから戻るたびに通常変数を消してはいけない。
     if(index===0){for(const at of globalOffsets.values())emit(OP.MOVE32,constant(0),globalVar(at));if(usesGeometry)for(const at of [diameterOffset,treadOffset])emit(OP.MOVE32,constant(0),globalVar(at));}
     if(index===0&&usesRamps)for(const at of [rampOffset,rampOffset+4,rampOffset+8])emit(OP.MOVE32,constant(0),globalVar(at));
     if(index===0&&usesTimer)emit(OP.MOVE32,constant(0),globalVar(timerOffset));
@@ -574,6 +602,8 @@ export function compile(program,folder='EV3Lab') {
     emit(OP.END);
     return {code,localBytes:bytes,trigger:index ? 1:0,name:names[index]};
   });
+  // RBFは16バイトのファイルヘッダ、各12バイトのオブジェクトヘッダ、命令列の順。
+  // オブジェクト末尾とジャンプ位置は、実機VMの検証を通すため正確に一致させる。
   let offset=16+12*objects.length;
   const headers=[];
   for(const o of objects) {o.offset=offset; headers.push(...u32(offset),...u16(0),...u16(o.trigger),...u32(o.localBytes)); offset+=o.code.length;}
@@ -582,6 +612,7 @@ export function compile(program,folder='EV3Lab') {
   return {data,objects,program,usesSensors,usesFloat,usesRamps,usesTimer,diagnosticTag,diagnosticPath:recordsTiming&&!usesRamps?diagnosticPath:null};
 }
 
+// 本体に保存した68バイトの補正記録を復号する。識別タグを照合し、別のプログラムの古い記録を混同しない。
 export function decodeTimingRecord(data,expectedTag){
   if(data.length!==68)throw Error('停止時刻の記録形式が一致しません。0.1.6以降で再転送・実行してください。');
   const v=new DataView(data.buffer,data.byteOffset,data.byteLength),word=i=>v.getInt32(i*4,true);
@@ -595,7 +626,9 @@ export function decodeTimingRecord(data,expectedTag){
     checkpoints:[25,50,75].map((percent,i)=>({percent,ms:[word(10+2*i),word(11+2*i)]})),timedOut:word(16)===1};
 }
 
+// EV3パケットは長さ2バイト・通番2バイト・種別1バイト・内容の順。長さは先頭2バイト自身を含まない。
 export function packet(counter,type,payload) {return new Uint8Array([...u16(3+payload.length),...u16(counter),type,...payload]);}
+// Bluetoothの受信はパケット単位とは限らない。分割・結合されたバイト列を長さ情報から組み直す。
 export class Framer {
   constructor(onPacket){this.buffer=new Uint8Array();this.onPacket=onPacket;}
   push(chunk){
@@ -612,6 +645,7 @@ const statusNames={1:'ファイルハンドルが無効',2:'本体の準備が�
 // Stock EV3: vendor-defined HID, no report ID; 1024-byte high-speed or
 // 64-byte full-speed reports (LEGO d_usbdev/computil.c descriptors).
 const EV3_USB_FILTER={vendorId:0x0694,productId:0x0005,usagePage:0xff00,usage:1};
+// USBは標準EV3のHIDレポートを確認する。ブートローダー用のデバイスや想定外の形式は使わない。
 function ev3HidReports(device){
  if(device.vendorId!==EV3_USB_FILTER.vendorId||device.productId!==EV3_USB_FILTER.productId)throw Error('標準ファームウェアで起動したEV3を選んでください。');
  const collections=[];const walk=items=>{for(const c of items??[]){if(c.usagePage===0xff00&&c.usage===1)collections.push(c);walk(c.children);}};walk(device.collections);
@@ -619,10 +653,13 @@ function ev3HidReports(device){
  for(const c of collections){const inputSize=size(c,'inputReports'),outputSize=size(c,'outputReports');if([64,1024].includes(inputSize)&&[64,1024].includes(outputSize))return {inputSize,outputSize,reportId:0};}
  throw Error('EV3のUSB通信形式を確認できません。標準ファームウェアで起動し、USBケーブルを接続し直してください。');
 }
+// 共通の送受信・照合処理に、BluetoothのストリームとUSBのHIDレポートを接続する。
+// platformを差し替えられる形にして、実機がない環境でも通信の試験を行えるようにする。
 export class EV3Connection {
   constructor(log=()=>{},changed=()=>{},platform=globalThis){this.log=log;this.changed=changed;this.platform=platform;this.counter=0;this.pending=new Map();this.port=null;this.device=null;this.transport='bluetooth';this.closing=false;}
   get connected(){return !!(this.port||this.device) && !this.closing;}
   get chunkSize(){return this.transport==='usb'&&this.usbReports?Math.min(240,this.usbReports.outputSize-7,this.usbReports.inputSize-12):240;}
+  // BluetoothはOSでペアリング済みのシリアルポートを、ユーザー操作で選択して開く。
   async connect(transport='bluetooth'){
     if(this.port||this.device)throw Error('接続中です。先に切断してください。');
     if(!['bluetooth','usb'].includes(transport))throw Error('接続方式を選んでください。');
@@ -638,6 +675,7 @@ export class EV3Connection {
     this.log('接続',JSON.stringify(port.getInfo()));
     this.pump=this.readLoop();this.changed(true);
   }
+  // USBのデバイス選択・受信・切断処理を登録する。HID末尾の埋め草はパケットへ混ぜない。
   async connectUSB(){
     const hid=this.platform.navigator?.hid;
     if(!hid)throw Error('このブラウザではUSB接続（WebHID）を使えません。パソコンまたはChromebookのChromeで開いてください。');
@@ -669,6 +707,7 @@ export class EV3Connection {
     }};
     this.log('USB接続',JSON.stringify({name:device.productName??'EV3',inputBytes:reports.inputSize,outputBytes:reports.outputSize}));this.changed(true);
   }
+  // 送信時の通番で待機中の要求と対応付ける。対応しない応答は次の要求へ流用しない。
   receive(frame){
     this.log('受信',hex(frame));
     const id=frame[2]+256*frame[3]; const p=this.pending.get(id);
@@ -680,6 +719,7 @@ export class EV3Connection {
     catch(e){if(!this.closing)this.log('エラー',e.message);}
     finally {this.reader.releaseLock();if(!this.closing){this.fail(Error('EV3との接続が切れました。接続し直してください。'));this.changed(false);queueMicrotask(()=>this.close());}}
   }
+  // 切断時は保留中の通信も失敗として解放する。USBのイベント登録、シリアルの読み書きロックも片付ける。
   async close(){
     if(this.closing)return;
     if(this.device){
@@ -697,6 +737,7 @@ export class EV3Connection {
     try {this.writer.releaseLock();await port.close();}catch(e){this.log('補足',e.message);}
     this.port=null;this.changed(false);this.log('切断','EV3本体から保存したプログラムを起動できます。');
   }
+  // 同時通信は1件に限定する。待ち受けを先に登録してから送信し、即時応答の取りこぼしを防ぐ。
   async request(type,payload,timeout=10000){
     if(!this.connected)throw Error('先にEV3に接続してください。');
     if(this.pending.size)throw Error('通信中です。完了を待ってください。');
@@ -710,6 +751,7 @@ export class EV3Connection {
     this.log('送信',hex(bytes));
     const result=await response;await sending;return result;
   }
+  // ファイル操作用のシステムコマンド。応答種別・コマンド番号・許可したステータスをすべて確認する。
   async system(cmd,args=[],allowed=[0]){
     const f=await this.request(1,[cmd,...args]);
     if(f.length<7 || ![3,5].includes(f[4]) || f[5]!==cmd)throw Error('EV3の応答形式が一致しません。');
@@ -731,6 +773,7 @@ export class EV3Connection {
     if(reply.length!==5||reply[4]!==2)throw Error('EV3が完了音の命令を受け付けませんでした。');
     this.log('完了音','照合完了後、660Hz→880Hzの短い完了音を送信しました。');
   }
+  // 全バイト照合に成功してから完了音を送る。音の失敗とファイル保存の成功は分けて返す。
   async transferWithSignal(data,filename,onProgress,folder='EV3Lab'){
     const path=await this.transfer(data,filename,onProgress,folder);
     try{await this.signalTransferComplete();return {path,soundError:null};}
@@ -745,6 +788,7 @@ export class EV3Connection {
     const counts={B:view.getInt32(0,true),C:view.getInt32(4,true)};
     this.log('角度読取',JSON.stringify(counts));return counts;
   }
+  // 本体で即座に実行する命令。応答用の共有メモリサイズを指定し、USBの送信上限も事前確認する。
   async directCommand(code,globalBytes=0,timeout=3000){
     if(!Number.isInteger(globalBytes)||globalBytes<0||globalBytes>1023)throw Error('読み取りサイズが不正です。');
     const payload=[...u16(globalBytes),...code];
@@ -757,6 +801,7 @@ export class EV3Connection {
     const value=await this.directCommand([0x0c,...constant(22),...constant(1),...globalVar(0),0x0c,...constant(24),...constant(1),...globalVar(1)],2);
     return {status:value[0],result:value[1]};
   }
+  // 実行中のプログラムを上書きしないよう、USER_SLOTの状態を確認する。停止の指示自体は別操作で行う。
   async ensureProgramStopped(){
     if((await this.programStatus()).status!==0x40)throw Error('EV3でプログラムが実行中です。「実行を停止」または本体の戻るボタンで停止してから転送してください。');
   }
@@ -771,6 +816,7 @@ export class EV3Connection {
     const state=await this.programStatus();if(state.result===2)throw Error('EV3で実行エラーが発生しました。本体の表示とプログラムを確認してください。');
     this.log('起動',`${path} の起動命令をEV3が受け付けました。`);
   }
+  // 転送・読み戻し照合が済んだパスだけを起動する。起動失敗時も照合済みパスを呼び出し元へ伝える。
   async transferAndRun(data,filename,onProgress,folder='EV3Lab'){
     const path=`${projectDirectory(folder)}/${filename}`,code=this.programStartCode(path);
     if(this.transport==='usb'&&this.usbReports&&code.length+7>this.usbReports.outputSize)throw Error('このUSB接続ではプロジェクト名とプログラム名を短くしてください。');
@@ -783,6 +829,7 @@ export class EV3Connection {
     await this.directCommand([OP.PROGRAM_STOP,...constant(1),OP.STOP,...constant(0),...constant(15),...constant(1)]);
     this.log('停止','ユーザープログラムとすべてのモーターへ停止命令を送信しました。');
   }
+  // 接続中の画面表示用。センサのモードを変えず、各ポートを順番に読むため同一瞬間の測定ではない。
   async readSensorSnapshot(){
     const inputs=[];
     for(let port=0;port<4;port++){
@@ -802,6 +849,7 @@ export class EV3Connection {
     try{data=await this.readFile(path);}catch(e){throw Error(`停止時刻の記録を読めません。0.1.6以降で転送した今回のファイルを実行してください。${e.message}`);}
     const record=decodeTimingRecord(data,tag);this.log('停止時刻記録',JSON.stringify(record));return record;
   }
+  // ファイルハンドルを取得して分割送信する。途中失敗時は可能ならハンドルを閉じる。
   async writeFile(path,data,onProgress=()=>{}){
     const first=await this.system(0x92,[...u32(data.length),...zstr(path)]);
     if(first.data.length!==1)throw Error('保存先ハンドルの応答が不正です。');
@@ -815,6 +863,7 @@ export class EV3Connection {
       finished=true;
     }finally{if(!finished && this.connected)try{await this.system(0x98,[handle]);}catch{}}
   }
+  // EOFまで読み戻し、宣言サイズとも照合する。ブロック境界ぴったりのサイズでも最後の読み取りでハンドルを閉じる。
   async readFile(path){
     const first=await this.system(0x94,[...u16(this.chunkSize),...zstr(path)],[0,8]);
     if(first.data.length<5)throw Error('読み戻しの応答が不正です。');
@@ -834,6 +883,7 @@ export class EV3Connection {
     if(bytes.length!==size)throw Error('読み戻したファイルのサイズが一致しません。');
     return new Uint8Array(bytes);
   }
+  // フォルダ作成 → ファイル送信 → 読み戻し → 全バイト比較を行う。送信完了だけでは成功扱いにしない。
   async transfer(data,filename,onProgress,folder='EV3Lab'){
     if(!/^[A-Za-z0-9_-]{1,31}\.rbf$/.test(filename))throw Error('本体用ファイル名が不正です。');
     const directoryPath=projectDirectory(folder);
