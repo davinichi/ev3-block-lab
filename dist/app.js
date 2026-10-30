@@ -1,7 +1,7 @@
 import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.js'; import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from './library.js';
 const $=id=>document.getElementById(id);
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.11.0';
+const VERSION='0.11.1';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -463,14 +463,14 @@ function importMyBlockLibrary(data){
  workspace.clearUndo();dirty=true;check();saveLocal();
 }
 
-function project(){return {format:'ev3-block-lab',version:1,appVersion:VERSION,name:$('projectName').value,programName:$('programName').value,ev3ProjectName:$('ev3ProjectName').value,pairMode:$('pairMode').value,workspace:Blockly.serialization.workspaces.save(workspace)};}
+function project(){return {format:'ev3-block-lab',version:1,appVersion:VERSION,name:$('programName').value,programName:$('programName').value,ev3ProjectName:$('ev3ProjectName').value,pairMode:$('pairMode').value,workspace:Blockly.serialization.workspaces.save(workspace)};}
 function restore(data){
   if(data?.format!=='ev3-block-lab' || data.version!==1 || !data.workspace?.blocks)throw Error('EV3 Block Labのプロジェクト（バージョン1）を選んでください。');
   inspectBlocks(data.workspace.blocks);
-  const backup=Blockly.serialization.workspaces.save(workspace),oldName=$('projectName').value;
+  const backup=Blockly.serialization.workspaces.save(workspace);
   loading=true;
-  try{Blockly.serialization.workspaces.load(data.workspace,workspace);$('projectName').value=String(data.name??'プロジェクト').slice(0,60);}
-  catch(e){Blockly.serialization.workspaces.load(backup,workspace);$('projectName').value=oldName;throw e;}
+  try{Blockly.serialization.workspaces.load(data.workspace,workspace);}
+  catch(e){Blockly.serialization.workspaces.load(backup,workspace);throw e;}
   finally{loading=false;}
   $('ev3ProjectName').value=typeof data.ev3ProjectName==='string'?data.ev3ProjectName:'EV3Lab';
   $('programName').value=typeof data.programName==='string'?data.programName:'MyProgram';
@@ -496,7 +496,7 @@ function sample(mode){
   const body=motor?`<block type="ev3_motor"><field name="PORTS">2</field><value name="SPEED">${arg('速度')}</value><value name="DEGREES">${arg('角度')}</value></block>`:`<block type="ev3_tone"><field name="VOLUME">25</field><value name="FREQUENCY">${arg('周波数')}</value>${n('MS',250)}</block>`;
   const xml=`<xml xmlns="https://developers.google.com/blockly/xml"><variables>${params.map(p=>`<variable id="arg-${p}">${p}</variable>`).join('')}</variables><block type="ev3_start" x="30" y="35"><next>${call(motor?[90,20]:[440],wait)}</next></block><block type="procedures_defnoreturn" x="30" y="410"><mutation>${params.map(p=>`<arg name="${p}" varid="arg-${p}"></arg>`).join('')}</mutation><field name="NAME">${proc}</field><statement name="STACK">${body}</statement></block></xml>`;
   loading=true;
-  try{workspace.clear();Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(xml),workspace);$('projectName').value=motor?'モーターBとマイブロック':'音とマイブロック';workspace.clearUndo();}
+  try{workspace.clear();Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(xml),workspace);$('programName').value=motor?'MotorSample':'SoundSample';workspace.clearUndo();}
   finally{loading=false;}
   check();saveLocal();dirty=false;
 }
@@ -505,7 +505,6 @@ workspace.addChangeListener(e=>{
   if(loading || e.isUiEvent)return;
   dirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(()=>{check();saveLocal();},350);
 });
-$('projectName').addEventListener('input',()=>{dirty=true;saveLocal();});
 $('ev3ProjectName').addEventListener('input',()=>{dirty=true;check();saveLocal();});
 $('programName').addEventListener('input',()=>{dirty=true;updateButtons();saveLocal();});
 $('pairMode').onchange=()=>{dirty=true;check();saveLocal();feedback('2モーターの制御方式を変更しました。反映するには再転送が必要です。');};
@@ -543,19 +542,19 @@ $('spinSample').onclick=()=>{
  const turn=direction=>({type:'ev3_spin_'+direction,fields:{LEFT_PORT:'2',RIGHT_PORT:'4'},inputs:{SPEED:number(20),ANGLE:number(90)}});
  const left=turn('left'),wait={type:'ev3_wait_seconds',inputs:{SECONDS:number(1)},next:{block:left}},right={...turn('right'),next:{block:wait}};
  const first={type:'ev3_start',next:{block:{type:'ev3_wheel',fields:{DIAMETER:56},next:{block:{type:'ev3_tread',fields:{TREAD:112},next:{block:right}}}}}};
- loading=true;try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[first]}},workspace);$('projectName').value='左右のスピンターン';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('直径56mm・トレッド112mmの例です。実物の寸法と左右のポートに合わせて変更してください。');
+ loading=true;try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[first]}},workspace);$('programName').value='SpinTurn';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('直径56mm・トレッド112mmの例です。実物の寸法と左右のポートに合わせて変更してください。');
 };
 $('sensorMotorSample').onclick=()=>{
  if(dirty && !confirm('現在の編集内容を距離で停止のサンプルに置き換えます。必要なら先に保存してください。'))return;
  const stop={type:'ev3_stop'},wait={type:'ev3_wait_until',inputs:{BOOL:{block:{type:'ev3_distance_compare',fields:{PORT:'4',OP:'lt'},inputs:{VALUE:shadow(15)}}}},next:{block:stop}};
  const run={type:'ev3_motor_l_run',fields:{PORTS:'6'},inputs:{SPEED:shadow(20)},next:{block:wait}};
- loading=true;try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:80,y:60,next:{block:run}}]}},workspace);$('projectName').value='距離で停止';workspace.clearUndo();}finally{loading=false;}
+ loading=true;try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:80,y:60,next:{block:run}}]}},workspace);$('programName').value='DistanceStop';workspace.clearUndo();}finally{loading=false;}
  check();saveLocal();dirty=false;feedback('LモーターB+Cを速さ20％で回し、ポート4の超音波センサが15cm未満になったら停止します。');
 };
 $('colorSample').onclick=()=>{
  if(dirty && !confirm('現在の編集内容を赤で音のサンプルに置き換えます。必要なら先に保存してください。'))return;
  loading=true;
- try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:80,y:60,next:{block:{type:'ev3_wait_until',inputs:{BOOL:{block:{type:'ev3_color_is',fields:{PORT:'3',COLOR:'5'}}}},next:{block:{type:'ev3_tone',fields:{VOLUME:25},inputs:{FREQUENCY:shadow(880),MS:shadow(300)}}}}}}]}},workspace);$('projectName').value='赤を見つけたら音';workspace.clearUndo();}
+ try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:80,y:60,next:{block:{type:'ev3_wait_until',inputs:{BOOL:{block:{type:'ev3_color_is',fields:{PORT:'3',COLOR:'5'}}}},next:{block:{type:'ev3_tone',fields:{VOLUME:25},inputs:{FREQUENCY:shadow(880),MS:shadow(300)}}}}}}]}},workspace);$('programName').value='ColorSound';workspace.clearUndo();}
  finally{loading=false;}
  check();saveLocal();dirty=false;feedback('カラーセンサをポート3に接続し、赤い物を近づけると音が鳴ります。');
 };
@@ -566,13 +565,13 @@ $('controlSample').onclick=()=>{
  const branch={type:'controls_if',extraState:{hasElse:true},inputs:{IF0:{block:{type:'logic_compare',fields:{OP:'EQ'},inputs:{A:variable(),B:number(2)}}},DO0:tone(880),ELSE:tone(440)},next:{block:{type:'ev3_wait_seconds',inputs:{SECONDS:number(.5)}}}};
  const repeat={type:'controls_whileUntil',fields:{MODE:'WHILE'},inputs:{BOOL:{block:{type:'logic_compare',fields:{OP:'LT'},inputs:{A:variable(),B:number(3)}}},DO:{block:{type:'math_change',fields:{VAR:{id:'sample-count'}},inputs:{DELTA:number(1)},next:{block:branch}}}}};
  const first={type:'ev3_start',next:{block:{type:'variables_set',fields:{VAR:{id:'sample-count'}},inputs:{VALUE:number(0)},next:{block:repeat}}}};
- loading=true;try{Blockly.serialization.workspaces.load({variables:[{id:'sample-count',name:'回数'}],blocks:{languageVersion:0,blocks:[first]}},workspace);$('projectName').value='変数と分岐';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('回数を1ずつ増やし、2回目だけ高い音を鳴らします。');
+ loading=true;try{Blockly.serialization.workspaces.load({variables:[{id:'sample-count',name:'回数'}],blocks:{languageVersion:0,blocks:[first]}},workspace);$('programName').value='Variables';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('回数を1ずつ増やし、2回目だけ高い音を鳴らします。');
 };
 $('driveSample').onclick=()=>{
  if(dirty && !confirm('現在の編集内容を走行サンプルに置き換えます。必要なら先に保存してください。'))return;
  const move=(direction)=>'<block type="ev3_drive_'+direction+'"><field name="PORTS">6</field>'+n('SPEED',20)+n('CM',20)+'</block>';
  const xml='<xml xmlns="https://developers.google.com/blockly/xml"><block type="ev3_start" x="30" y="35"><next><block type="ev3_wheel"><field name="DIAMETER">56</field><next>'+move('forward').replace('</block>','<next><block type="ev3_wait_seconds">'+n('SECONDS',1)+'<next>'+move('backward')+'</next></block></next></block>')+'</next></block></next></block></xml>';
- loading=true;try{workspace.clear();Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(xml),workspace);$('projectName').value='前進と後退';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('タイヤ直径56mm・B+C・前後20cmのサンプルです。実物の直径を確認してください。');
+ loading=true;try{workspace.clear();Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(xml),workspace);$('programName').value='ForwardBackward';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('タイヤ直径56mm・B+C・前後20cmのサンプルです。実物の直径を確認してください。');
 };
 $('soundSample').onclick=()=>replaceSample('sound');$('motorSample').onclick=()=>replaceSample('motor');
 $('undo').onclick=()=>workspace.undo(false);$('redo').onclick=()=>workspace.undo(true);
@@ -580,7 +579,7 @@ $('help').onclick=()=>$('helpDialog').showModal();
 $('newProject').onclick=()=>{
  if(workspace.getAllBlocks(false).length && !confirm('新しい作品を作ります。現在の作品が必要な場合は、先に「保存」してください。'))return;
  loading=true;
- try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:30,y:35}]}},workspace);$('projectName').value='新しい作品';$('ev3ProjectName').value='EV3Lab';$('programName').value='MyProgram';workspace.clearUndo();}
+ try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:30,y:35}]}},workspace);$('ev3ProjectName').value='EV3Lab';$('programName').value='MyProgram';workspace.clearUndo();}
  finally{loading=false;}
  savedPath='';dirty=false;check();saveLocal();feedback('新しい作品を作りました。マイブロックの読み込みもできます。');
 };
@@ -600,13 +599,13 @@ function rampSampleState(){
  return {blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:30,y:30,next:first}]}};
 }
 function loadRampSample(){
- loading=true;try{Blockly.serialization.workspaces.load(rampSampleState(),workspace);$('projectName').value='台形とS字の比較';workspace.clearUndo();}finally{loading=false;}
+ loading=true;try{Blockly.serialization.workspaces.load(rampSampleState(),workspace);$('programName').value='RampTest';workspace.clearUndo();}finally{loading=false;}
  check();saveLocal();dirty=false;feedback('LモーターBを台形→1秒待つ→S字の順に720度ずつ回します。速度30％、加速・減速各1秒です。実機確認をお願いします。');
 }
 $('rampSample').onclick=()=>{if(dirty)$('rampSampleDialog').showModal();else loadRampSample();};
 $('rampSampleCancel').onclick=()=>$('rampSampleDialog').close();
 $('rampSampleConfirm').onclick=()=>{$('rampSampleDialog').close();loadRampSample();};
-$('saveProject').onclick=()=>{download(JSON.stringify(project(),null,2),'project.ev3lab','application/json');dirty=false;};
+$('saveProject').onclick=()=>{try{const filename=programFileName($('programName').value).replace(/\.rbf$/,'.ev3lab');download(JSON.stringify(project(),null,2),filename,'application/json');dirty=false;}catch(e){feedback(e.message,true);$('programName').focus();}};
 $('loadProject').onclick=()=>$('fileInput').click();
 $('fileInput').onchange=async e=>{
   const file=e.target.files[0];e.target.value='';if(!file)return;
@@ -632,7 +631,7 @@ $('transfer').onclick=async()=>{
   let filename;try{filename=fileName();}catch(e){feedback(e.message,true);return;}
   busy=true;updateButtons();$('progress').hidden=false;$('progress').value=0;feedback(`「${filename}」を保存しています。同じ名前のプログラムは上書きされます…`);
   try{
-    log('プログラム',JSON.stringify({name:$('projectName').value,filename,ir:build.program}));
+    log('プログラム',JSON.stringify({name:$('programName').value,filename,ir:build.program}));
     savedPath='';
     const result=await connection.transferWithSignal(build.data,filename,p=>{$('progress').value=p;feedback(p===100?'送信完了。EV3から読み戻して照合しています…':`本体に保存しています… ${p}%`);},$('ev3ProjectName').value);
     savedPath=result.path;

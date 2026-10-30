@@ -1,6 +1,6 @@
 # EV3 Block Lab
 
-小学校の授業で、Chromebook・WindowsのブラウザからLEGO MINDSTORMS EV3をプログラミングするための試作アプリです。バージョンは **0.11.0** です。
+小学校の授業で、Chromebook・WindowsのブラウザからLEGO MINDSTORMS EV3をプログラミングするための試作アプリです。バージョンは **0.11.1** です。
 
 ブロックからEV3標準形式の実行ファイル（.rbf）を生成し、本体へ転送・読み戻し照合します。本体に保存したプログラムは、PCから切り離して本体で選択・実行できます。
 
@@ -14,7 +14,7 @@
 4. **Actions → Deploy EV3 Block Lab to GitHub Pages → Run workflow** を実行します。
 5. Actionsの完了後、Pagesに表示されるURLを開きます。
 
-以後、mainブランチの更新時にテストを実行し、成功した場合にdistフォルダを公開します。プルリクエストではテストのみ実行します。手動でトークンをソースへ書く必要はありません。
+当面はバックアップとして利用するため、mainブランチの更新時とプルリクエストではテストのみ実行します。GitHub Pagesへの公開は、正式公開時にPagesを設定してRun workflowを手動実行した場合だけ行います。手動でトークンをソースへ書く必要はありません。
 
 公式手順: https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
 
@@ -40,6 +40,8 @@
 - 超音波・カラー・タッチ・赤外線センサー、モーターのエンコーダ取得・リセット
 - 変数、数値演算、比較、論理、条件分岐、繰り返し、引数付きマイブロック
 - 作品とマイブロックの保存・読み込み、Bluetooth/USB転送・照合、転送完了音
+
+左上にはプロジェクト名（EV3の保存先フォルダ）とプログラム名を入力します。保存時のファイル名は「プログラム名.ev3lab」です。
 
 作品は `.ev3lab`、マイブロックは `.ev3blocks`、EV3実行用は `.rbf` です。作品・マイブロックは本アプリ専用形式で、LEGO純正ソフトの `.ev3` 形式とは互換性がありません。
 

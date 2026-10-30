@@ -2,7 +2,7 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {compile} from '../dist/ev3.js';
+import {compile,programFileName} from '../dist/ev3.js';
 import {createBlockLibrary,mergeBlockLibrary} from '../dist/library.js';
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
 // Blockly's headless shadow serialization still creates XML nodes. Supply
@@ -26,6 +26,20 @@ function editor(){
  vm.runInContext(app.slice(app.indexOf('function expression('),app.indexOf('function check(){')),context);
  return context;
 }
+
+test('program names determine saved filenames and preserve EV3 destinations across legacy load, save and reload',()=>{
+ const context=editor();context.programFileName=programFileName;context.inspectBlocks=()=>{};
+ vm.runInContext(`let loading=false,dirty=true;function check(){};const downloads=[];let error='';function download(data,name,type){downloads.push({data:JSON.parse(data),name,type});}function feedback(message){error=message;}let focused=false;$('programName').focus=()=>focused=true;`,context);
+ vm.runInContext(app.slice(app.indexOf('function project(){'),app.indexOf('function saveLocal(){')),context);
+ vm.runInContext(app.slice(app.indexOf("$('saveProject').onclick="),app.indexOf("$('loadProject').onclick=")),context);
+ const result=JSON.parse(vm.runInContext(`
+ Blockly.Events.disable();workspace.newBlock('ev3_start');const old={format:'ev3-block-lab',version:1,name:'古い作品名',ev3ProjectName:'Class1',programName:'LineTrace',pairMode:'feedback',workspace:Blockly.serialization.workspaces.save(workspace)};
+ restore(old);$('saveProject').onclick();const first=downloads[0];$('programName').value='Changed';$('ev3ProjectName').value='Other';restore(first.data);const loaded=project();
+ $('programName').value='Turn_90';$('saveProject').onclick();const renamed=downloads[1];
+ $('programName').value='../bad';dirty=true;$('saveProject').onclick();
+ Blockly.Events.enable();JSON.stringify({first,loaded,renamed,count:downloads.length,error,focused,dirty});`,context));
+ assert.equal(result.first.name,'LineTrace.ev3lab');assert.equal(result.first.type,'application/json');assert.equal(result.loaded.programName,'LineTrace');assert.equal(result.loaded.ev3ProjectName,'Class1');assert.equal(result.loaded.pairMode,'feedback');assert.equal(result.loaded.name,'LineTrace');assert.equal(result.loaded.workspace.blocks.blocks[0].type,'ev3_start');assert.equal(result.renamed.name,'Turn_90.ev3lab');assert.equal(result.renamed.data.programName,'Turn_90');assert.equal(result.count,2);assert.ok(result.error);assert.equal(result.focused,true);assert.equal(result.dirty,true);
+});
 
 test('plain procedure form creates and edits arguments while retaining callers and scoped references',()=>{
  const context=editor();
