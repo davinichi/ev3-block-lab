@@ -28,6 +28,18 @@ function editor(){
  return context;
 }
 
+test('brick button palette and saved definitions retain selected buttons and released conditions',()=>{
+ const context=editor();
+ const result=JSON.parse(vm.runInContext(`
+ Blockly.Events.disable();const def=saveMyBlock(workspace,'ボタン待ち',[]),wait=workspace.newBlock('ev3_wait_until'),condition=workspace.newBlock('ev3_brick_button');condition.setFieldValue('4','BUTTON');condition.setFieldValue('0','STATE');def.getInput('STACK').connection.connect(wait.previousConnection);wait.getInput('BOOL').connection.connect(condition.outputConnection);
+ const start=workspace.newBlock('ev3_start'),call=workspace.newBlock('procedures_callnoreturn');call.loadExtraState({name:'ボタン待ち',params:[]});start.nextConnection.connect(call.previousConnection);
+ const numeric=workspace.newBlock('ev3_brick_button_value');numeric.setFieldValue('7','BUTTON');const reading=expression(numeric),saved=Blockly.serialization.workspaces.save(workspace);Blockly.serialization.workspaces.load(saved,workspace);const built=program();const types=toolbox.contents.find(c=>c.name==='センサー').contents.map(x=>x.type);Blockly.Events.enable();JSON.stringify({value:reading,program:built,types});`,context));
+ assert.deepEqual(result.value,{button:{id:7}});
+ assert.deepEqual(result.program.procedures[0].body[0].condition,{op:'eq',left:{button:{id:4}},right:0});
+ assert.ok(result.types.includes('ev3_brick_button'));assert.ok(result.types.includes('ev3_brick_button_value'));
+ compile(result.program);
+});
+
 test('program names determine saved filenames and preserve EV3 destinations across legacy load, save and reload',()=>{
  const context=editor();context.programFileName=programFileName;context.inspectBlocks=()=>{};
  vm.runInContext(`let loading=false,dirty=true;function check(){};const downloads=[];let error='';function download(data,name,type){downloads.push({data:JSON.parse(data),name,type});}function feedback(message){error=message;}let focused=false;$('programName').focus=()=>focused=true;`,context);

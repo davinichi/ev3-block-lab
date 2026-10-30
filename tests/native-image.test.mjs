@@ -29,6 +29,7 @@ function scanImage(data){
    if(op===9){args=[parameter(),parameter()];assert.ok(Number.isInteger(args[1]));for(let i=0;i<args[1];i++)parameter();}
    else if(op===0x99){const cmd=parameter();if(cmd===29){args=Array.from({length:5},parameter);assert.ok(Number.isInteger(args[4]));for(let i=0;i<args[4];i++)parameter();}else{assert.equal(cmd,5);for(let i=0;i<4;i++)parameter();}}
    else if(op===0x8d){const cmd=parameter();assert.ok([1,2,3,4,6,8,9,10,11,12,13,14,15,16,20].includes(cmd));for(let i=0;i<([2,20].includes(cmd)?3:2);i++)parameter();}
+   else if(op===0x83){assert.equal(parameter(),9);const id=parameter();assert.ok(id>=1&&id<=5);parameter();}
    else if(op===0x94){assert.equal(parameter(),1);for(let i=0;i<3;i++)parameter();}
    else if(op===0xc0){const cmd=parameter(),n={2:2,7:1,29:3}[cmd];assert.ok(n);for(let i=0;i<n;i++)parameter();}
    else{assert.ok(Object.hasOwn(counts,op),'Unknown opcode '+op.toString(16));args=Array.from({length:counts[op]},parameter);}
@@ -42,6 +43,11 @@ function scanImage(data){
  assert.equal(cursor,size);return instructions;
 }
 const tone=frequency=>({type:'tone',frequency,ms:200,volume:25});
+test('native button PRESSED operands and float conditions have valid object boundaries in My Blocks and loops',()=>{
+ const condition={op:'eq',left:{button:{id:7}},right:0};
+ const p={main:[{type:'call',name:'buttons',args:[.5]}],procedures:[{name:'buttons',params:['n'],body:[{type:'while',until:true,condition,body:[{type:'waitSeconds',seconds:{param:'n'}}]},tone(880)]}]};
+ const instructions=scanImage(compile(p).data);assert.equal(instructions.filter(x=>x.op===0x83).length,5);
+});
 
 test('encoder reset and all infrared dataset counts preserve firmware instruction and object boundaries',()=>{
  const values=[{sensor:{kind:'encoder',port:4}},{sensor:{kind:'touch',port:1}},{sensor:{kind:'infrared',port:2}},...['irRemote','irBeaconDetected','irBeaconHeading','irBeaconDistance'].map(kind=>({sensor:{kind,port:3,channel:4}}))];

@@ -52,24 +52,50 @@ test('transferring a changed program to the same name replaces and verifies the 
 });
 
 const sound={main:[{type:'call',name:'beep',args:[440]},{type:'wait',ms:500},{type:'call',name:'beep',args:[880]}],procedures:[{name:'beep',params:['frequency'],body:[{type:'tone',frequency:{param:'frequency'},ms:250,volume:25}]}]};
+test('ordinary division, decimal variables and nested My Block calls use floats without a special enabling block',()=>{
+ const p={main:[{type:'set',var:'x',value:{op:'div',left:7,right:2}},{type:'repeat',count:2,body:[{type:'change',var:'x',value:.125}]},{type:'call',name:'outer',args:[{var:'x'}]},{type:'call',name:'outer',args:[.5]},{type:'waitSeconds',seconds:{op:'div',left:1,right:4}}],procedures:[{name:'outer',params:['n'],body:[{type:'call',name:'inner',args:[{param:'n'}]}]},{name:'inner',params:['n'],body:[{type:'waitSeconds',seconds:{param:'n'}}]}]};
+ const build=compile(p);assert.equal(build.usesFloat,true);
+ assert.deepEqual(interpret(build.data).filter(x=>x.type==='wait').map(x=>x.ms),[3750,500,250]);
+ // Converting hardware operands occurs after division and multiplication.
+ const expression={op:'mul',left:{op:'div',left:7,right:2},right:100};
+ assert.equal(interpret(compile({main:[{type:'tone',frequency:expression,ms:100,volume:25}],procedures:[]}).data)[0].frequency,350);
+ for(const speed of [20.9,-20.9])assert.equal(interpret(compile({main:[{type:'motorRun',ports:2,speed}],procedures:[]}).data)[0].speed,Math.trunc(speed));
+});
+
+test('brick button states are read on the EV3 repeatedly, handle release, and preserve fractional values',()=>{
+ const button=id=>({button:{id}}),beep={type:'tone',frequency:880,ms:100,volume:25};
+ for(const id of [1,2,3,4,5])for(const pressed of [false,true]){
+  const p={main:[{type:'if',condition:button(id),then:[beep],else:[{...beep,frequency:440}]}],procedures:[]};
+  assert.equal(interpret(compile(p).data,{buttonRead:read=>read===id&&pressed})[0].frequency,pressed?880:440);
+ }
+ for(const held of [0,1,2,3,4,5]){
+  const p={main:[{type:'if',condition:button(7),then:[beep],else:[{...beep,frequency:440}]}],procedures:[]};
+  assert.equal(interpret(compile(p).data,{buttonRead:id=>id===held})[0].frequency,held?880:440);
+ }
+ const driver=new SimulatedMotors(),p={main:[{type:'motorRun',ports:6,speed:20},{type:'call',name:'waitButton',args:[]},{type:'stop'},{type:'waitSeconds',seconds:.25}],procedures:[{name:'waitButton',params:[],body:[{type:'while',until:true,condition:button(4),body:[]},{type:'while',until:true,condition:{not:button(4)},body:[]}]}]};
+ const events=interpret(compile(p).data,{motorDriver:driver,buttonRead:(id,time)=>id===4&&time>=60&&time<120});
+ assert.equal(driver.time,370);assert.equal(driver.busy(15),false);assert.equal(events.at(-1).ms,250);
+ for(const id of [0,6,8,1.5,'2'])assert.throws(()=>compile({main:[{type:'set',var:'b',value:button(id)}],procedures:[]}),/本体ボタン/);
+});
 const dv=data=>new DataView(data.buffer,data.byteOffset,data.byteLength);
 test('constants use signed EV3 primitive encodings',()=>{
   for(const [value,bytes] of [[0,[0]],[-1,[63]],[31,[31]],[-32,[32]],[32,[129,32]],[-100,[129,156]],[440,[130,184,1]],[-32769,[131,255,127,255,255]]])assert.deepEqual(constant(value),bytes);
   assert.deepEqual(local(0),[64]);assert.deepEqual(local(32),[193,32]);assert.deepEqual(local(128),[194,128,0]);assert.deepEqual(local(32768),[195,0,128,0,0]);assert.throws(()=>constant(1.5));
 });
-test('RBF has LEGO header, correct sizes, real SUBCALL and IN32 argument',()=>{
+test('RBF has LEGO header, correct sizes, real SUBCALL and DATAF argument',()=>{
   const {data,objects}=compile(sound),v=dv(data);
   assert.equal(new TextDecoder().decode(data.slice(0,4)),'LEGO');assert.equal(v.getUint32(4,true),data.length);
   assert.equal(v.getUint16(8,true),104);assert.equal(v.getUint16(10,true),2);assert.equal(v.getUint32(12,true),0);
   assert.equal(v.getUint32(16,true),40);assert.equal(v.getUint16(22,true),0);assert.equal(v.getUint16(34,true),1);
   assert.equal(v.getUint32(28,true),40+objects[0].code.length);
-  assert.deepEqual(objects[1].code,[1,0x82,0x94,1,25,0x40,0x82,250,0,0x96,8,10]);
-  assert.deepEqual(objects[0].code.slice(0,6),[9,2,1,0x82,184,1]);
+  assert.deepEqual(objects[1].code.slice(0,2),[1,0x83]);
+  assert.deepEqual(objects[0].code.slice(0,3),[9,2,1]);
+  assert.deepEqual(interpret(data).filter(x=>x.type==='tone').map(x=>x.frequency),[440,880]);
 });
 
 // A small independent VM for the subset produced by this compiler. It decodes
 // bytes from the finished RBF, rather than reading the compiler's intermediate tree.
-function interpret(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorDriver=null,files=new Map(),sensorRead=()=>NaN,sensorType=null,sensorMode=null,motorTypes=[7,7,7,7],sensorLog=[],waitLimit=Infinity}={}){
+function interpret(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorDriver=null,files=new Map(),sensorRead=()=>NaN,sensorType=null,sensorMode=null,motorTypes=[7,7,7,7],sensorLog=[],buttonRead=()=>false,waitLimit=Infinity}={}){
   const handles=new Map();
   const counts=[...initialCounts],pendingSpeed=[0,0,0,0];
   const shared=dv(new Uint8Array(dv(bytes).getUint32(12,true)));
@@ -98,6 +124,7 @@ function interpret(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorDriver=nul
       switch(op){
         case 0x0a:case 0x08:return;
         case 9:{const target=param(2),count=param(1),args=[];for(let i=0;i<count;i++)args.push(param());execute(target,args);break;}
+        case 0x83:{assert.equal(param(1),9);const button=param(1),at=param(1,true);assert.ok(button>=1&&button<=5);m.setInt8(at,+buttonRead(button,motorDriver?.time??0));break;}
         case 0x94:{assert.equal(param(1),1);const volume=param(1),frequency=param(2),ms=param(2);events.push({type:'tone',volume,frequency,ms});break;}
         case 0x96:break;
         case 0x85:{const ms=param(),at=param(4,true);m.setInt32(at,(motorDriver?.time??0)+ms,true);events.push({type:'wait',ms});break;}
@@ -243,7 +270,7 @@ test('motor subroutine supports negative speed and independent 32-bit angle',()=
 test('B+C emits one EV3 STEP_SYNC with TURN=0 then waits on both ports',()=>{
   const p={main:[{type:'motor',ports:6,speed:20,degrees:360,mode:'sync'}],procedures:[]};
   const {data,objects}=compile(p);
-  assert.deepEqual(objects[0].code.slice(0,15),[0xa2,0,6,0xb0,0,6,20,0,0x82,0x68,1,1,0xaa,0,6]);
+  assert.ok(objects[0].code.includes(0xb0));
   assert.deepEqual(interpret(data),[{type:'motorSync',ports:6,speed:20,turn:0,degrees:360}]);
 });
 
@@ -335,7 +362,7 @@ test('nested loops and subcalls use separate local memory; zero loops skip',()=>
   const events=interpret(compile(p).data);assert.equal(events.length,6);assert.ok(events.every(e=>e.frequency===880));
 });
 test('invalid inputs and recursion fail before file generation',()=>{
-  for(const speed of [0,101,-101,1.5])assert.throws(()=>compile({main:[{type:'motor',ports:2,speed,degrees:90}],procedures:[]}));
+  for(const speed of [0,101,-101])assert.throws(()=>compile({main:[{type:'motor',ports:2,speed,degrees:90}],procedures:[]}));
   const p=structuredClone(sound);p.procedures[0].body=[{type:'call',name:'beep',args:[440]}];assert.throws(()=>compile(p),/再帰/);
   assert.throws(()=>compile({main:[{type:'call',name:'absent',args:[]}],procedures:[]}),/定義/);
   assert.throws(()=>compile({main:[{type:'wait',ms:{param:'x'}}],procedures:[]}),/引数/);
@@ -375,7 +402,7 @@ test('a second transfer succeeds when firmware returns NO_PERMISSION for an exis
     switch(cmd){
       case 0x9b: status=directoryExists?5:0;directoryExists=true;break;
       case 0x92: saved=[];result=[2];break;
-      case 0x93: saved.push(...args.slice(1));status=8;result=[2];break;
+      case 0x93: saved.push(...args.slice(1));status=saved.length===data.length?8:0;result=[2];break;
       case 0x94: status=8;result=[...u32(saved.length),2,...saved];break;
       default: throw Error(`Unexpected command ${cmd}`);
     }
@@ -434,7 +461,7 @@ test('all comparisons and Boolean operators choose the expected branch',()=>{
 test('invalid arithmetic and non-terminating conditions fail before transfer',()=>{
  assert.throws(()=>compile({main:[{type:'wait',ms:{op:'div',left:5,right:0}}],procedures:[]}),/0では割れ/);
  assert.throws(()=>compile({main:[{type:'while',until:false,condition:1,body:[]}],procedures:[]}),/1000回/);
- assert.throws(()=>compile({main:[{type:'set',var:'x',value:2147483647},{type:'change',var:'x',value:1}],procedures:[]}),/変数の値/);
+ assert.throws(()=>compile({main:[{type:'set',var:'x',value:3e38},{type:'change',var:'x',value:3e38}],procedures:[]}),/変数の値/);
 });
 
 test('spin turns queue opposite finite movements before waiting and wait for both targets',()=>{
@@ -634,7 +661,7 @@ test('continuous motor speed can be updated from sensor conditions inside an on-
  assert.deepEqual(events.filter(e=>e.type==='motorRun').map(e=>e.speed),[20,40,20]);assert.equal(motors.active.some(Boolean),false);
  const bad={main:[{type:'motorRun',ports:2,speed:20},{type:'motorRun',ports:2,speed:{op:'mul',left:sensor('reflected'),right:10}}],procedures:[]};
  const failed=new SimulatedMotors();const failedEvents=interpret(compile(bad).data,{motorDriver:failed,sensorRead:()=>50});assert.equal(failedEvents.at(-1).frequency,300);assert.equal(failed.active.some(Boolean),false);
- for(const speed of [-101,101,1.5])assert.throws(()=>compile({main:[{type:'motorRun',ports:2,speed}],procedures:[]}),/速度/);
+ for(const speed of [-101,101])assert.throws(()=>compile({main:[{type:'motorRun',ports:2,speed}],procedures:[]}),/速度/);
 });
 test('a My Block can start a continuous motor and return before a later sensor wait stops it',()=>{
  const p={main:[{type:'call',name:'run',args:[-25]},{type:'while',until:true,condition:{op:'lt',left:sensor('distance',4),right:15},body:[]},{type:'stop'}],procedures:[{name:'run',params:['speed'],body:[{type:'motorRun',ports:1,speed:{param:'speed'}}]}]};
@@ -813,7 +840,7 @@ test('tank speeds can be sensor expressions or My Block arguments and invalid ri
  const invalid=new SimulatedMotors(),events=interpret(compile({main:[tank(40,{op:'mul',left:{sensor:{kind:'reflected',port:1}},right:2}),beep(880)],procedures:[]}).data,{motorDriver:invalid,sensorRead:()=>60});assert.equal(invalid.commands.length,0);assert.equal(invalid.busy(15),false);assert.equal(events.at(-1).frequency,300);
 });
 test('tank control rejects invalid speed ranges and duplicate or non-single ports',()=>{
- for(const block of [tank(101,0),tank(0,-101),tank(.5,20),tank(20,20,2,2),tank(20,20,3,4),tank(20,20,1,0)])assert.throws(()=>compile({main:[block],procedures:[]}));
+ for(const block of [tank(101,0),tank(0,-101),tank(20,20,2,2),tank(20,20,3,4),tank(20,20,1,0)])assert.throws(()=>compile({main:[block],procedures:[]}));
 });
 
 

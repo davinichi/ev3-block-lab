@@ -1,7 +1,7 @@
 import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.js'; import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from './library.js'; import {sensorReading} from './sensor-monitor.js';
 const $=id=>document.getElementById(id);
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.14.0';
+const VERSION='0.15.0';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -28,7 +28,7 @@ Blockly.defineBlocksWithJsonArray([
 
 Blockly.defineBlocksWithJsonArray([
  ...[['l','L', [...pairPorts,...singlePorts]],['m','M',[...singlePorts,...pairPorts]]].map(([kind,label,ports])=>({type:'ev3_motor_'+kind+'_run',message0:label+'モーター %1 を速さ %2 ％で回し続ける',args0:[{type:'field_dropdown',name:'PORTS',options:ports},{type:'input_value',name:'SPEED',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'速さは−100〜100％。負の値は逆回転、0は停止。回転を始めたらすぐ次のブロックへ進み、停止の命令またはプログラム終了まで回ります。'})),
- {type:'ev3_math',message0:'%1 %2 %3',args0:[{type:'input_value',name:'A',check:'Number'},{type:'field_dropdown',name:'OP',options:[['＋','add'],['−','sub'],['×','mul'],['÷（整数）','div']]},{type:'input_value',name:'B',check:'Number'}],output:'Number',inputsInline:true,colour:'#668b6d'},
+ {type:'ev3_math',message0:'%1 %2 %3',args0:[{type:'input_value',name:'A',check:'Number'},{type:'field_dropdown',name:'OP',options:[['＋','add'],['−','sub'],['×','mul'],['÷','div']]},{type:'input_value',name:'B',check:'Number'}],output:'Number',inputsInline:true,colour:'#668b6d'},
  {type:'ev3_motor_m',message0:'Mモーター %1 速さ %2 ％で %3 度回す',args0:[{type:'field_dropdown',name:'PORTS',options:[...singlePorts,...pairPorts]},{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'DEGREES',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5'},
  {type:'ev3_motor_m_time',message0:'Mモーター %1 速さ %2 ％で %3 秒動かす',args0:[{type:'field_dropdown',name:'PORTS',options:[...singlePorts,...pairPorts]},{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'SECONDS',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'時間は0より大きく60秒以下。速さを負にすると逆回転します。2ポートは同時に指定時間だけ動かします。角度の同期・停止タイミング補正は角度指定のブロックを使ってください。'},
  {type:'ev3_wait_seconds',message0:'%1 秒待つ',args0:[{type:'input_value',name:'SECONDS',check:'Number'}],previousStatement:null,nextStatement:null,colour:'#d19636',tooltip:'0〜60秒。0.5秒などの小数も使えます。'},
@@ -64,6 +64,7 @@ function classroomMotorToolbox(){
 }
 
 const sensorPorts=[['1','1'],['2','2'],['3','3'],['4','4']];
+const brickButtons=[['中央','2'],['上','1'],['下','3'],['左','5'],['右','4'],['いずれか','7']];
 const colorNames=[['赤','5'],['黒','1'],['青','2'],['緑','3'],['黄','4'],['白','6'],['茶','7'],['色なし','0']];
 const sensorPort=()=>({type:'field_dropdown',name:'PORT',options:sensorPorts});
 const comparison=()=>({type:'field_dropdown',name:'OP',options:[['＜','lt'],['＝','eq'],['＞','gt'],['≦','lte'],['≧','gte'],['≠','neq']]});
@@ -82,6 +83,8 @@ Blockly.defineBlocksWithJsonArray([
 const irChannel=()=>({type:'field_dropdown',name:'CHANNEL',options:[['1','1'],['2','2'],['3','3'],['4','4']]});
 const irButtons=[['押されていない','0'],['左上','1'],['左下','2'],['右上','3'],['右下','4'],['左上＋右上','5'],['左上＋右下','6'],['左下＋右上','7'],['左下＋右下','8'],['ビーコン','9'],['左上＋左下','10'],['右上＋右下','11']];
 Blockly.defineBlocksWithJsonArray([
+ {type:'ev3_brick_button',message0:'本体の %1 ボタンが %2',args0:[{type:'field_dropdown',name:'BUTTON',options:brickButtons},{type:'field_dropdown',name:'STATE',options:[['押されている','1'],['離されている','0']]}],output:'Boolean',inputsInline:true,colour:'#34ccf1',tooltip:'現在のボタンの状態を判定します。押した瞬間を記憶する機能ではありません。「いずれか」は上下左右・中央が対象です。戻るボタンは本体の停止操作に使います。'},
+ {type:'ev3_brick_button_value',message0:'本体の %1 ボタンの値（0／1）',args0:[{type:'field_dropdown',name:'BUTTON',options:brickButtons}],output:'Number',colour:'#34ccf1',tooltip:'押されていれば1、離されていれば0。上下左右・中央に対応します。'},
  {type:'ev3_timer',message0:'タイマー（秒）',output:'Number',colour:'#34ccf1',tooltip:'プログラム開始または最後のリセットからの経過秒数。0.5秒などの小数で取得します。すべてのマイブロックで同じタイマーを使います。'},
  {type:'ev3_timer_reset',message0:'タイマーをリセット',previousStatement:null,nextStatement:null,colour:'#34ccf1',tooltip:'タイマーを0秒に戻します。モーターや待ち時間の制御は変更しません。'},
  {type:'ev3_encoder_reset',message0:'モーター %1 の回転角度を0にする',args0:[{type:'field_dropdown',name:'PORT',options:singlePorts.map(([label],i)=>[label,String(i+1)])}],previousStatement:null,nextStatement:null,colour:'#34ccf1',tooltip:'L・M共通。選んだポートのエンコーダだけを0に戻します。ほかのポートの角度や、回転・停止の状態は変えません。'},
@@ -138,10 +141,10 @@ const operatorColour='#00b84a';
 const operatorKinds={add:['＋','Number'],sub:['−','Number'],mul:['×','Number'],div:['÷','Number'],lt:['＜','Boolean'],eq:['＝','Boolean'],gt:['＞','Boolean'],lte:['≦','Boolean'],gte:['≧','Boolean'],neq:['≠','Boolean'],and:['かつ','Boolean'],or:['または','Boolean']};
 Blockly.defineBlocksWithJsonArray(Object.entries(operatorKinds).map(([op,[label,output]])=>({
  type:'ev3_op_'+op,message0:'%1 '+label+' %2',args0:[{type:'input_value',name:'A',check:['and','or'].includes(op)?'Boolean':'Number'},{type:'input_value',name:'B',check:['and','or'].includes(op)?'Boolean':'Number'}],output,inputsInline:true,colour:operatorColour,
- tooltip:op==='div'?'整数の割り算です。小数部分は切り捨てます。0では割れません。':'左右に数値・変数・センサや条件を入れられます。'
+ tooltip:op==='div'?'小数も計算できます。0では割れません。':'左右に数値・変数・センサや条件を入れられます。'
 })));
 const numericFunctions=[['絶対値','abs'],['切り下げ','floor'],['切り上げ','ceil'],['平方根','sqrt'],['sin','sin'],['cos','cos'],['tan','tan'],['asin','asin'],['acos','acos'],['atan','atan'],['ln','ln'],['log','log'],['e^','exp'],['10^','pow10']];
-Blockly.defineBlocksWithJsonArray([{type:'ev3_math_function',message0:'%1 の %2',args0:[{type:'input_value',name:'VALUE',check:'Number'},{type:'field_dropdown',name:'FUNCTION',options:numericFunctions}],output:'Number',inputsInline:true,colour:operatorColour,tooltip:'数値関数を選びます。三角関数の角度は度。数値関数を含むプログラムでは、変数・引数と四則演算も小数に対応します。'}]);
+Blockly.defineBlocksWithJsonArray([{type:'ev3_math_function',message0:'%1 の %2',args0:[{type:'input_value',name:'VALUE',check:'Number'},{type:'field_dropdown',name:'FUNCTION',options:numericFunctions}],output:'Number',inputsInline:true,colour:operatorColour,tooltip:'数値関数を選びます。三角関数の角度は度。変数・引数と四則演算は常に小数に対応します。'}]);
 // Older projects keep their stored operator choices; new palette blocks have
 // fixed symbols, so children do not need to change a dropdown after dragging.
 for(const type of ['math_number','ev3_math','logic_compare','logic_operation','logic_negate','logic_boolean']){
@@ -155,7 +158,7 @@ const toolbox={kind:'categoryToolbox',contents:[
  {kind:'category',name:'スタート',colour:'#d3a238',contents:[{kind:'block',type:'ev3_start'}]},
  {kind:'category',name:'モーター',colour:'#0090f5',contents:classroomMotorToolbox()},
  {kind:'category',name:'動き',colour:'#ff4ccd',contents:[{kind:'block',type:'ev3_wheel'},{kind:'block',type:'ev3_tread'},{kind:'block',type:'ev3_tank',inputs:{LEFT_SPEED:shadow(20),RIGHT_SPEED:shadow(20)}},{kind:'block',type:'ev3_spin_right',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_spin_left',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_pivot_right',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_pivot_left',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_drive_forward',inputs:{SPEED:shadow(20),CM:shadow(20)}},{kind:'block',type:'ev3_drive_backward',inputs:{SPEED:shadow(20),CM:shadow(20)}}]},
- {kind:'category',name:'センサー',colour:'#34ccf1',contents:[{kind:'label',text:'タイマー'},{kind:'block',type:'ev3_timer'},{kind:'block',type:'ev3_timer_reset'},{kind:'label',text:'モーターのエンコーダ'},{kind:'block',type:'ev3_encoder'},{kind:'block',type:'ev3_encoder_reset'},{kind:'label',text:'EV3 タッチセンサ'},{kind:'block',type:'ev3_touch'},{kind:'block',type:'ev3_touch_value'},{kind:'label',text:'EV3 赤外線センサ'},{kind:'block',type:'ev3_ir_proximity'},{kind:'block',type:'ev3_ir_compare',inputs:{VALUE:shadow(20)}},{kind:'block',type:'ev3_ir_button'},{kind:'block',type:'ev3_ir_remote'},{kind:'block',type:'ev3_ir_beacon_detected'},{kind:'block',type:'ev3_ir_beacon_heading'},{kind:'block',type:'ev3_ir_beacon_distance'},{kind:'label',text:'EV3 カラーセンサ'},{kind:'block',type:'ev3_color_is'},{kind:'block',type:'ev3_color_value'},{kind:'block',type:'ev3_reflected_compare',inputs:{VALUE:shadow(50)}},{kind:'block',type:'ev3_reflected'},{kind:'label',text:'EV3 超音波センサ'},{kind:'block',type:'ev3_distance_compare',inputs:{VALUE:shadow(15)}},{kind:'block',type:'ev3_distance'}]},
+ {kind:'category',name:'センサー',colour:'#34ccf1',contents:[{kind:'label',text:'EV3本体のボタン'},{kind:'block',type:'ev3_brick_button'},{kind:'block',type:'ev3_brick_button_value'},{kind:'label',text:'タイマー'},{kind:'block',type:'ev3_timer'},{kind:'block',type:'ev3_timer_reset'},{kind:'label',text:'モーターのエンコーダ'},{kind:'block',type:'ev3_encoder'},{kind:'block',type:'ev3_encoder_reset'},{kind:'label',text:'EV3 タッチセンサ'},{kind:'block',type:'ev3_touch'},{kind:'block',type:'ev3_touch_value'},{kind:'label',text:'EV3 赤外線センサ'},{kind:'block',type:'ev3_ir_proximity'},{kind:'block',type:'ev3_ir_compare',inputs:{VALUE:shadow(20)}},{kind:'block',type:'ev3_ir_button'},{kind:'block',type:'ev3_ir_remote'},{kind:'block',type:'ev3_ir_beacon_detected'},{kind:'block',type:'ev3_ir_beacon_heading'},{kind:'block',type:'ev3_ir_beacon_distance'},{kind:'label',text:'EV3 カラーセンサ'},{kind:'block',type:'ev3_color_is'},{kind:'block',type:'ev3_color_value'},{kind:'block',type:'ev3_reflected_compare',inputs:{VALUE:shadow(50)}},{kind:'block',type:'ev3_reflected'},{kind:'label',text:'EV3 超音波センサ'},{kind:'block',type:'ev3_distance_compare',inputs:{VALUE:shadow(15)}},{kind:'block',type:'ev3_distance'}]},
  {kind:'category',name:'音',colour:'#a570b3',contents:[{kind:'block',type:'ev3_tone',inputs:{FREQUENCY:shadow(440),MS:shadow(200)}}]},
  {kind:'category',name:'制御',colour:controlColour,contents:[{kind:'block',type:'ev3_wait_seconds',inputs:{SECONDS:shadow(1)}},{kind:'block',type:'controls_if'},{kind:'block',type:'controls_if',extraState:{hasElse:true}},{kind:'block',type:'ev3_forever'},{kind:'block',type:'controls_repeat_ext',inputs:{TIMES:shadow(10)}},{kind:'block',type:'controls_whileUntil',fields:{MODE:'UNTIL'}},{kind:'block',type:'controls_whileUntil',fields:{MODE:'WHILE'}},{kind:'block',type:'ev3_wait_until'}]},
  {kind:'category',name:'演算',colour:operatorColour,contents:[num(0),...['add','sub','mul','div'].map(op=>({kind:'block',type:'ev3_op_'+op,inputs:{A:shadow(1),B:shadow(1)}})),{kind:'block',type:'ev3_math_function',inputs:{VALUE:shadow(1)}},...['lt','eq','gt','lte','gte','neq'].map(op=>({kind:'block',type:'ev3_op_'+op,inputs:{A:shadow(0),B:shadow(100)}})),...['and','or'].map(op=>({kind:'block',type:'ev3_op_'+op})),{kind:'block',type:'logic_negate'},{kind:'block',type:'logic_boolean'}]},
@@ -335,6 +338,7 @@ function expression(x){
    return root.type==='procedures_defnoreturn' && root.getVarModels().some(m=>m.getId()===model.getId())?{param:model.name}:{var:model.name};
  }
 
+ if(['ev3_brick_button','ev3_brick_button_value'].includes(x.type)){const reading={button:{id:Number(x.getFieldValue('BUTTON'))}};return x.type==='ev3_brick_button'?{op:'eq',left:reading,right:Number(x.getFieldValue('STATE'))}:reading;}
  if(x.type==='ev3_timer')return {timer:true};
  if(x.type==='ev3_encoder')return {sensor:{kind:'encoder',port:Number(x.getFieldValue('PORT'))}};
  if(['ev3_touch','ev3_touch_value'].includes(x.type)){const reading={sensor:{kind:'touch',port:Number(x.getFieldValue('PORT'))}};return x.type==='ev3_touch'?{op:'eq',left:reading,right:Number(x.getFieldValue('STATE'))}:reading;}

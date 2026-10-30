@@ -26,7 +26,7 @@ const UNKNOWN=Symbol('runtime sensor value');
 const inRange = (v,a,b,label) => {if(v===UNKNOWN)return;if (!Number.isInteger(v) || v<a || v>b) throw Error(`${label}は ${a}〜${b} の整数にしてください。`);};
 const FLOATS=Symbol('floating-point expressions'),MAX_FLOAT=3.4028234663852886e38;
 const unaryCodes={abs:6,floor:3,ceil:4,sqrt:8,sin:11,cos:12,tan:13,asin:14,acos:15,atan:16,ln:10,log:9,exp:1,pow10:20};
-function hasUnary(x){return !!(x&&typeof x==='object'&&(x.math||x.timer===true||Object.values(x).some(hasUnary)));}
+// All user numbers, variables and parameters use native EV3 DATAF consistently.
 function finiteNumber(n,label='計算結果'){if(n!==UNKNOWN&&(!Number.isFinite(n)||Math.abs(n)>MAX_FLOAT))throw Error(label+'が計算できる範囲を超えています。');return n;}
 function unaryValue(fn,n){
  if(!Object.hasOwn(unaryCodes,fn))throw Error('未対応の数値関数です。');if(n===UNKNOWN)return UNKNOWN;
@@ -40,6 +40,10 @@ function unaryValue(fn,n){
 function floatingConstant(n){const bytes=new Uint8Array(4);new DataView(bytes.buffer).setFloat32(0,finiteNumber(Math.fround(n)),true);return [0x83,...bytes];}
 const GLOBALS=Symbol('globals'),GEOMETRY=Symbol('geometry');
 const arithmetic={add:(a,b)=>a+b,sub:(a,b)=>a-b,mul:(a,b)=>a*b,div:(a,b)=>{if(b===0)throw Error('0では割れません。');return Math.trunc(a/b);},eq:(a,b)=>+(a===b),neq:(a,b)=>+(a!==b),lt:(a,b)=>+(a<b),lte:(a,b)=>+(a<=b),gt:(a,b)=>+(a>b),gte:(a,b)=>+(a>=b),and:(a,b)=>+(!!a&&!!b),or:(a,b)=>+(!!a||!!b)};
+function buttonConfiguration(button){
+  if(!button || ![1,2,3,4,5,7].includes(button.id))throw Error('本体ボタンを選んでください。');
+  return button.id===7?[1,2,3,4,5]:[button.id];
+}
 function sensorConfiguration(sensor){
  const {kind,port,channel}=sensor;
  if(!Number.isInteger(port)||port<1||port>4)throw Error('センサの種類・ポートを確認してください。');
@@ -53,6 +57,7 @@ function evaluate(x, env) {
   if (typeof x==='number') {if(!Number.isFinite(x))throw Error('数値を確認してください。');return env[FLOATS]?finiteNumber(Math.fround(x)):x;}
   if(x?.math)return unaryValue(x.math.fn,evaluate(x.math.value,env));
   if(x?.timer!==undefined){if(x.timer!==true)throw Error('タイマーの指定が不正です。');return UNKNOWN;}
+  if(x?.button){buttonConfiguration(x.button);return UNKNOWN;}
   if(x?.sensor){sensorConfiguration(x.sensor);return UNKNOWN;}
   if(x?.geometry){
     const geometry=env[GEOMETRY],diameter=geometry?.diameter10;
@@ -98,7 +103,7 @@ function prepareProgram(input){
   return {...input,main:sequence(input.main),procedures:input.procedures.map(p=>({...p,body:sequence(p.body)}))};
 }
 export function validate(program) {
-  const floatingMode=hasUnary(program);
+  const floatingMode=true;
   if (!program || !Array.isArray(program.main) || !program.main.length) throw Error('「スタート」の下にブロックをつなげてください。');
   if (!Array.isArray(program.procedures) || program.procedures.length>32) throw Error('マイブロックは32個までです。');
   const map=new Map();
@@ -164,11 +169,11 @@ export function validate(program) {
   return {map,visits};
 }
 export function compile(program,folder='EV3Lab') {
-  const directory=projectDirectory(folder),usesFloat=hasUnary(program);
+  const directory=projectDirectory(folder),usesFloat=true;
   program=prepareProgram(program);
   validate(program);
   const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false,usesTimer=false;
-  const collect=x=>{if(x&&typeof x==='object'){if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
+  const collect=x=>{if(x&&typeof x==='object'){if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
   collect(program);if(variableNames.size>32)throw Error('変数は32個までです。');
   const globalOffsets=new Map([...variableNames].map((name,i)=>[name,i*4]));
   const diameterOffset=globalOffsets.size*4,treadOffset=diameterOffset+4,rampOffset=diameterOffset+(usesGeometry?8:0);
@@ -191,6 +196,15 @@ export function compile(program,folder='EV3Lab') {
     const integerExpr=x=>{
       if(typeof x==='number')return constant(x);
       if(x?.register!==undefined)return local(x.register);
+      if(x?.button){
+        const result=local(alloc());emit(OP.MOVE32,constant(0),result);
+        for(const id of buttonConfiguration(x.button)){
+          const pressed=local(alloc());emit(OP.MOVE32,constant(0),pressed);
+          // UI_BUTTON PRESSED returns DATA8. Keep upper bytes clear for DATA32.
+          emit(0x83,constant(9),constant(id),pressed);emit(0x22,result,pressed,result);
+        }
+        return result;
+      }
       if(x?.sensor){
         const {kind,port,channel}=x.sensor,config=sensorConfiguration(x.sensor),result=local(alloc());
         const actualType=local(alloc()),actualMode=local(alloc());
@@ -283,6 +297,8 @@ export function compile(program,folder='EV3Lab') {
     };
     const expr=x=>{
       if(!usesFloat)return integerExpr(x);
+      // Hardware operands are integers; do not round intermediate calculations.
+      if(typeof x==='number')return constant(Math.trunc(finiteNumber(Math.fround(x))));
       const value=floatExpr(x),result=local(alloc());floatGuard(value);emit(OP.MOVEF32,value,result);return result;
     };
     const feedbackPair=b=>{
