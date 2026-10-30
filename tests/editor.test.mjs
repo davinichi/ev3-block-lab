@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {compile,programFileName} from '../dist/ev3.js';
-import {createBlockLibrary,mergeBlockLibrary} from '../dist/library.js';
+import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from '../dist/library.js';
 import {sensorReading} from '../dist/sensor-monitor.js';
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
 // Blockly's headless shadow serialization still creates XML nodes. Supply
@@ -47,6 +47,38 @@ test('control exit blocks are caps, retain saved behavior and reject My Block re
  const saved=Blockly.serialization.workspaces.save(workspace);Blockly.serialization.workspaces.load(saved,workspace);const first=program();const restored=workspace.getAllBlocks(false).find(b=>b.type==='ev3_myblock_return');const returned=chain(restored);
  restored.previousConnection.disconnect();workspace.getAllBlocks(false).find(b=>b.type==='ev3_program_end').dispose();workspace.getAllBlocks(false).find(b=>b.type==='ev3_start').nextConnection.connect(restored.previousConnection);let error='';try{program();}catch(e){error=e.message;}Blockly.Events.enable();JSON.stringify({caps,first,returned,error,types:toolbox.contents.find(c=>c.name==='制御').contents.map(x=>x.type)});`,context));
  assert.equal(result.caps,true);assert.deepEqual(result.first.main,[{type:'programEnd'}]);assert.deepEqual(result.returned,[{type:'myblockReturn'}]);assert.match(result.error,/定義の中/);assert.ok(result.types.includes('ev3_program_end'));assert.ok(result.types.includes('ev3_myblock_return'));compile(result.first);
+});
+
+// Blockly自身の復元だけでなく、実際のファイル入力時の許可一覧を通して検証する。
+function savedButtonExitLesson(){
+ const context=editor();
+ return JSON.parse(vm.runInContext(`Blockly.Events.disable();
+ const def=saveMyBlock(workspace,'ボタンで戻る',[]),variable=workspace.getVariableMap().createVariable('押下値'),set=workspace.newBlock('variables_set'),reading=workspace.newBlock('ev3_brick_button_value');set.setFieldValue(variable.getId(),'VAR');reading.setFieldValue('7','BUTTON');set.getInput('VALUE').connection.connect(reading.outputConnection);def.getInput('STACK').connection.connect(set.previousConnection);
+ const branch=workspace.newBlock('controls_if');branch.loadExtraState({hasElse:true});set.nextConnection.connect(branch.previousConnection);const button=workspace.newBlock('ev3_brick_button');button.setFieldValue('4','BUTTON');button.setFieldValue('0','STATE');branch.getInput('IF0').connection.connect(button.outputConnection);branch.getInput('DO0').connection.connect(workspace.newBlock('ev3_myblock_return').previousConnection);branch.getInput('ELSE').connection.connect(workspace.newBlock('ev3_program_end').previousConnection);
+ const start=workspace.newBlock('ev3_start'),call=workspace.newBlock('procedures_callnoreturn');call.loadExtraState({name:'ボタンで戻る',params:[]});start.nextConnection.connect(call.previousConnection);ensureArgumentInputs();const state=Blockly.serialization.workspaces.save(workspace);Blockly.Events.enable();JSON.stringify({state,program:program()});`,context));
+}
+
+test('actual project save and restore accepts brick button and both exit blocks without losing settings',()=>{
+ const fixture=savedButtonExitLesson(),context=editor();context.inspectBlocks=inspectBlocks;context.programFileName=programFileName;context.lesson=JSON.stringify({format:'ev3-block-lab',version:1,programName:'ButtonsEnd',ev3ProjectName:'Class1',workspace:fixture.state});
+ vm.runInContext(`let loading=false,dirty=true;function check(){};const downloads=[];function download(data,name,type){downloads.push({data:JSON.parse(data),name,type});}function feedback(message){throw Error(message);}`,context);
+ vm.runInContext(app.slice(app.indexOf('function project(){'),app.indexOf('function saveLocal(){')),context);
+ vm.runInContext(app.slice(app.indexOf("$('saveProject').onclick="),app.indexOf("$('loadProject').onclick=")),context);
+ const result=JSON.parse(vm.runInContext(`Blockly.Events.disable();restore(JSON.parse(lesson));$('saveProject').onclick();const file=downloads[0];workspace.clear();restore(JSON.parse(JSON.stringify(file.data)));const built=program();const result={file,built,count:workspace.getAllBlocks(false).length};Blockly.Events.enable();JSON.stringify(result);`,context));
+ assert.equal(result.file.name,'ButtonsEnd.ev3lab');assert.deepEqual(result.built,fixture.program);assert.equal(result.count,9);compile(result.built);
+});
+
+test('My Block export and import accepts button and exit blocks while preserving the existing project',()=>{
+ const fixture=savedButtonExitLesson(),library=JSON.parse(JSON.stringify(createBlockLibrary(fixture.state,'0.16.1')));
+ const current={blocks:{languageVersion:0,blocks:[{type:'ev3_start',id:'keep-start'}]}};
+ const merged=mergeBlockLibrary(current,library),context=editor();context.lesson=JSON.stringify(merged);
+ const result=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const start=workspace.getBlockById('keep-start'),call=workspace.newBlock('procedures_callnoreturn');call.loadExtraState({name:'ボタンで戻る',params:[]});start.nextConnection.connect(call.previousConnection);const built=program();Blockly.Events.enable();JSON.stringify(built);`,context));
+ assert.equal(current.blocks.blocks.length,1);assert.deepEqual(result,fixture.program);compile(result);
+});
+
+test('all advertised palette blocks pass the external-file block validation',()=>{
+ const context=editor();const items=JSON.parse(vm.runInContext(`JSON.stringify(toolbox.contents.flatMap(c=>c.contents??[]).filter(x=>x.kind==='block'))`,context));
+ for(const item of items)assert.doesNotThrow(()=>inspectBlocks([item]),item.type);
+ assert.throws(()=>inspectBlocks([{type:'unknown_script'}]),/未対応/);
 });
 
 test('program names determine saved filenames and preserve EV3 destinations across legacy load, save and reload',()=>{

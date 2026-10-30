@@ -1,6 +1,8 @@
 // 編集ファイルとマイブロック集の検証・結合を担当する。EV3用RBFの生成や通信は行わない。
 // 独自ブロックを追加したときは、この許可一覧にも型名を登録して保存ファイルから復元できるようにする。
 const types=new Set(['add','sub','mul','div','lt','eq','gt','lte','gte','neq','and','or'].map(op=>'ev3_op_'+op));
+// 本体ボタン・終了命令も、作品ファイルとマイブロック集の両方から復元できるよう許可する。
+for(const type of ['ev3_brick_button','ev3_brick_button_value','ev3_program_end','ev3_myblock_return'])types.add(type);
 for(const type of ['ev3_tank','ev3_pivot_right','ev3_pivot_left','ev3_ramp','ev3_math_function','ev3_forever','ev3_motor_l_run','ev3_motor_m_run','ev3_color_is','ev3_color_value','ev3_reflected','ev3_reflected_compare','ev3_distance','ev3_distance_compare','ev3_wait_until','ev3_argument','ev3_math','logic_compare','logic_operation','logic_negate','logic_boolean','controls_if','controls_whileUntil','variables_set','math_change','ev3_start','ev3_motor','ev3_motor_m','ev3_motor_m_time','ev3_wait_seconds','ev3_tread','ev3_spin_right','ev3_spin_left','ev3_wheel','ev3_drive_forward','ev3_drive_backward','ev3_tone','ev3_wait','ev3_stop_port','ev3_stop','math_number','variables_get','controls_repeat_ext','procedures_defnoreturn','procedures_callnoreturn'])types.add(type);
 for(const kind of ['l','m'])for(const group of ['single','pair'])for(const action of ['run','angle','time'])types.add('ev3_motor_'+kind+'_'+group+'_'+action);
 for(const type of ['ev3_timer','ev3_timer_reset','ev3_encoder','ev3_encoder_reset','ev3_touch','ev3_touch_value','ev3_ir_proximity','ev3_ir_compare','ev3_ir_remote','ev3_ir_button','ev3_ir_beacon_detected','ev3_ir_beacon_heading','ev3_ir_beacon_distance'])types.add(type);

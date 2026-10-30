@@ -1,0 +1,97 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "appVersion": "0.16.1",
+  "programName": "ButtonsEndTest",
+  "ev3ProjectName": "EV3Lab",
+  "pairMode": "independent",
+  "workspace": {
+    "variables": [
+      {
+        "id": "button-state",
+        "name": "押下値"
+      }
+    ],
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "x": 40,
+          "y": 40,
+          "next": {
+            "block": {
+              "type": "procedures_callnoreturn",
+              "extraState": {
+                "name": "ボタンで戻る",
+                "params": []
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defnoreturn",
+          "x": 40,
+          "y": 220,
+          "fields": {
+            "NAME": "ボタンで戻る"
+          },
+          "extraState": {
+            "params": []
+          },
+          "inputs": {
+            "STACK": {
+              "block": {
+                "type": "variables_set",
+                "fields": {
+                  "VAR": {
+                    "id": "button-state"
+                  }
+                },
+                "inputs": {
+                  "VALUE": {
+                    "block": {
+                      "type": "ev3_brick_button_value",
+                      "fields": {
+                        "BUTTON": "7"
+                      }
+                    }
+                  }
+                },
+                "next": {
+                  "block": {
+                    "type": "controls_if",
+                    "extraState": {
+                      "hasElse": true
+                    },
+                    "inputs": {
+                      "IF0": {
+                        "block": {
+                          "type": "ev3_brick_button",
+                          "fields": {
+                            "BUTTON": "4",
+                            "STATE": "0"
+                          }
+                        }
+                      },
+                      "DO0": {
+                        "block": {
+                          "type": "ev3_myblock_return"
+                        }
+                      },
+                      "ELSE": {
+                        "block": {
+                          "type": "ev3_program_end"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
