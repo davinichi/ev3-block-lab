@@ -1,0 +1,106 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "appVersion": "0.10.0",
+  "name": "PivotTest",
+  "programName": "PivotTest",
+  "ev3ProjectName": "EV3Lab",
+  "pairMode": "independent",
+  "workspace": {
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "x": 30,
+          "y": 30,
+          "next": {
+            "block": {
+              "type": "ev3_wheel",
+              "fields": {
+                "DIAMETER": 56
+              },
+              "next": {
+                "block": {
+                  "type": "ev3_tread",
+                  "fields": {
+                    "TREAD": 112
+                  },
+                  "next": {
+                    "block": {
+                      "type": "ev3_pivot_right",
+                      "fields": {
+                        "LEFT_PORT": "2",
+                        "RIGHT_PORT": "4"
+                      },
+                      "inputs": {
+                        "SPEED": {
+                          "shadow": {
+                            "type": "math_number",
+                            "fields": {
+                              "NUM": 20
+                            }
+                          }
+                        },
+                        "ANGLE": {
+                          "shadow": {
+                            "type": "math_number",
+                            "fields": {
+                              "NUM": 90
+                            }
+                          }
+                        }
+                      },
+                      "next": {
+                        "block": {
+                          "type": "ev3_wait_seconds",
+                          "inputs": {
+                            "SECONDS": {
+                              "shadow": {
+                                "type": "math_number",
+                                "fields": {
+                                  "NUM": 1
+                                }
+                              }
+                            }
+                          },
+                          "next": {
+                            "block": {
+                              "type": "ev3_pivot_left",
+                              "fields": {
+                                "LEFT_PORT": "2",
+                                "RIGHT_PORT": "4"
+                              },
+                              "inputs": {
+                                "SPEED": {
+                                  "shadow": {
+                                    "type": "math_number",
+                                    "fields": {
+                                      "NUM": 20
+                                    }
+                                  }
+                                },
+                                "ANGLE": {
+                                  "shadow": {
+                                    "type": "math_number",
+                                    "fields": {
+                                      "NUM": 90
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

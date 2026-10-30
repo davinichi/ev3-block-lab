@@ -1,0 +1,70 @@
+const types=new Set(['add','sub','mul','div','lt','eq','gt','lte','gte','neq','and','or'].map(op=>'ev3_op_'+op));
+for(const type of ['ev3_tank','ev3_pivot_right','ev3_pivot_left','ev3_ramp','ev3_math_function','ev3_forever','ev3_motor_l_run','ev3_motor_m_run','ev3_color_is','ev3_color_value','ev3_reflected','ev3_reflected_compare','ev3_distance','ev3_distance_compare','ev3_wait_until','ev3_argument','ev3_math','logic_compare','logic_operation','logic_negate','logic_boolean','controls_if','controls_whileUntil','variables_set','math_change','ev3_start','ev3_motor','ev3_motor_m','ev3_motor_m_time','ev3_wait_seconds','ev3_tread','ev3_spin_right','ev3_spin_left','ev3_wheel','ev3_drive_forward','ev3_drive_backward','ev3_tone','ev3_wait','ev3_stop_port','ev3_stop','math_number','variables_get','controls_repeat_ext','procedures_defnoreturn','procedures_callnoreturn'])types.add(type);
+for(const kind of ['l','m'])for(const group of ['single','pair'])for(const action of ['run','angle','time'])types.add('ev3_motor_'+kind+'_'+group+'_'+action);
+for(const type of ['ev3_encoder','ev3_encoder_reset','ev3_touch','ev3_touch_value','ev3_ir_proximity','ev3_ir_compare','ev3_ir_remote','ev3_ir_button','ev3_ir_beacon_detected','ev3_ir_beacon_heading','ev3_ir_beacon_distance'])types.add(type);
+export function inspectBlocks(blocks){
+  let count=0;
+  function inspect(value,depth=0){
+    if(depth>200)throw Error('ブロックの入れ子が深すぎます。');
+    if(value && typeof value==='object'){
+      if(value.type && !types.has(value.type))throw Error(`未対応のブロック: ${value.type}`);
+      if(value.type && ++count>1000)throw Error('ブロックは1000個までです。');
+      for(const child of Object.values(value))inspect(child,depth+1);
+    }
+  }
+  inspect(blocks);
+}
+function references(nodes){
+  const ids=new Set();
+  function visit(value){
+    if(!value||typeof value!=='object')return;
+    if(value.fields?.VAR?.id)ids.add(value.fields.VAR.id);
+    if(value.extraState?.parameterId)ids.add(value.extraState.parameterId);
+    if(value.type==='procedures_defnoreturn')for(const p of value.extraState?.params??[])if(p.id)ids.add(p.id);
+    for(const child of Object.values(value))visit(child);
+  }
+  visit(nodes);return ids;
+}
+const definitionName=block=>String(block.fields?.NAME??'').trim();
+export function createBlockLibrary(state,appVersion){
+  const definitions=(state.blocks?.blocks??[]).filter(b=>b.type==='procedures_defnoreturn');
+  if(!definitions.length)throw Error('書き出すマイブロックがありません。');
+  inspectBlocks(definitions);
+  const refs=references(definitions);
+  return {format:'ev3-block-lab-library',version:1,appVersion,definitions:structuredClone(definitions),variables:structuredClone((state.variables??[]).filter(v=>refs.has(v.id)))};
+}
+export function mergeBlockLibrary(current,library,makeId=()=>crypto.randomUUID()){
+  if(library?.format!=='ev3-block-lab-library'||library.version!==1||!Array.isArray(library.definitions)||!library.definitions.length||library.definitions.length>32||!Array.isArray(library.variables))throw Error('マイブロックを書き出したファイルを選んでください。');
+  inspectBlocks(library.definitions);
+  const names=new Set((current.blocks?.blocks??[]).filter(b=>b.type==='procedures_defnoreturn').map(b=>definitionName(b).toLocaleLowerCase()));
+  for(const definition of library.definitions){
+    const name=definitionName(definition),key=name.toLocaleLowerCase();
+    if(definition.type!=='procedures_defnoreturn'||!name)throw Error('マイブロックの定義が不正です。');
+    if(names.has(key))throw Error(`同じ名前のマイブロック「${name}」があります。名前を変更してから読み込んでください。`);
+    names.add(key);
+  }
+  if(names.size>32)throw Error('マイブロックは32個まで読み込めます。');
+  const merged=structuredClone(current),variables=merged.variables??[],mapping=new Map();
+  for(const variable of library.variables){
+    if(typeof variable.id!=='string'||!variable.id||typeof variable.name!=='string'||!variable.name||variable.name.length>256||(variable.type??'')!=='')throw Error('マイブロックの変数情報が不正です。');
+    if(mapping.has(variable.id))throw Error('変数の識別情報が重複しています。');
+    let target=variables.find(v=>v.name===variable.name&&(v.type??'')===(variable.type??''));
+    if(!target){target={...variable,id:makeId()};variables.push(target);}
+    mapping.set(variable.id,target.id);
+  }
+  for(const id of references(library.definitions))if(!mapping.has(id))throw Error('引数または変数の情報が不足しています。');
+  const imported=structuredClone(library.definitions);
+  function remap(value){
+    if(!value||typeof value!=='object')return;
+    if(types.has(value.type))delete value.id;
+    if(value.fields?.VAR?.id)value.fields.VAR.id=mapping.get(value.fields.VAR.id);
+    if(value.extraState?.parameterId)value.extraState.parameterId=mapping.get(value.extraState.parameterId);
+    if(value.type==='procedures_defnoreturn')for(const p of value.extraState?.params??[])if(p.id)p.id=mapping.get(p.id);
+    for(const child of Object.values(value))remap(child);
+  }
+  remap(imported);
+  const existing=merged.blocks?.blocks??[],bottom=Math.max(0,...existing.map(b=>Number(b.y)||0))+200;
+  imported.forEach((block,i)=>{block.x=40+420*(i%2);block.y=bottom+300*Math.floor(i/2);});
+  merged.variables=variables;merged.blocks={...(merged.blocks??{}),languageVersion:0,blocks:[...existing,...imported]};
+  inspectBlocks(merged.blocks);return merged;
+}
