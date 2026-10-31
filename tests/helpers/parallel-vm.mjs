@@ -32,6 +32,7 @@ export function runParallel(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorD
     while(--budget>0){
       const op=bytes[pc++];
       switch(op){
+        case 0x84:{const cmd=param(1);let args=[];if([17,18].includes(cmd))args=[param(1)];else if([3,9].includes(cmd))args=[param(1),param(2),param(2),param(2),param(2)];else if(cmd===8)args=[param(1),param(2),param(2),fparam(),param(1),param(1)];else assert.ok([0,1].includes(cmd));events.push({type:'draw',cmd,args,task:id});break;}
         case 0x0a:case 0x08:return;
         case 5:{const target=param(2);tasks.set(target,{gen:execute(target),until:0});break;}
         case 7:{const target=param(2);while(tasks.has(target))yield {until:time+1};break;}

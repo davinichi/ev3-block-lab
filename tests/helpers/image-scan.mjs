@@ -27,6 +27,7 @@ export function scanImage(data){
    else if(op===0x99){const cmd=parameter();if(cmd===29){args=Array.from({length:5},parameter);assert.ok(Number.isInteger(args[4]));for(let i=0;i<args[4];i++)parameter();}else{assert.equal(cmd,5);for(let i=0;i<4;i++)parameter();}}
    else if(op===0x8d){const cmd=parameter();assert.ok([1,2,3,4,6,8,9,10,11,12,13,14,15,16,20].includes(cmd));for(let i=0;i<([2,20].includes(cmd)?3:2);i++)parameter();}
    else if(op===0x82){assert.equal(parameter(),27);parameter();}
+   else if(op===0x84){const cmd=parameter(),n={0:0,1:0,3:5,8:6,9:5,17:1,18:1}[cmd];assert.notEqual(n,undefined);for(let i=0;i<n;i++)parameter();}
    else if(op===0xc1){const cmd=parameter(),n={4:2,5:2,12:2}[cmd];assert.ok(n);for(let i=0;i<n;i++)parameter();}
    else if(op===0x7d){const cmd=parameter(),n={5:2,7:2,11:4}[cmd];assert.ok(n);for(let i=0;i<n;i++)parameter();}
    else if(op===0x83){assert.equal(parameter(),9);const id=parameter();assert.ok(id>=1&&id<=5);parameter();}

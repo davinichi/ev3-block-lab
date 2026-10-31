@@ -82,3 +82,8 @@ export function mergeBlockLibrary(current,library,makeId=()=>crypto.randomUUID()
 }
 
 for(const type of ['ev3_motor_speed_set','ev3_motor_power','ev3_motor_stop_mode','ev3_motor_speed','ev3_tank_angle','ev3_tank_time'])types.add(type);
+
+// 直接停止のブロックも作品・マイブロックの読み込みで許可する。
+types.add('ev3_motor_stop');
+
+for(const kind of ['clear','text','image','number'])types.add('ev3_display_'+kind);

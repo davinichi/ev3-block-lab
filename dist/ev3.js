@@ -1,3 +1,4 @@
+import {validateDisplay,emitDisplay} from './display.js';
 import {motorFeatures,stopModes} from './motor-features.js';
 import {parallelPlan,sharedLock} from './parallel.js';
 import {extraLayout,dataEmitter,isText,checkText} from './data.js';
@@ -144,6 +145,7 @@ export function validate(program) {
       const sourceInt=x=>{const n=evaluate(x,env);return floatingMode&&n!==UNKNOWN?Math.trunc(n):n;};
       const val=k=>floatingMode&&!['value','condition','seconds'].includes(k)?sourceInt(b[k]):evaluate(b[k],env);
       switch(b.type) {
+        case 'displayClear':case 'displayBitmap':case 'displayNumber':validateDisplay(b);if(b.type==='displayNumber')evaluate(b.value,env);break;
         case 'led':inRange(b.color,0,3,'ランプの色');if(!['on','flash','pulse'].includes(b.mode))throw Error('ランプの点灯方法を選んでください。');break;
         case 'steering':{if(![1,2,4,8].includes(b.leftPort)||![1,2,4,8].includes(b.rightPort)||b.leftPort===b.rightPort)throw Error('ステアリングの左右には異なるポートを選んでください。');inRange(val('speed'),-100,100,'速さ');inRange(val('turn'),-100,100,'ステアリング');if(!['run','angle','time'].includes(b.action))throw Error('ステアリングの動作を選んでください。');if(b.action!=='run'&&val('speed')===0)throw Error('有限走行の速さは0以外にしてください。');if(b.action==='angle')inRange(val('degrees'),1,36000,'外側モーターの角度');if(b.action==='time'){const t=evaluate(b.seconds,env);if(t!==UNKNOWN&&(!Number.isFinite(t)||t<=0||t>60))throw Error('走行時間は0より大きく60秒以下にしてください。');}break;}
         case 'textSet':checkText(b.value);break;
@@ -567,7 +569,7 @@ export function compile(program,folder='EV3Lab') {
     const sequence=nodes=>{
       for(const original of nodes) {
         let b=original;
-        const shared=['set','change','textSet','listAdd','listSet','listClear','listDelete','logStart','logValue','logEnd','broadcast','wheel','tread','ramp','timerReset','stopMode'].includes(b.type)&&lock&&!lockDepth;
+        const shared=['displayClear','displayBitmap','displayNumber','set','change','textSet','listAdd','listSet','listClear','listDelete','logStart','logValue','logEnd','broadcast','wheel','tread','ramp','timerReset','stopMode'].includes(b.type)&&lock&&!lockDepth;
         if(shared){lock.acquire();lockDepth++;}
         if(usesSensors||usesForever||usesFloat||usesRamps){
           const checked=(source,min,max)=>{const at=alloc();emit(OP.MOVE32,expr(source),local(at));guard(local(at),min,max);return {register:at};};
@@ -581,6 +583,7 @@ export function compile(program,folder='EV3Lab') {
           }
         }
         switch(b.type) {
+          case 'displayClear':case 'displayBitmap':case 'displayNumber':emitDisplay(b,{emit,constant,floatExpr,guard,floatGuard});break;
           case 'led':emit(0x82,constant(27),constant(b.color===0?0:b.color+({on:0,flash:3,pulse:6}[b.mode])));break;
           case 'steering':{const ports=b.leftPort|b.rightPort,speed=expr(b.speed),turn=expr(b.turn),nativeTurn=local(alloc());guard(speed,-100,100);guard(turn,-100,100);emit(OP.MUL32,turn,constant(b.leftPort<b.rightPort?2:-2),nativeTurn);if(b.action==='run'){emit(OP.MOTOR_SYNC,constant(0),constant(ports),speed,nativeTurn,constant(0),constant(0));}else{nonzero(speed);const brake=motors.nativeBrake(ports,true);emit(OP.MOTOR_RESET,constant(0),constant(ports));const amount=b.action==='angle'?expr(b.degrees):expr(scaled(b.seconds,1000));guard(amount,1,b.action==='angle'?36000:60000);emit(b.action==='time'?0xb1:OP.MOTOR_SYNC,constant(0),constant(ports),speed,nativeTurn,amount,brake);emit(OP.MOTOR_READY,constant(0),constant(ports));motors.finish(ports);}break;}
           case 'stopMode':motors.configure(b);break;

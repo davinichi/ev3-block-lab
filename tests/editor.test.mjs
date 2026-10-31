@@ -5,7 +5,42 @@ import assert from 'node:assert/strict';
 import {compile,programFileName} from '../dist/ev3.js';
 import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from '../dist/library.js';
 import {sensorReading} from '../dist/sensor-monitor.js';
+import {DISPLAY_IMAGES,presetBitmap,rasterDisplayText} from '../dist/display.js';
+test('new stop palette offers three direct methods and retains each through library reuse',()=>{
+ for(const mode of ['brake','coast','hold']){
+  const context=editor();context.mode=mode;
+  const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();
+  const palette=classroomMotorToolbox();if(palette.some(x=>x.type==='ev3_stop_port'))throw Error('legacy stop in palette');
+  const item=palette.find(x=>x.type==='ev3_motor_stop'),block=Blockly.serialization.blocks.append(item,workspace);
+  if(block.getFieldValue('STOP_MODE')!=='brake')throw Error('default must be explicit brake');
+  if(block.getField('STOP_MODE').getOptions().map(x=>x[1]).join(',')!=='brake,coast,hold')throw Error('ambiguous option');
+  block.setFieldValue(mode,'STOP_MODE');block.setFieldValue('9','PORTS');
+  const def=saveMyBlock(workspace,'直接停止',[]);def.getInput('STACK').connection.connect(block.previousConnection);
+  const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);
+  const saved=Blockly.serialization.workspaces.save(workspace);Blockly.Events.enable();JSON.stringify(saved);`,context));
+  inspectBlocks(saved.blocks);context.lesson=JSON.stringify(mergeBlockLibrary({blocks:{languageVersion:0,blocks:[{type:'ev3_start'}]}},createBlockLibrary(saved,'0.19.1')));
+  const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const start=workspace.getAllBlocks(false).find(b=>b.type==='ev3_start'),call=workspace.newBlock('procedures_callnoreturn');call.loadExtraState({name:'直接停止',params:[]});start.nextConnection.connect(call.previousConnection);const p=program();Blockly.Events.enable();JSON.stringify(p);`,context));
+  assert.deepEqual(p.procedures[0].body,[{type:'stop',ports:9,stopMode:mode}]);compile(p);
+ }
+});
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
+test('display blocks keep Japanese text, preset choice and numeric inputs through project and My Block reuse',()=>{
+ const context=editor();const rendered=[];
+ context.rasterDisplayText=(text,size)=>{rendered.push({text,size});return {width:2,height:1,rows:['10']};};
+ const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();
+ const steps=[{type:'ev3_display_clear'},{type:'ev3_display_text',fields:{TEXT:'こんにちは',SIZE:'24',X:3,Y:4}},{type:'ev3_display_image',fields:{IMAGE:'left',SIZE:'96',X:8,Y:16}},{type:'ev3_display_number',fields:{X:0,Y:110,FONT:'0',DECIMALS:3},inputs:{VALUE:{block:{type:'ev3_timer'}}}}];for(let i=0;i<steps.length-1;i++)steps[i].next={block:steps[i+1]};
+ Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'procedures_defnoreturn',fields:{NAME:'表示'},inputs:{STACK:{block:steps[0]}}}]}},workspace);const saved=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(saved,workspace);Blockly.Events.enable();JSON.stringify(Blockly.serialization.workspaces.save(workspace));`,context));
+ inspectBlocks(saved.blocks);context.lesson=JSON.stringify(mergeBlockLibrary({blocks:{languageVersion:0,blocks:[{type:'ev3_start'}]}},createBlockLibrary(saved,'0.20.0')));
+ const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const start=workspace.getAllBlocks(false).find(b=>b.type==='ev3_start'),call=workspace.newBlock('procedures_callnoreturn');call.loadExtraState({name:'表示',params:[]});start.nextConnection.connect(call.previousConnection);const p=program();Blockly.Events.enable();JSON.stringify(p);`,context));
+ assert.deepEqual(rendered,[{text:'こんにちは',size:24}]);assert.deepEqual(p.procedures[0].body[2].bitmap,presetBitmap('left',96));assert.deepEqual(p.procedures[0].body[3].value,{timer:true});compile(p);
+});
+test('downloadable display example has a supported format and matches the in-app sample',()=>{
+ const context=editor();vm.runInContext(app.slice(app.indexOf('function displaySampleState(){'),app.indexOf("$('displaySample').onclick")),context);
+ const sample=JSON.parse(readFileSync(new URL('../examples/DisplayTest.ev3lab',import.meta.url),'utf8'));
+ assert.equal(sample.version,1);assert.equal(sample.ev3ProjectName,'EV3Lab');inspectBlocks(sample.workspace.blocks);
+ assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(displaySampleState())',context)),sample.workspace);
+ assert.deepEqual(JSON.parse(readFileSync(new URL('../dist/samples/DisplayTest.ev3lab',import.meta.url),'utf8')),sample);
+});
 // Blockly's headless shadow serialization still creates XML nodes. Supply
 // only that DOM surface; no browser or rendering is emulated by these tests.
 class XmlNode{
@@ -20,7 +55,7 @@ class XmlNode{
 }
 function editor(){
  const elements=new Map();
- const context=vm.createContext({console,setTimeout,clearTimeout,structuredClone,XMLSerializer:class{serializeToString(n){return '<'+n.nodeName+' '+[...n.attrs].map(([k,v])=>k+'='+JSON.stringify(v)).join(' ')+'>'+n.childNodes.map(c=>this.serializeToString(c)).join('')+'</'+n.nodeName+'>'; }},document:{createElementNS:(_ns,name)=>new XmlNode(name),createTextNode:text=>new XmlNode('#text',3,text),querySelector:()=>({}),getElementById:id=>{if(!elements.has(id))elements.set(id,{value:id==='pairMode'?'independent':'',textContent:''});return elements.get(id);}}});
+ const context=vm.createContext({DISPLAY_IMAGES,presetBitmap,rasterDisplayText,console,setTimeout,clearTimeout,structuredClone,XMLSerializer:class{serializeToString(n){return '<'+n.nodeName+' '+[...n.attrs].map(([k,v])=>k+'='+JSON.stringify(v)).join(' ')+'>'+n.childNodes.map(c=>this.serializeToString(c)).join('')+'</'+n.nodeName+'>'; }},document:{createElementNS:(_ns,name)=>new XmlNode(name),createTextNode:text=>new XmlNode('#text',3,text),querySelector:()=>({}),getElementById:id=>{if(!elements.has(id))elements.set(id,{value:id==='pairMode'?'independent':'',textContent:''});return elements.get(id);}}});
  for(const file of ['blockly_compressed.js','blocks_compressed.js','ja.js'])vm.runInContext(readFileSync(new URL('../dist/vendor/'+file,import.meta.url),'utf8'),context);
  const prefix=app.slice(app.indexOf('\n')+1,app.indexOf('const theme='));vm.runInContext(prefix,context);
  vm.runInContext('const workspace=new Blockly.Workspace();',context);
