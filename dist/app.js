@@ -4,7 +4,7 @@ import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.
 const $=id=>document.getElementById(id);
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.17.0';
+const VERSION='0.17.1';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -683,11 +683,11 @@ $('soundSample').onclick=()=>replaceSample('sound');$('motorSample').onclick=()=
 $('undo').onclick=()=>workspace.undo(false);$('redo').onclick=()=>workspace.undo(true);
 $('help').onclick=()=>$('helpDialog').showModal();
 $('newProject').onclick=()=>{
- if(workspace.getAllBlocks(false).length && !confirm('新しい作品を作ります。現在の作品が必要な場合は、先に「保存」してください。'))return;
+ if(workspace.getAllBlocks(false).length && !confirm('新しいプログラムを作ります。現在のプログラムが必要な場合は、先に「保存」してください。'))return;
  loading=true;
  try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:30,y:35}]}},workspace);$('ev3ProjectName').value='EV3Lab';$('programName').value='MyProgram';workspace.clearUndo();}
  finally{loading=false;}
- savedPath='';dirty=false;check();saveLocal();feedback('新しい作品を作りました。マイブロックの読み込みもできます。');
+ savedPath='';dirty=false;check();saveLocal();feedback('新しいプログラムを作りました。マイブロックの読み込みもできます。');
 };
 $('exportMyBlocks').onclick=()=>{try{const library=exportMyBlockLibrary();download(JSON.stringify(library,null,2),'my-blocks.ev3blocks','application/json');feedback(library.definitions.length+'個のマイブロックを書き出しました。');}catch(e){feedback(e.message,true);}};
 $('importMyBlocks').onclick=()=>$('libraryFileInput').click();

@@ -50,3 +50,7 @@ aside#connectionPanel{z-index:1000}
 #transfer:hover:not(:disabled){background:#0d47a1}
 #transferRun{background:#187d42;color:#fff;box-shadow:0 3px 5px #187d4226}
 #transferRun:hover:not(:disabled){background:#11632f}
+
+/* 新規作成は「保存」「開く」と並べ、メニューを開かずに見つけられるようにする。 */
+.project-actions #newProject{background:#edf7f5;border-color:#9cc6bf;color:#126c67;font-weight:600}
+.project-actions #newProject:hover{background:#dcefeb}
