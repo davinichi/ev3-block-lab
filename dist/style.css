@@ -66,3 +66,9 @@ aside#connectionPanel{z-index:1000}
 
 /* 戻り値の有無も、名前や引数と同じ作成画面で選ぶ。 */
 #myBlockReturn{width:100%;padding:10px;border:1px solid #cbd9df;border-radius:8px;background:white;color:inherit;font:inherit;margin:6px 0 14px;}
+
+/* SBLと同じ、ラベル＋標準プルダウンでサンプルを選ぶ。 */
+.sample-picker{display:flex;align-items:center;gap:5px;color:#627986;font-size:11px;min-width:0}
+.sample-picker select{width:180px;max-width:28vw;min-height:30px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;background:white;color:#314953;font:inherit;font-size:12px}
+.sample-picker select:focus-visible{outline:3px solid #e2b94f;outline-offset:2px}
+@media(max-width:480px){.sample-picker select{width:125px;max-width:30vw}}

@@ -25,6 +25,25 @@ test('new stop palette offers three direct methods and retains each through libr
 });
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
 
+test('sample picker protects edits on cancel, resets the selection, and permits repeated loading',async()=>{
+ const c=editor();
+ vm.runInContext(`let dirty=true,opened=0;function feedback(){};
+ $('sampleConfirmDialog').showModal=function(){this.open=true;};$('sampleConfirmDialog').close=function(){this.open=false;};$('sampleSelect').focus=()=>{};
+ sampleAction('example').onclick=()=>{opened++;dirty=false;};`,c);
+ vm.runInContext(app.slice(app.indexOf('// 選択後はプレースホルダーへ戻し')),c);
+ vm.runInContext(`const picker=$('sampleSelect');picker.value='example';picker.selectedOptions=[{textContent:'テスト'}];picker.onchange({target:picker});
+ if(opened!==0||picker.value!==''||!$('sampleConfirmDialog').open)throw Error('must confirm before replacing edits');
+ $('sampleConfirmCancel').onclick();if(opened!==0||!dirty||$('sampleConfirmDialog').open)throw Error('cancel must preserve edits');
+ picker.value='example';picker.onchange({target:picker});$('sampleConfirmOpen').onclick();`,c);
+ await vm.runInContext(`Promise.resolve()`,c);
+ assert.equal(vm.runInContext('opened',c),1);
+ await vm.runInContext(`openSelectedSample('example')`,c);
+ assert.equal(vm.runInContext('opened',c),2);
+ vm.runInContext(`dirty=true;sampleAction('broken').onclick=()=>{throw Error('load failed');};`,c);
+ await vm.runInContext(`openSelectedSample('broken')`,c);
+ assert.equal(vm.runInContext('dirty',c),true);assert.equal(vm.runInContext("$('sampleSelect').disabled",c),false);
+});
+
 test('numeric My Blocks keep return shape, arguments and result through save and library reuse',()=>{
  const c=editor();
  const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();
@@ -65,7 +84,7 @@ test('display blocks keep Japanese text, preset choice and numeric inputs throug
  assert.deepEqual(rendered,[{text:'こんにちは',size:24}]);assert.deepEqual(p.procedures[0].body[2].bitmap,presetBitmap('left',96));assert.deepEqual(p.procedures[0].body[3].value,{timer:true});compile(p);
 });
 test('downloadable display example has a supported format and matches the in-app sample',()=>{
- const context=editor();vm.runInContext(app.slice(app.indexOf('function displaySampleState(){'),app.indexOf("$('displaySample').onclick")),context);
+ const context=editor();vm.runInContext(app.slice(app.indexOf('function displaySampleState(){'),app.indexOf("sampleAction('displaySample').onclick")),context);
  const sample=JSON.parse(readFileSync(new URL('../examples/DisplayTest.ev3lab',import.meta.url),'utf8'));
  assert.equal(sample.version,1);assert.equal(sample.ev3ProjectName,'EV3Lab');inspectBlocks(sample.workspace.blocks);
  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(displaySampleState())',context)),sample.workspace);
@@ -309,9 +328,9 @@ test('all new motor blocks retain wiring, fractional seconds and control modes t
 test('the variable-and-branch classroom sample builds a compilable Blockly program',()=>{
  const context=editor();
  vm.runInContext('let dirty=false,loading=false;function saveLocal(){}function feedback(){}function check(){}',context);
- const sample=app.slice(app.indexOf("$('controlSample').onclick="),app.indexOf("$('driveSample').onclick="));
+ const sample=app.slice(app.indexOf("sampleAction('controlSample').onclick="),app.indexOf("sampleAction('driveSample').onclick="));
  vm.runInContext(sample,context);
- vm.runInContext("$('controlSample').onclick();",context);
+ vm.runInContext("sampleAction('controlSample').onclick();",context);
  const p=JSON.parse(vm.runInContext('JSON.stringify(program())',context));
  assert.equal(p.main[1].type,'while');assert.equal(p.main[1].body[1].else.length,1);
  assert.ok(compile(p).data.length>28);
@@ -336,8 +355,8 @@ test('saved Blockly variables and distance expressions round-trip into compilabl
 test('spin-turn Blockly sample round-trips and supplies both motor ports and geometry',()=>{
  const context=editor();
  vm.runInContext('let dirty=false,loading=false;function saveLocal(){}function feedback(){}function check(){}',context);
- vm.runInContext(app.slice(app.indexOf("$('spinSample').onclick="),app.indexOf("$('controlSample').onclick=")),context);
- vm.runInContext("$('spinSample').onclick();const saved=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(saved,workspace);",context);
+ vm.runInContext(app.slice(app.indexOf("sampleAction('spinSample').onclick="),app.indexOf("sampleAction('controlSample').onclick=")),context);
+ vm.runInContext("sampleAction('spinSample').onclick();const saved=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(saved,workspace);",context);
  const p=JSON.parse(vm.runInContext('JSON.stringify(program())',context));
  assert.deepEqual(p.main[0],{type:'movementSetup',leftPort:2,rightPort:4});assert.equal(p.main[1].diameter,56);assert.equal(p.main[2].mm,112);assert.equal(p.main[3].movement,true);assert.equal(p.main[3].direction,'right');assert.equal(p.main[5].direction,'left');
  assert.ok(compile(p).diagnosticPath);
@@ -461,8 +480,8 @@ test('exported setup and parameterized My Blocks can be reused in a fresh projec
 test('color classroom sample saves, reloads and compiles into an on-brick wait and tone',()=>{
  const context=editor();
  vm.runInContext('let dirty=false,loading=false;function saveLocal(){}function feedback(){}function check(){}',context);
- vm.runInContext(app.slice(app.indexOf("$('colorSample').onclick="),app.indexOf("$('controlSample').onclick=")),context);
- const p=JSON.parse(vm.runInContext("$('colorSample').onclick();const savedColor=Blockly.serialization.workspaces.save(workspace);Blockly.serialization.workspaces.load(savedColor,workspace);JSON.stringify(program());",context));
+ vm.runInContext(app.slice(app.indexOf("sampleAction('colorSample').onclick="),app.indexOf("sampleAction('controlSample').onclick=")),context);
+ const p=JSON.parse(vm.runInContext("sampleAction('colorSample').onclick();const savedColor=Blockly.serialization.workspaces.save(workspace);Blockly.serialization.workspaces.load(savedColor,workspace);JSON.stringify(program());",context));
  assert.equal(p.main[0].type,'while');assert.equal(p.main[0].until,true);assert.deepEqual(p.main[0].condition,{op:'eq',left:{sensor:{kind:'color',port:3}},right:5});assert.equal(p.main[1].frequency,880);
  assert.equal(compile(p).usesSensors,true);
 });
@@ -511,8 +530,8 @@ test('continuous L/M motor blocks preserve port and variable speed through libra
 });
 test('distance-stop classroom sample compiles a continuous start followed by a sensor wait and stop',()=>{
  const context=editor();vm.runInContext('let dirty=false,loading=false;function saveLocal(){}function feedback(){}function check(){}',context);
- vm.runInContext(app.slice(app.indexOf("$('sensorMotorSample').onclick="),app.indexOf("$('colorSample').onclick=")),context);
- const p=JSON.parse(vm.runInContext("$('sensorMotorSample').onclick();const saved=Blockly.serialization.workspaces.save(workspace);Blockly.serialization.workspaces.load(saved,workspace);JSON.stringify(program());",context));
+ vm.runInContext(app.slice(app.indexOf("sampleAction('sensorMotorSample').onclick="),app.indexOf("sampleAction('colorSample').onclick=")),context);
+ const p=JSON.parse(vm.runInContext("sampleAction('sensorMotorSample').onclick();const saved=Blockly.serialization.workspaces.save(workspace);Blockly.serialization.workspaces.load(saved,workspace);JSON.stringify(program());",context));
  assert.deepEqual(p.main.map(b=>b.type),['motorRun','while','stop']);assert.equal(p.main[0].ports,6);assert.equal(p.main[1].condition.left.sensor.port,4);assert.equal(p.main[1].condition.right,15);assert.equal(compile(p).usesSensors,true);
 });
 

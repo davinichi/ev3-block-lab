@@ -2,9 +2,12 @@ import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.
 // 画面とBlocklyを結び付ける入口。ブロック定義 → 中間データ → ev3.jsでRBF生成 → 接続・転送の順に処理する。
 // 外部ライブラリのdist/vendorは編集せず、独自ブロックと画面側の振る舞いをここに記述する。
 const $=id=>document.getElementById(id);
+// サンプルの実装を選択UIから分離する。すべて同じ確認画面を経由して開く。
+const sampleActions=new Map();
+function sampleAction(id){if(!sampleActions.has(id))sampleActions.set(id,{});return sampleActions.get(id);}
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.24.0';
+const VERSION='0.24.1';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -782,7 +785,7 @@ function sample(mode){
   finally{loading=false;}
   check();saveLocal();dirty=false;
 }
-function replaceSample(mode){if(dirty && !confirm('現在の編集内容をサンプルに置き換えます。必要な場合は先に「保存」してください。'))return;sample(mode);feedback('サンプルを読み込みました。');}
+function replaceSample(mode){sample(mode);feedback('サンプルを読み込みました。');}
 workspace.addChangeListener(e=>{
   if(loading || e.isUiEvent)return;
   dirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(()=>{check();saveLocal();},350);
@@ -818,30 +821,26 @@ $('readCounts').onclick=async()=>{
   finally{busy=false;updateButtons();}
 };
 $('check').onclick=()=>{check();};
-$('spinSample').onclick=()=>{
- if(dirty && !confirm('現在の編集内容をスピンターンのサンプルに置き換えます。必要なら先に保存してください。'))return;
+sampleAction('spinSample').onclick=()=>{
  const number=n=>({block:{type:'math_number',fields:{NUM:n}}});
  const turn=direction=>({type:'ev3_spin_'+direction,fields:{LEFT_PORT:'2',RIGHT_PORT:'4'},inputs:{SPEED:number(20),ANGLE:number(90)}});
  const left=turn('left'),wait={type:'ev3_wait_seconds',inputs:{SECONDS:number(1)},next:{block:left}},right={...turn('right'),next:{block:wait}};
  const first={type:'ev3_start',next:{block:{type:'ev3_wheel',fields:{DIAMETER:56},next:{block:{type:'ev3_tread',fields:{TREAD:112},next:{block:right}}}}}};
  loading=true;try{Blockly.serialization.workspaces.load(movementSampleState({blocks:{languageVersion:0,blocks:[first]}}),workspace);$('programName').value='SpinTurn';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('直径56mm・トレッド112mmの例です。実物の寸法と左右のポートに合わせて変更してください。');
 };
-$('sensorMotorSample').onclick=()=>{
- if(dirty && !confirm('現在の編集内容を距離で停止のサンプルに置き換えます。必要なら先に保存してください。'))return;
+sampleAction('sensorMotorSample').onclick=()=>{
  const stop={type:'ev3_stop'},wait={type:'ev3_wait_until',inputs:{BOOL:{block:{type:'ev3_distance_compare',fields:{PORT:'4',OP:'lt'},inputs:{VALUE:shadow(15)}}}},next:{block:stop}};
  const run={type:'ev3_motor_l_run',fields:{PORTS:'6'},inputs:{SPEED:shadow(20)},next:{block:wait}};
  loading=true;try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:80,y:60,next:{block:run}}]}},workspace);$('programName').value='DistanceStop';workspace.clearUndo();}finally{loading=false;}
  check();saveLocal();dirty=false;feedback('LモーターB+Cを速さ20％で回し、ポート4の超音波センサが15cm未満になったら停止します。');
 };
-$('colorSample').onclick=()=>{
- if(dirty && !confirm('現在の編集内容を赤で音のサンプルに置き換えます。必要なら先に保存してください。'))return;
+sampleAction('colorSample').onclick=()=>{
  loading=true;
  try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:80,y:60,next:{block:{type:'ev3_wait_until',inputs:{BOOL:{block:{type:'ev3_color_is',fields:{PORT:'3',COLOR:'5'}}}},next:{block:{type:'ev3_tone',fields:{VOLUME:25},inputs:{FREQUENCY:shadow(880),MS:shadow(300)}}}}}}]}},workspace);$('programName').value='ColorSound';workspace.clearUndo();}
  finally{loading=false;}
  check();saveLocal();dirty=false;feedback('カラーセンサをポート3に接続し、赤い物を近づけると音が鳴ります。');
 };
-$('controlSample').onclick=()=>{
- if(dirty && !confirm('現在の編集内容を変数と分岐のサンプルに置き換えます。必要なら先に保存してください。'))return;
+sampleAction('controlSample').onclick=()=>{
  const number=n=>({block:{type:'math_number',fields:{NUM:n}}}),variable=()=>({block:{type:'variables_get',fields:{VAR:{id:'sample-count'}}}});
  const tone=frequency=>({block:{type:'ev3_tone',fields:{VOLUME:25},inputs:{FREQUENCY:number(frequency),MS:number(200)}}});
  const branch={type:'controls_if',extraState:{hasElse:true},inputs:{IF0:{block:{type:'logic_compare',fields:{OP:'EQ'},inputs:{A:variable(),B:number(2)}}},DO0:tone(880),ELSE:tone(440)},next:{block:{type:'ev3_wait_seconds',inputs:{SECONDS:number(.5)}}}};
@@ -849,13 +848,12 @@ $('controlSample').onclick=()=>{
  const first={type:'ev3_start',next:{block:{type:'variables_set',fields:{VAR:{id:'sample-count'}},inputs:{VALUE:number(0)},next:{block:repeat}}}};
  loading=true;try{Blockly.serialization.workspaces.load({variables:[{id:'sample-count',name:'回数'}],blocks:{languageVersion:0,blocks:[first]}},workspace);$('programName').value='Variables';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('回数を1ずつ増やし、2回目だけ高い音を鳴らします。');
 };
-$('driveSample').onclick=()=>{
- if(dirty && !confirm('現在の編集内容を走行サンプルに置き換えます。必要なら先に保存してください。'))return;
+sampleAction('driveSample').onclick=()=>{
  const move=(direction)=>'<block type="ev3_drive_'+direction+'"><field name="PORTS">6</field>'+n('SPEED',20)+n('CM',20)+'</block>';
  const xml='<xml xmlns="https://developers.google.com/blockly/xml"><block type="ev3_start" x="30" y="35"><next><block type="ev3_wheel"><field name="DIAMETER">56</field><next>'+move('forward').replace('</block>','<next><block type="ev3_wait_seconds">'+n('SECONDS',1)+'<next>'+move('backward')+'</next></block></next></block>')+'</next></block></next></block></xml>';
  loading=true;try{workspace.clear();Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(xml),workspace);const state=movementSampleState(Blockly.serialization.workspaces.save(workspace));Blockly.serialization.workspaces.load(state,workspace);$('programName').value='ForwardBackward';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('タイヤ直径56mm・B+C・前後20cmのサンプルです。実物の直径を確認してください。');
 };
-$('soundSample').onclick=()=>replaceSample('sound');$('motorSample').onclick=()=>replaceSample('motor');
+sampleAction('soundSample').onclick=()=>replaceSample('sound');sampleAction('motorSample').onclick=()=>replaceSample('motor');
 $('undo').onclick=()=>workspace.undo(false);$('redo').onclick=()=>workspace.undo(true);
 $('zoomToFit').onclick=()=>{
  // パレットを閉じて編集領域全体を使う。ブロックの配置・接続は変更しない。
@@ -894,9 +892,7 @@ function loadRampSample(){
  loading=true;try{Blockly.serialization.workspaces.load(rampSampleState(),workspace);$('programName').value='RampTest';workspace.clearUndo();}finally{loading=false;}
  check();saveLocal();dirty=false;feedback('LモーターBを台形→1秒待つ→S字の順に720度ずつ回します。速度30％、加速・減速各1秒です。実機確認をお願いします。');
 }
-$('rampSample').onclick=()=>{if(dirty)$('rampSampleDialog').showModal();else loadRampSample();};
-$('rampSampleCancel').onclick=()=>$('rampSampleDialog').close();
-$('rampSampleConfirm').onclick=()=>{$('rampSampleDialog').close();loadRampSample();};
+sampleAction('rampSample').onclick=()=>loadRampSample();
 $('saveProject').onclick=()=>{try{const filename=programFileName($('programName').value).replace(/\.rbf$/,'.ev3lab');download(JSON.stringify(project(),null,2),filename,'application/json');dirty=false;}catch(e){feedback(e.message,true);$('programName').focus();}};
 $('loadProject').onclick=()=>$('fileInput').click();
 $('fileInput').onchange=async e=>{
@@ -1029,23 +1025,20 @@ $('autoSensors').onchange=()=>{clearTimeout(monitorTimer);monitorTimer=null;if($
 $('exportCsv').onclick=async()=>{if(busy||!connection.connected)return;stopSensorMonitor();busy=true;updateButtons();$('csvStatus').textContent='EV3からCSVを読み出しています…';try{const file=$('csvName').value.trim(),csv=await connection.readCsv($('ev3ProjectName').value,file);download('\ufeff'+csv,file+'.csv','text/csv;charset=utf-8');$('csvStatus').textContent='CSVを保存しました。EV3本体の記録は残っています。';}catch(e){$('csvStatus').textContent=e.message;}finally{busy=false;updateButtons();}};
 
 async function loadFeatureSample(name){
- if(dirty&&!confirm('編集内容をサンプルに置き換えます。必要な場合は先に保存してください。'))return;
- try{const response=await fetch('samples/'+name+'.ev3lab');if(!response.ok)throw Error('サンプルを読み込めません。');restore(await response.json());$('fileMenu').open=false;check();saveLocal();dirty=false;feedback('サンプルを読み込みました。ログ名はLogです。ステアリングの例は転送して実行すると走行します。');}catch(e){feedback(e.message,true);}
+ const response=await fetch('samples/'+name+'.ev3lab');if(!response.ok)throw Error('サンプルを読み込めません。');restore(await response.json());$('fileMenu').open=false;check();saveLocal();dirty=false;feedback('サンプルを読み込みました。ログ名はLogです。ステアリングの例は転送して実行すると走行します。');
 }
-$('sampleData').onclick=()=>loadFeatureSample('DataLogTest');
-$('sampleSteering').onclick=()=>loadFeatureSample('SteeringTest');
+sampleAction('sampleData').onclick=()=>loadFeatureSample('DataLogTest');
+sampleAction('sampleSteering').onclick=()=>loadFeatureSample('SteeringTest');
 
-for(const [id,kind,name]of [['parallelSample','parallel','ParallelMeasure'],['eventSample','event','TouchEvent'],['messageSample','message','MessageRelay']])$(id).onclick=()=>{
- if(dirty&&!confirm('編集中の内容をサンプルに置き換えます。必要なら先に保存してください。'))return;
+for(const [id,kind,name]of [['parallelSample','parallel','ParallelMeasure'],['eventSample','event','TouchEvent'],['messageSample','message','MessageRelay']])sampleAction(id).onclick=()=>{
  loading=true;try{Blockly.serialization.workspaces.load(parallelSampleState(kind),workspace);$('programName').value=name;workspace.clearUndo();}finally{loading=false;}
- check();saveLocal();dirty=false;$('sampleMenu').open=false;
+ check();saveLocal();dirty=false;
  feedback(kind==='parallel'?'B+Cの走行と、超音波センサ2のCSV記録を並行します。ログ名はParallelです。':kind==='event'?'B+Cを回し続け、タッチセンサ1で全体を停止します。本体の戻るボタンでも停止できます。':'「測定」を送って待ち、超音波センサ2をCSVに記録します。ログ名はMessageです。');
 };
 
-for(const [id,kind,name]of [['motorStopSample','stop','MotorStopTest'],['tankFiniteSample','tank','TankFiniteTest'],['motorPowerSample','power','MotorPowerTest']])$(id).onclick=()=>{
- if(dirty&&!confirm('編集内容をモーターのサンプルに置き換えます。必要なら先に保存してください。'))return;
+for(const [id,kind,name]of [['motorStopSample','stop','MotorStopTest'],['tankFiniteSample','tank','TankFiniteTest'],['motorPowerSample','power','MotorPowerTest']])sampleAction(id).onclick=()=>{
  loading=true;try{Blockly.serialization.workspaces.load(motorSampleState(kind),workspace);$('programName').value=name;workspace.clearUndo();}finally{loading=false;}
- check();saveLocal();dirty=false;$('sampleMenu').open=false;
+ check();saveLocal();dirty=false;
  feedback(kind==='stop'?'モーターBを惰性→ブレーキ→保持の順で各0.25回転し、1秒ずつ待ちます。':kind==='tank'?'B+Cを左30％・右15％で速い側180度、次に左右逆回転で0.5秒動かします。':'モーターBの速度指定20％→30％→パワー20％を比較し、実測速度をCSV（Power）に記録します。');
 };
 
@@ -1055,35 +1048,47 @@ function displaySampleState(){
  for(let i=0;i<blocks.length-1;i++)blocks[i].next={block:blocks[i+1]};
  return {blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:40,y:35,next:{block:blocks[0]}}]}};
 }
-$('displaySample').onclick=()=>{
- if(dirty&&!confirm('編集中の内容を「本体画面の表示」に置き換えます。必要な作品は先に保存してください。'))return;
+sampleAction('displaySample').onclick=()=>{
  loading=true;try{Blockly.serialization.workspaces.load(displaySampleState(),workspace);$('programName').value='DisplayTest';workspace.clearUndo();}finally{loading=false;}
- check();saveLocal();dirty=false;$('sampleMenu').open=false;
+ check();saveLocal();dirty=false;
 };
 
-$('gyroSample').onclick=()=>{
- if(dirty&&!confirm('編集中の内容を「ジャイロの角度・回転速度」に置き換えます。必要な作品は先に保存してください。'))return;
+sampleAction('gyroSample').onclick=()=>{
  loading=true;try{Blockly.serialization.workspaces.load(gyroSampleState(),workspace);$('programName').value='GyroTest';workspace.clearUndo();}finally{loading=false;}
- check();saveLocal();dirty=false;$('sampleMenu').open=false;
+ check();saveLocal();dirty=false;
  feedback('ジャイロをポート1に接続して静止させてください。開始音の後、約10秒間、手で向きを変えると角度・回転速度を画面表示しCSVに記録します。');
 };
 
-for(const [id,kind,name]of [['batterySample','battery','BatteryTest'],['pidSample','pid','PIDTest']])$(id).onclick=()=>{
- if(dirty&&!confirm('編集中の内容をサンプルに置き換えます。必要なら先に保存してください。'))return;
+for(const [id,kind,name]of [['batterySample','battery','BatteryTest'],['pidSample','pid','PIDTest']])sampleAction(id).onclick=()=>{
  loading=true;try{Blockly.serialization.workspaces.load(powerPidSampleState(kind),workspace);$('programName').value=name;workspace.clearUndo();}finally{loading=false;}
- check();saveLocal();dirty=false;$('sampleMenu').open=false;
+ check();saveLocal();dirty=false;
  feedback(kind==='battery'?'バッテリー全体の電圧・電流を画面表示し、ログBatteryへ記録します。モーターは動かしません。':'目標10・測定4の固定値でPIDを10回計算し、ログPIDへ記録します。モーターは動かしません。');
 };
 
-for(const [id,kind,name]of [['movementBasicSample','basic','MovementBasic'],['movementSwitchSample','switch','MovementSwitch'],['movementMyBlockSample','myblock','MovementMyBlock']])$(id).onclick=()=>{
- if(dirty&&!confirm('現在の編集内容を共通モーター設定のサンプルに置き換えます。必要なら先に保存してください。'))return;
+for(const [id,kind,name]of [['movementBasicSample','basic','MovementBasic'],['movementSwitchSample','switch','MovementSwitch'],['movementMyBlockSample','myblock','MovementMyBlock']])sampleAction(id).onclick=()=>{
  loading=true;try{Blockly.serialization.workspaces.load(commonMovementSampleState(kind),workspace);$('programName').value=name;$('pairMode').value='feedback';workspace.clearUndo();}finally{loading=false;}
  check();saveLocal();dirty=false;feedback(kind==='switch'?'左B・右Cで前進後、旧組を停止して左A・右Dへ切替え、後退します。4個の実機配線を確認してから実行してください。':'左B・右Cをスタート直後に設定します。実際の配線・直径を確認してください。');
 };
 
 function returnSampleState(){return {"variables":[{"id":"return-値1","name":"値1"},{"id":"return-値2","name":"値2"}],"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":40,"y":35,"next":{"block":{"type":"ev3_tone","fields":{"VOLUME":25},"inputs":{"FREQUENCY":{"block":{"type":"procedures_callreturn","extraState":{"name":"平均","params":["値1","値2"]},"inputs":{"ARG0":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"ARG1":{"shadow":{"type":"math_number","fields":{"NUM":880}}}}}},"MS":{"shadow":{"type":"math_number","fields":{"NUM":400}}}}}}},{"type":"procedures_defreturn","x":40,"y":250,"fields":{"NAME":"平均"},"extraState":{"params":[{"id":"return-値1","name":"値1"},{"id":"return-値2","name":"値2"}]},"inputs":{"RETURN":{"block":{"type":"ev3_op_div","inputs":{"A":{"block":{"type":"ev3_op_add","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"return-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"return-値2"},"fields":{"ARG_NAME":"値2"}}}}}},"B":{"shadow":{"type":"math_number","fields":{"NUM":2}}}}}}}}]}};}
-$('returnSample').onclick=()=>{
- if(dirty&&!confirm('編集中の内容を「マイブロックの戻り値」に置き換えます。必要なら先に保存してください。'))return;
+sampleAction('returnSample').onclick=()=>{
  loading=true;try{Blockly.serialization.workspaces.load(returnSampleState(),workspace);$('programName').value='MyBlockReturn';workspace.clearUndo();}finally{loading=false;}
- check();saveLocal();dirty=false;$('sampleMenu').open=false;feedback('平均の戻り値を音の周波数に使います。440と880の平均、660Hzで鳴らします。モーターは動かしません。');
+ check();saveLocal();dirty=false;feedback('平均の戻り値を音の周波数に使います。440と880の平均、660Hzで鳴らします。モーターは動かしません。');
 };
+
+// 選択後はプレースホルダーへ戻し、同じサンプルも再び選べるようにする。
+let pendingSample=null;
+async function openSelectedSample(id){
+ const action=sampleActions.get(id)?.onclick;if(!action)return;
+ const previousDirty=dirty;const picker=$('sampleSelect');picker.disabled=true;
+ try{dirty=false;await action();}catch(error){dirty=previousDirty;feedback('サンプルを開けませんでした。'+error.message,true);}
+ finally{picker.disabled=false;}
+}
+$('sampleSelect').onchange=event=>{
+ const picker=event.target,id=picker.value,label=picker.selectedOptions[0]?.textContent;picker.value='';if(!sampleActions.has(id))return;
+ if(dirty){pendingSample=id;$('sampleConfirmText').textContent='「'+label+'」を開きます。';$('sampleConfirmDialog').showModal();}
+ else openSelectedSample(id);
+};
+$('sampleConfirmCancel').onclick=()=>{pendingSample=null;$('sampleConfirmDialog').close();$('sampleSelect').focus();};
+$('sampleConfirmDialog').oncancel=()=>{pendingSample=null;};
+$('sampleConfirmOpen').onclick=()=>{const id=pendingSample;pendingSample=null;$('sampleConfirmDialog').close();if(id)openSelectedSample(id);};
