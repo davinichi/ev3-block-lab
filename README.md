@@ -16,11 +16,11 @@ v0.19.0では、左右別速度の角度・時間指定、ブレーキ／惰性�
 
 ## 最新版マニュアル
 
-[ジャイロセンサの説明・実機テスト v0.21.0](docs/manual-v0.21.0/README.md) ／ [テスト用サンプル GyroTest.ev3lab](examples/GyroTest.ev3lab)
+[ジャイロセンサの説明・実機テスト v0.21.0](docs/manual-v0.21.0/gyro-guide.md) ／ [テスト用サンプル GyroTest.ev3lab](examples/GyroTest.ev3lab)
 
-[ブロック命令マニュアル v0.20.0（全34章）](docs/manual-v0.20.0/README.md)
+[ブロック命令マニュアル v0.21.0（全35章・38ページ）](docs/manual-v0.21.0/README.md)
 
-[配布・印刷用PDF](docs/manual-v0.20.0/EV3-Block-Lab-ブロック命令マニュアル-v0.20.0.pdf) ／ [HTML版](docs/manual-v0.20.0/EV3-Block-Lab-ブロック命令マニュアル-v0.20.0.html) ／ [マニュアル一覧](docs/README.md)
+[配布・印刷用PDF](docs/manual-v0.21.0/EV3-Block-Lab-ブロック命令マニュアル-v0.21.0.pdf) ／ [HTML版](docs/manual-v0.21.0/EV3-Block-Lab-ブロック命令マニュアル-v0.21.0.html) ／ [マニュアル一覧](docs/README.md)
 
 基本操作からCSV・文字列・数値リスト・並行処理・イベント・停止方法・本体画面表示までを統合。EV3 Classroomとの比較表を含みます。公開サイト上部の「マニュアル PDF」からも保存できます。
 
