@@ -700,3 +700,25 @@ test('gyro sample is loadable, compiles to a standalone program and matches the 
  assert.equal(p.main[1].type,'gyroReset');assert.equal(p.main[2].frequency,440);assert.ok(compile(p).logFiles.includes('Gyro'));
  assert.deepEqual(JSON.parse(readFileSync(new URL('../dist/samples/GyroTest.ev3lab',import.meta.url),'utf8')),sample);
 });
+
+test('battery and PID blocks preserve all five value inputs and controller names through project and My Block reuse',()=>{
+ const context=editor();
+ const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();const def=saveMyBlock(workspace,'PID計算',[]);const reset=workspace.newBlock('ev3_pid_reset');reset.setFieldValue('制御1','NAME');def.getInput('STACK').connection.connect(reset.previousConnection);
+ const control=workspace.newBlock('ev3_pid');control.setFieldValue('制御1','NAME');for(const [key,val]of Object.entries({TARGET:7.5,KP:1.2,KI:.3,KD:.04})){const n=workspace.newBlock('math_number');n.setFieldValue(val,'NUM');control.getInput(key).connection.connect(n.outputConnection);}control.getInput('MEASURED').connection.connect(workspace.newBlock('ev3_battery_voltage').outputConnection);
+ const model=workspace.getVariableMap().createVariable('出力'),assign=workspace.newBlock('variables_set');assign.setFieldValue(model.getId(),'VAR');assign.getInput('VALUE').connection.connect(control.outputConnection);reset.nextConnection.connect(assign.previousConnection);
+ const current=workspace.newBlock('ev3_battery_current'),variable=workspace.getVariableMap().createVariable('電流'),set=workspace.newBlock('variables_set');set.setFieldValue(variable.getId(),'VAR');set.getInput('VALUE').connection.connect(current.outputConnection);assign.nextConnection.connect(set.previousConnection);
+ const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);Blockly.Events.enable();JSON.stringify(Blockly.serialization.workspaces.save(workspace));`,context));
+ inspectBlocks(saved.blocks);context.lesson=JSON.stringify(mergeBlockLibrary({blocks:{languageVersion:0,blocks:[{type:'ev3_start'}]}},createBlockLibrary(saved,'0.22.0')));
+ const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const start=workspace.getTopBlocks(false).find(b=>b.type==='ev3_start'),call=workspace.newBlock('procedures_callnoreturn');call.loadExtraState({name:'PID計算',params:[]});start.nextConnection.connect(call.previousConnection);const p=program();Blockly.Events.enable();JSON.stringify(p);`,context));
+ assert.deepEqual(p.procedures[0].body[0],{type:'pidReset',name:'制御1'});
+ assert.deepEqual(p.procedures[0].body[1].value,{pid:{name:'制御1',target:7.5,measured:{battery:'voltage'},kp:1.2,ki:.3,kd:.04}});assert.deepEqual(p.procedures[0].body[2].value,{battery:'current'});compile(p);
+});
+
+test('battery and PID samples compile after loading and match the downloadable files',()=>{
+ for(const [name,kind,log]of [['BatteryTest','battery','Battery'],['PIDTest','pid','PID']]){
+  const context=editor(),sample=JSON.parse(readFileSync(new URL('../examples/'+name+'.ev3lab',import.meta.url),'utf8'));
+  inspectBlocks(sample.workspace.blocks);context.kind=kind;assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(powerPidSampleState(kind))',context)),sample.workspace);
+  context.lesson=JSON.stringify(sample.workspace);const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const p=program();Blockly.Events.enable();JSON.stringify(p);`,context));assert.ok(compile(p).logFiles.includes(log));
+  assert.deepEqual(JSON.parse(readFileSync(new URL('../dist/samples/'+name+'.ev3lab',import.meta.url),'utf8')),sample);
+ }
+});

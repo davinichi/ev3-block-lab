@@ -109,7 +109,7 @@ test('RBF has LEGO header, correct sizes, real SUBCALL and DATAF argument',()=>{
 
 // A small independent VM for the subset produced by this compiler. It decodes
 // bytes from the finished RBF, rather than reading the compiler's intermediate tree.
-function interpret(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorDriver=null,files=new Map(),sensorRead=()=>NaN,sensorType=null,sensorMode=null,motorTypes=[7,7,7,7],sensorLog=[],buttonRead=()=>false,waitLimit=Infinity}={}){
+function interpret(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorDriver=null,files=new Map(),sensorRead=()=>NaN,batteryRead=()=>NaN,sensorType=null,sensorMode=null,motorTypes=[7,7,7,7],sensorLog=[],buttonRead=()=>false,waitLimit=Infinity}={}){
   const handles=new Map(),arrays=new Map();let nextArray=10;
   const counts=[...initialCounts],pendingSpeed=[0,0,0,0];
   const shared=dv(new Uint8Array(dv(bytes).getUint32(12,true)));
@@ -141,6 +141,7 @@ function interpret(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorDriver=nul
       switch(op){
         case 0x0a:case 0x08:return;
         case 9:{const target=param(2),count=param(1),args=[];for(let i=0;i<count;i++)args.push(param());execute(target,args);break;}
+        case 0x81:{const kind=param(1),out=param(4,true);assert.ok([1,2].includes(kind));setFloat(out,batteryRead(kind,motorDriver?.time??0));break;}
         case 0x83:{assert.equal(param(1),9);const button=param(1),at=param(1,true);assert.ok(button>=1&&button<=5);m.setInt8(at,+buttonRead(button,motorDriver?.time??0));break;}
         case 0x94:{assert.equal(param(1),1);const volume=param(1),frequency=param(2),ms=param(2);events.push({type:'tone',volume,frequency,ms});break;}
         case 0x96:break;

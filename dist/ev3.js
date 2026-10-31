@@ -1,3 +1,4 @@
+import {pidName,validatePid,pidLayout,pidEmitter} from './pid.js';
 import {validateDisplay,emitDisplay} from './display.js';
 import {motorFeatures,stopModes} from './motor-features.js';
 import {parallelPlan,sharedLock} from './parallel.js';
@@ -70,6 +71,8 @@ function sensorConfiguration(sensor){
 // 転送前の検証用に式を評価する。確定する値は計算し、実測が必要な値はUNKNOWNとして後段の検査へ渡す。
 function evaluate(x, env) {
   if (typeof x==='number') {if(!Number.isFinite(x))throw Error('数値を確認してください。');return env[FLOATS]?finiteNumber(Math.fround(x)):x;}
+  if(x?.battery!==undefined){if(!['voltage','current'].includes(x.battery))throw Error('バッテリーの測定項目を確認してください。');return UNKNOWN;}
+  if(x?.pid){validatePid(x.pid,value=>evaluate(value,env));return UNKNOWN;}
   if(x?.numeric){const {op,a,b,low,high}=x.numeric;if(!['mod','random','min','max','clamp','round'].includes(op))throw Error('未対応のデータ演算です。');const values=[a,...(b===undefined?[]:[b]),...(op==='clamp'?[low,high]:[])].map(v=>evaluate(v,env));if(op==='mod'&&values[1]===0)throw Error('0では割れません。');if(op==='random'&&values.every(v=>v!==UNKNOWN)&&(Math.trunc(values[0])>Math.trunc(values[1])||values.some(v=>v< -32767||v>32767)))throw Error('乱数は−32767〜32767の整数範囲で、下限≦上限にしてください。');if(op==='clamp'&&values[1]!==UNKNOWN&&values[2]!==UNKNOWN&&values[1]>values[2])throw Error('範囲の下限を上限以下にしてください。');return UNKNOWN;}
   if(x?.textData){if(!['length','contains','equal','number'].includes(x.textData.op))throw Error('文字列の演算を確認してください。');checkText(x.textData.value);if(x.textData.other)checkText(x.textData.other);return UNKNOWN;}
   if(x?.listData){if(!['length','item','contains','sum','average','min','max'].includes(x.listData.op))throw Error('リストの演算を確認してください。');if(x.listData.index!==undefined)evaluate(x.listData.index,env);if(x.listData.value!==undefined)evaluate(x.listData.value,env);return UNKNOWN;}
@@ -194,6 +197,7 @@ export function validate(program) {
         case 'wait': if(b.secondsSource!==undefined){const seconds=evaluate(b.secondsSource,env);if(seconds!==UNKNOWN&&(!Number.isFinite(seconds)||seconds<0||seconds>60))throw Error('待ち時間は0〜60秒にしてください。');} inRange(val('ms'),0,60000,'待ち時間'); break;
         case 'motorTimed': inRange(b.ports,1,15,'モーターポート');if(b.ports.toString(2).split('1').length-1>2)throw Error('モーターポートは2個まで指定できます。');inRange(val('speed'),-100,100,'モーターの速さ');if(val('speed')===0)throw Error('モーターの速さは0以外にしてください。');{const seconds=val('seconds');if(seconds!==UNKNOWN&&(!Number.isFinite(seconds)||seconds<=0||seconds>60))throw Error('モーターの時間は0より大きく60秒以下にしてください。');} break;
         case 'timerReset':break;
+        case 'pidReset':pidName(b.name);break;
         case 'gyroReset':sensorConfiguration({kind:'gyroAngle',port:b.port});break;
         case 'encoderReset':inRange(b.port,1,4,'リセットするモーターポート');break;
         case 'broadcast':if(typeof b.message!=='string'||!b.message.trim()||b.message.length>40||b.message.includes('\0'))throw Error('メッセージ名は1〜40文字にしてください。');break;
@@ -233,7 +237,7 @@ export function compile(program,folder='EV3Lab') {
   validate(program);
   const parallel=parallelPlan(program);
   const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false,usesTimer=false,usesStopModes=false,usesGyro=false;
-  const collect=x=>{if(x&&typeof x==='object'){if(x.sensor?.kind?.startsWith('gyro')||x.type==='gyroReset'){usesGyro=true;usesSensors=true;}if(x.type==='stopMode'||x.stopMode!==undefined)usesStopModes=true;if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
+  const collect=x=>{if(x&&typeof x==='object'){if(x.sensor?.kind?.startsWith('gyro')||x.type==='gyroReset'){usesGyro=true;usesSensors=true;}if(x.type==='stopMode'||x.stopMode!==undefined)usesStopModes=true;if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.battery||x.pid||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
   collect(program);if(variableNames.size>32)throw Error('変数は32個までです。');
   // 通常変数・寸法・加減速設定・共有タイマーを重ならない位置へ配置する。各数値の領域は4バイト。
   const globalOffsets=new Map([...variableNames].map((name,i)=>[name,i*4]));
@@ -243,7 +247,8 @@ export function compile(program,folder='EV3Lab') {
   // 角度のゼロ点はポート別・プログラム全体で共有。物理的な再校正やモード切替はしない。
   const gyroOffset=stopModeOffset+(usesStopModes?16:0);
   const baseGlobalBytes=gyroOffset+(usesGyro?16:0);
-  const extras=extraLayout(program,baseGlobalBytes,directory);
+  const pids=pidLayout(program,baseGlobalBytes),dataBase=baseGlobalBytes+pids.bytes;
+  const extras=extraLayout(program,dataBase,directory);
   // Bind a diagnostic record to this compiler revision and exact project.
   let diagnosticTag=0x811c9dc5;
   for(const ch of new TextEncoder().encode('timing-v1-0.1.6|'+JSON.stringify(program)))diagnosticTag=Math.imul(diagnosticTag^ch,0x01000193);
@@ -251,10 +256,10 @@ export function compile(program,folder='EV3Lab') {
   let recordsTiming=false;
   const procs=program.procedures;
   const roots=parallel?.roots??[];
-  const messageBase=baseGlobalBytes+extras.bytes;
+  const messageBase=dataBase+extras.bytes;
   const ackBase=messageBase+(parallel?.messages.size??0)*4;
   const lockBase=ackBase+roots.length*4;
-  const globalBytes=parallel?lockBase+roots.length*8:baseGlobalBytes+extras.bytes;
+  const globalBytes=parallel?lockBase+roots.length*8:dataBase+extras.bytes;
   const messageAt=name=>globalVar(messageBase+parallel.messages.get(name)*4);
   const ackAt=i=>globalVar(ackBase+i*4);
   const needed=roots.map(r=>{const names=new Set();parallel.visit(r.body,b=>{if(b.type==='call')names.add(b.name);});return names;});
@@ -359,6 +364,8 @@ export function compile(program,folder='EV3Lab') {
     // ユーザーの式・変数・引数は常に小数で計算する。ハードウェアへ渡す直前だけexprで整数に変換する。
     const floatExpr=x=>{
       if(typeof x==='number')return floatingConstant(x);
+      if(x?.battery!==undefined){const result=local(alloc());emit(0x81,constant(x.battery==='voltage'?1:2),result);floatGuard(result);return result;}
+      if(x?.pid)return locked(()=>pidOps.compute(x.pid));
       if(x?.timer===true){const elapsed=local(alloc()),seconds=local(alloc());emit(OP.TIMER_READ,elapsed);emit(OP.SUB32,elapsed,globalVar(timerOffset),elapsed);emit(0x1f,asFloat(elapsed),floatingConstant(1000),seconds);return seconds;}
       if(x?.numeric){const {op,a,b,low,high}=x.numeric,A=floatExpr(a),r=local(alloc());floatGuard(A);if(op==='round'){const t=local(alloc());emit(0x13,A,floatingConstant(.5),t);emit(0x8d,constant(3),t,r);return r;}const B=b===undefined?null:floatExpr(b);if(B)floatGuard(B);if(op==='mod'){floatNonzero(B);emit(0x8d,constant(2),A,B,r);const zero=jump(OP.JR_LT32,[floatCompare(0x53,r,floatingConstant(0)),constant(1)]),positive=local(alloc());emit(0x1b,r,B,positive);const same=jump(0x6b,[positive,floatingConstant(0)]);emit(0x13,r,B,r);patch(zero,code.length);patch(same,code.length);return r;}if(op==='random'){const from=expr(a),to=expr(b);guard(from,-32767,32767);guard(to,-32767,32767);faults.push(jump(OP.JR_GT32,[from,to]));const n=local(alloc());emit(OP.MOVE32,constant(0),n);emit(0x8e,from,to,n);const signed=local(alloc());emit(0x36,n,signed);return asFloat(signed);}if(op==='clamp'){const lo=floatExpr(low),hi=floatExpr(high);floatGuard(lo);floatGuard(hi);faults.push(jump(0x6b,[lo,hi]));emit(0x3f,A,r);const ok=jump(0x6b,[r,lo]);emit(0x3f,lo,r);patch(ok,code.length);const ok2=jump(0x67,[r,hi]);emit(0x3f,hi,r);patch(ok2,code.length);return r;}emit(0x3f,A,r);const keep=jump(op==='min'?0x67:0x6b,[A,B]);emit(0x3f,B,r);patch(keep,code.length);return r;}
       if(x?.textData||x?.listData)return locked(()=>dataOps.numeric(x));
@@ -390,6 +397,7 @@ export function compile(program,folder='EV3Lab') {
       if(typeof x==='number')return constant(Math.trunc(finiteNumber(Math.fround(x))));
       const value=floatExpr(x),result=local(alloc());floatGuard(value);emit(OP.MOVEF32,value,result);return result;
     };
+    const pidOps=pidEmitter({emit,alloc,local,globalVar,constant,floatConstant:floatingConstant,floatExpr,asFloat,floatGuard,jump,patch,position:()=>code.length},pids);
     const motors=motorFeatures({emit,alloc,local,globalVar,constant,expr,guard,nonzero,jump,patch,position:()=>code.length},usesStopModes,stopModeOffset);
     const dataOps=dataEmitter({emit,alloc,local,globalVar,constant,zstr,floatExpr,expr,asFloat,guard,floatGuard,jump,patch,faults,floatConstant:floatingConstant,position:()=>code.length},extras);
     // 2個のモーターの進み具合をエンコーダで比較し、先行側の速度を調整する試作の補正制御。
@@ -575,7 +583,7 @@ export function compile(program,folder='EV3Lab') {
     const sequence=nodes=>{
       for(const original of nodes) {
         let b=original;
-        const shared=['displayClear','displayBitmap','displayNumber','set','change','textSet','listAdd','listSet','listClear','listDelete','logStart','logValue','logEnd','broadcast','wheel','tread','ramp','timerReset','stopMode'].includes(b.type)&&lock&&!lockDepth;
+        const shared=['displayClear','displayBitmap','displayNumber','set','change','textSet','listAdd','listSet','listClear','listDelete','logStart','logValue','logEnd','broadcast','wheel','tread','ramp','timerReset','stopMode','pidReset'].includes(b.type)&&lock&&!lockDepth;
         if(shared){lock.acquire();lockDepth++;}
         if(usesSensors||usesForever||usesFloat||usesRamps){
           const checked=(source,min,max)=>{const at=alloc();emit(OP.MOVE32,expr(source),local(at));guard(local(at),min,max);return {register:at};};
@@ -642,6 +650,7 @@ export function compile(program,folder='EV3Lab') {
             emit(OP.MOTOR_READY,constant(0),constant(b.ports));motors.finish(b.ports);if(done!==undefined)patch(done,code.length);break;}
           case 'tone': emit(OP.SOUND,constant(1),constant(b.volume),expr(b.frequency),expr(b.ms)); emit(OP.SOUND_READY); break;
           case 'wait': emit(OP.WAIT,expr(b.ms),local(timer)); emit(OP.READY,local(timer)); break;
+          case 'pidReset':pidOps.reset(b.name);break;
           case 'timerReset':emit(OP.TIMER_READ,globalVar(timerOffset));break;
           case 'gyroReset':{const raw=integerExpr({sensor:{kind:'gyroAngle',port:b.port}},{rawGyro:true});emit(OP.MOVE32,raw,globalVar(gyroOffset+4*(b.port-1)));break;}
           case 'encoderReset':integerExpr({sensor:{kind:'encoder',port:b.port}});emit(OP.MOTOR_CLEAR_COUNT,constant(0),constant(1<<(b.port-1)));break;
@@ -678,7 +687,7 @@ export function compile(program,folder='EV3Lab') {
     if(index===0&&usesTimer)emit(OP.MOVE32,constant(0),globalVar(timerOffset));
     if(index===0&&usesStopModes)for(let i=0;i<4;i++)emit(OP.MOVE32,constant(0),globalVar(stopModeOffset+4*i));
     if(index===0&&usesGyro)for(let i=0;i<4;i++)emit(OP.MOVE32,constant(0),globalVar(gyroOffset+4*i));
-    if(index===0)dataOps.init();
+    if(index===0){pidOps.init();dataOps.init();}
     const pause=ms=>{emit(OP.WAIT,constant(ms),local(timer));emit(OP.READY,local(timer));};
     if(p.boot){
       for(let at=messageBase;at<globalBytes;at+=4)emit(OP.MOVE32,constant(0),globalVar(at));

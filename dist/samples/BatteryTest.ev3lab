@@ -1,0 +1,147 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "projectName": "EV3Lab",
+  "programName": "BatteryTest",
+  "workspace": {
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "x": 40,
+          "y": 35,
+          "next": {
+            "block": {
+              "type": "ev3_display_clear",
+              "next": {
+                "block": {
+                  "type": "ev3_log_start",
+                  "fields": {
+                    "FILE": "Battery"
+                  },
+                  "next": {
+                    "block": {
+                      "type": "controls_repeat_ext",
+                      "inputs": {
+                        "TIMES": {
+                          "shadow": {
+                            "type": "math_number",
+                            "fields": {
+                              "NUM": 20
+                            }
+                          }
+                        },
+                        "DO": {
+                          "block": {
+                            "type": "ev3_log_value",
+                            "fields": {
+                              "LABEL": "voltage_V"
+                            },
+                            "inputs": {
+                              "VALUE": {
+                                "block": {
+                                  "type": "ev3_battery_voltage"
+                                }
+                              }
+                            },
+                            "next": {
+                              "block": {
+                                "type": "ev3_log_value",
+                                "fields": {
+                                  "LABEL": "current_A"
+                                },
+                                "inputs": {
+                                  "VALUE": {
+                                    "block": {
+                                      "type": "ev3_battery_current"
+                                    }
+                                  }
+                                },
+                                "next": {
+                                  "block": {
+                                    "type": "ev3_display_number",
+                                    "fields": {
+                                      "X": 0,
+                                      "Y": 0,
+                                      "FONT": "2",
+                                      "DECIMALS": 2
+                                    },
+                                    "inputs": {
+                                      "VALUE": {
+                                        "block": {
+                                          "type": "ev3_battery_voltage"
+                                        }
+                                      }
+                                    },
+                                    "next": {
+                                      "block": {
+                                        "type": "ev3_display_number",
+                                        "fields": {
+                                          "X": 0,
+                                          "Y": 32,
+                                          "FONT": "2",
+                                          "DECIMALS": 3
+                                        },
+                                        "inputs": {
+                                          "VALUE": {
+                                            "block": {
+                                              "type": "ev3_battery_current"
+                                            }
+                                          }
+                                        },
+                                        "next": {
+                                          "block": {
+                                            "type": "ev3_wait_seconds",
+                                            "inputs": {
+                                              "SECONDS": {
+                                                "shadow": {
+                                                  "type": "math_number",
+                                                  "fields": {
+                                                    "NUM": 0.5
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "next": {
+                        "block": {
+                          "type": "ev3_log_end",
+                          "next": {
+                            "block": {
+                              "type": "ev3_wait_seconds",
+                              "inputs": {
+                                "SECONDS": {
+                                  "shadow": {
+                                    "type": "math_number",
+                                    "fields": {
+                                      "NUM": 2
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

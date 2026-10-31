@@ -2,6 +2,8 @@
 
 統合マニュアルは **v0.21.0（2026年10月31日更新）・全35章・38ページの統合版** です。
 
+追加機能：[v0.22.0 バッテリーとPID制御](manual-v0.22.0/README.md) ／ [公開サイトで読む](https://ev3-block-lab-prototype.davinichi-9576.chatgpt.site/pid-battery-guide.html)
+
 追加機能：[v0.21.0 ジャイロセンサの説明と実機テスト手順](manual-v0.21.0/gyro-guide.md) ／ [公開サイトで読む](https://ev3-block-lab-prototype.davinichi-9576.chatgpt.site/gyro-guide.html)
 
 - [最新版の目次と全文](manual-v0.21.0/README.md)
