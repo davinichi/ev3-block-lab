@@ -7,7 +7,7 @@ const sampleActions=new Map();
 function sampleAction(id){if(!sampleActions.has(id))sampleActions.set(id,{});return sampleActions.get(id);}
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.25.2';
+const VERSION='0.25.3';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -28,6 +28,7 @@ const deviceName=type=>deviceNames[type]??([0,125,126,127].includes(type)?'未�
 const singlePorts=[['A','1'],['B','2'],['C','4'],['D','8']];
 const pairPorts=[['B + C','6'],['A + B','3'],['A + C','5'],['A + D','9'],['B + D','10'],['C + D','12']];
 Blockly.defineBlocksWithJsonArray([
+ {type:'ev3_movement_stop',message0:'停止',previousStatement:null,nextStatement:null,colour:'#ff4ccd',tooltip:'「動きに使うモーター」で設定した左右2個だけをブレーキ停止します。ほかのポートやプログラムは止めず、次の命令へ進みます。左右設定を先に実行してください。タイヤ直径やトレッドは不要です。'},
  {type:'ev3_return_value',message0:'%1 を返してこのマイブロックを終了する',args0:[{type:'input_value',name:'VALUE',check:'Number'}],previousStatement:null,inputsInline:true,colour:'#aa597e',tooltip:'数値を返す定義の中で使います。条件分岐や繰り返しの途中でも、値を返して呼び出し元へ戻ります。'},
  {type:'ev3_movement_setup',message0:'動きに使うモーターを 左 %1 右 %2 にする',args0:[{type:'field_dropdown',name:'LEFT_PORT',options:[singlePorts[1],singlePorts[0],singlePorts[2],singlePorts[3]]},{type:'field_dropdown',name:'RIGHT_PORT',options:[singlePorts[2],singlePorts[0],singlePorts[1],singlePorts[3]]}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'実行した時点から全処理・マイブロックで共有します。同じポートは選べません。設定だけでは回りません。変更時は以前の左右組を停止します。'},
  {type:'ev3_start',message0:'▶ スタート',nextStatement:null,colour:'#d3a238',tooltip:'EV3本体から起動すると、ここから実行します。複数置くと別々に並行して動きます。全部のスタートが終わると停止します。イベントがある場合はプログラム終了まで監視を続けます。'},
@@ -267,6 +268,7 @@ group('動き').splice(2,0,...['angle','time'].map(action=>({kind:'block',type:'
 group('動き').splice(2,0,...['run','angle','time'].map(action=>({kind:'block',type:'ev3_steering_'+action,inputs:{TURN:shadow(25),SPEED:shadow(20),...(action==='angle'?{DEGREES:shadow(360)}:action==='time'?{SECONDS:shadow(2)}:{})}})));
 const movementOrder=['ev3_movement_setup','ev3_wheel','ev3_tread','ev3_steering_run','ev3_steering_angle','ev3_steering_time','ev3_tank_angle','ev3_tank_time','ev3_tank','ev3_spin_right','ev3_spin_left','ev3_pivot_right','ev3_pivot_left','ev3_drive_forward','ev3_drive_backward'];
 group('動き').push({kind:'block',type:'ev3_movement_setup'});group('動き').sort((a,b)=>movementOrder.indexOf(a.type)-movementOrder.indexOf(b.type));
+group('動き').push({kind:'block',type:'ev3_movement_stop'});
 // 旋回は寸法設定が必要なまとまりとして、余白と説明で区切る。
 const spinIndex=group('動き').findIndex(x=>x.type==='ev3_spin_right');
 group('動き')[spinIndex-1].gap=40;
@@ -693,6 +695,7 @@ function chain(block){
       case 'ev3_pivot_right':case 'ev3_pivot_left':out.push({type:'pivot',movement:true,speed:value(b,'SPEED'),angle:value(b,'ANGLE'),direction:b.type==='ev3_pivot_right'?'right':'left'});break;
       case 'ev3_spin_right':case 'ev3_spin_left':out.push({type:'spin',movement:true,speed:value(b,'SPEED'),angle:value(b,'ANGLE'),direction:b.type==='ev3_spin_right'?'right':'left'});break;
       case 'ev3_movement_setup':out.push({type:'movementSetup',leftPort:Number(b.getFieldValue('LEFT_PORT')),rightPort:Number(b.getFieldValue('RIGHT_PORT'))});break;
+      case 'ev3_movement_stop':out.push({type:'stop',movement:true,stopMode:'brake'});break;
       case 'ev3_wheel':out.push({type:'wheel',diameter:Number(b.getFieldValue('DIAMETER'))});break;
       case 'ev3_drive_forward':case 'ev3_drive_backward':out.push({type:'drive',movement:true,speed:value(b,'SPEED'),cm:value(b,'CM'),direction:b.type==='ev3_drive_forward'?'forward':'backward',mode:$('pairMode').value});break;
       case 'ev3_display_clear':out.push({type:'displayClear'});break;

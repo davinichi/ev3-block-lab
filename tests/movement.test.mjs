@@ -10,6 +10,20 @@ const build=(main,procedures=[],threads=[])=>{const b=compile({main,procedures,t
 const call=name=>({type:'call',name,args:[]});
 const unknown={sensor:{kind:'touch',port:1}};
 
+test('movement stop brakes only the current pair, continues execution and requires runtime setup',()=>{
+ const stop={type:'stop',movement:true,stopMode:'brake'};
+ for(const [left,right]of [[2,4],[8,1],[4,2]]){
+  const masks=[],b=build([setup(left,right),{type:'motorRun',ports:3,speed:20},{type:'motorRun',ports:12,speed:20},wait(.1),call('止める'),{type:'tone',frequency:440,ms:10,volume:25}], [{name:'止める',params:[],body:[stop]}]);
+  const r=runParallel(b.data,{motorDriver:{setSpeed(){},startContinuous(){},advance(){},stop:(mask,brake)=>masks.push([mask,brake])}});
+  assert.equal(r.stopped,false);assert.ok(r.events.some(e=>e.type==='tone'&&e.frequency===440));
+  assert.deepEqual(masks.slice(0,3).map(x=>x[0]),[Math.min(left,right),Math.max(left,right),left|right]);assert.ok(r.events.filter(e=>e.type==='stop').slice(0,2).every(e=>e.brake===1));
+ }
+ assert.throws(()=>build([stop]),/動きに使うモーターを設定/);
+ assert.throws(()=>build([stop,setup()]),/動きに使うモーターを設定/);
+ const r=runParallel(build([stop],[],[{kind:'start',body:[wait(.5),setup()]}]).data);assert.equal(r.stopped,true);assert.ok(r.events.some(e=>e.type==='draw'&&e.cmd===8&&e.args.includes(23)));
+ const switched=runParallel(build([setup(),setup(8,1),stop]).data);assert.deepEqual(switched.events.filter(e=>e.type==='stop').map(e=>e.ports),[6,1,8,9,15]);
+});
+
 test('negative motion speeds reverse travel with constants, variables and ramp modes',()=>{
  for(const mode of ['off','trapezoid','scurve'])for(const type of ['drive','spin','pivot'])for(const direction of type==='drive'?['forward','backward']:['left','right']){
   const positions=[];

@@ -25,6 +25,14 @@ test('new stop palette offers three direct methods and retains each through libr
 });
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
 
+test('movement stop stays in its group and survives project and My Block library reuse',()=>{
+ const c=editor();
+ const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();const def=saveMyBlock(workspace,'走行を止める',[]),stop=workspace.newBlock('ev3_movement_stop');def.getInput('STACK').connection.connect(stop.previousConnection);if(!stop.nextConnection||stop.getField('PORTS'))throw Error('must continue with shared ports');const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);const contents=toolbox.contents.find(g=>g.name==='動き').contents;if(!contents.some(b=>b.type==='ev3_movement_stop'))throw Error('missing movement stop');Blockly.Events.enable();JSON.stringify(Blockly.serialization.workspaces.save(workspace));`,c));
+ const lib=createBlockLibrary(saved,'0.25.3');c.lesson=JSON.stringify(mergeBlockLibrary({blocks:{languageVersion:0,blocks:[{type:'ev3_start',next:{block:{type:'ev3_movement_setup',fields:{LEFT_PORT:'8',RIGHT_PORT:'1'},next:{block:{type:'procedures_callnoreturn',extraState:{name:'走行を止める',params:[]}}}}}}]}},lib));
+ const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();workspace.clear();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const p=program();Blockly.Events.enable();JSON.stringify(p);`,c));
+ assert.deepEqual(p.procedures[0].body,[{type:'stop',movement:true,stopMode:'brake'}]);compile(p);
+});
+
 test('all motor and movement speed sockets retain negative numbers through project reload',()=>{
  const c=editor();
  const result=JSON.parse(vm.runInContext(`Blockly.Events.disable();
@@ -832,7 +840,7 @@ test('battery and PID samples compile after loading and match the downloadable f
 test('movement palette exposes only one ordered wiring block and leaves independent motor ports intact',()=>{
  const c=editor();const result=JSON.parse(vm.runInContext(`Blockly.Events.disable();const palette=toolbox.contents.find(x=>x.name==='動き').contents;const types=palette.filter(x=>x.kind==='block').map(x=>x.type);const items=types.map(type=>{const b=workspace.newBlock(type);return {type,ports:['PORTS','LEFT_PORT','RIGHT_PORT'].filter(name=>b.getField(name))};});const motor=workspace.newBlock('ev3_motor_l_pair_angle'),stop=workspace.newBlock('ev3_stop_port');const independent=!!motor.getField('PORTS')&&!!stop.getField('PORTS');Blockly.Events.enable();JSON.stringify({types,items,independent});`,c));
  assert.equal(result.types[0],'ev3_movement_setup');assert.deepEqual(result.items[0].ports,['LEFT_PORT','RIGHT_PORT']);for(const b of result.items.slice(1))assert.deepEqual(b.ports,[],b.type);assert.equal(result.independent,true);
- assert.deepEqual(result.types,['ev3_movement_setup','ev3_wheel','ev3_tread','ev3_steering_run','ev3_steering_angle','ev3_steering_time','ev3_tank_angle','ev3_tank_time','ev3_tank','ev3_spin_right','ev3_spin_left','ev3_pivot_right','ev3_pivot_left','ev3_drive_forward','ev3_drive_backward']);
+ assert.deepEqual(result.types,['ev3_movement_setup','ev3_wheel','ev3_tread','ev3_steering_run','ev3_steering_angle','ev3_steering_time','ev3_tank_angle','ev3_tank_time','ev3_tank','ev3_spin_right','ev3_spin_left','ev3_pivot_right','ev3_pivot_left','ev3_drive_forward','ev3_drive_backward','ev3_movement_stop']);
 });
 
 test('all downloadable examples round-trip, pass allowlist and compile; motion samples start with explicit setup',()=>{
