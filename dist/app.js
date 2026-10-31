@@ -7,7 +7,7 @@ const sampleActions=new Map();
 function sampleAction(id){if(!sampleActions.has(id))sampleActions.set(id,{});return sampleActions.get(id);}
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.25.0';
+const VERSION='0.25.1';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -348,12 +348,26 @@ for(const type of ['variables_get','variables_set','math_change']){
 // 複数の戻り値にも名前を付ける。旧作品の1個の戻り値は「値」として復元する。
 const outputNames=def=>def?.type==='procedures_defreturn'?(def.returnNames_??['値']):[];
 function setDefinitionOutputs(block,names){
- block.returnNames_=[...names];block.callType_=names.length>1?'ev3_call_outputs':'procedures_callreturn';
+ block.returnNames_=[...names];block.callType_='procedures_callreturn';
  for(let i=block.inputList.length-1;i>=0;i--){const name=block.inputList[i].name;if(/^RETURN[1-9]\d*$/.test(name)&&Number(name.slice(6))>=names.length)block.removeInput(name);}
  names.forEach((name,i)=>{const key=i?'RETURN'+i:'RETURN';let input=block.getInput(key);if(!input)input=block.appendValueInput(key);input.setCheck('Number');
   if(i===0){if(!block.getField('RETURN_LABEL0'))input.appendField(name,'RETURN_LABEL0');else block.setFieldValue(name,'RETURN_LABEL0');}
   else if(!block.getField('RETURN_LABEL'+i))input.appendField('返す値 '+name,'RETURN_LABEL'+i);else block.setFieldValue('返す値 '+name,'RETURN_LABEL'+i);
  });
+}
+// 丸い呼び出しは選んだ戻り値を1個返す。呼び出すたびに定義を実行し、結果を使い回さない。
+{
+ const base=Blockly.Blocks.procedures_callreturn,save=base.saveExtraState,load=base.loadExtraState,dom=base.domToMutation,mutation=base.mutationToDom;
+ base.setReturnChoices=function(names,selected=this.getFieldValue('RESULT')??'0'){
+  this.returnNames_=[...names];
+  if(!this.getInput('RESULT_ROW'))this.appendDummyInput('RESULT_ROW').appendField('戻り値').appendField(new Blockly.FieldDropdown(()=>this.returnNames_.map((name,i)=>[name,String(i)])),'RESULT');
+  this.getField('RESULT').setOptions(names.map((name,i)=>[name,String(i)]));this.setFieldValue(String(selected),'RESULT');
+  this.setTooltip('呼び出すたびに定義内の命令を実行し、選んだ戻り値を返します。別の戻り値の呼び出しでも再実行します。');
+ };
+ base.saveExtraState=function(){return {...save.call(this),outputs:this.returnNames_??['値'],output:Number(this.getFieldValue('RESULT')??0)};};
+ base.loadExtraState=function(state){const selected=state.output??this.getFieldValue('RESULT')??'0';load.call(this,state);this.setReturnChoices(state.outputs??['値'],selected);};
+ base.mutationToDom=function(){const node=mutation.call(this);node.setAttribute('outputs',JSON.stringify(this.returnNames_??['値']));node.setAttribute('output',this.getFieldValue('RESULT')??'0');return node;};
+ base.domToMutation=function(node){const selected=this.getFieldValue('RESULT')??node.getAttribute('output')??'0';dom.call(this,node);const def=Blockly.Procedures.getDefinition(this.getProcedureCall(),this.workspace);this.setReturnChoices(def?outputNames(def):JSON.parse(node.getAttribute('outputs')??'["値"]'),selected);};
 }
 for(const type of ['procedures_defnoreturn','procedures_defreturn']){
  const base=Blockly.Blocks[type],init=base.init,save=base.saveExtraState,load=base.loadExtraState;
@@ -361,6 +375,8 @@ for(const type of ['procedures_defnoreturn','procedures_defreturn']){
   const menu=this.customContextMenu;this.customContextMenu=function(options){menu?.call(this,options);options.unshift({text:'名前・引数・戻り値を編集',enabled:true,callback:()=>openMyBlockDialog(this.id)});};
  };
  if(type==='procedures_defreturn'){
+  const mutation=base.mutationToDom; base.mutationToDom=function(...args){const node=mutation.apply(this,args);node.setAttribute('outputs',JSON.stringify(outputNames(this)));return node;};
+  const dom=base.domToMutation;base.domToMutation=function(node){dom.call(this,node);setDefinitionOutputs(this,JSON.parse(node.getAttribute('outputs')??'["値"]'));};
   base.saveExtraState=function(){return {...save.call(this),outputs:outputNames(this)};};
   base.loadExtraState=function(state){load.call(this,state);setDefinitionOutputs(this,state.outputs??['値']);};
  }
@@ -434,7 +450,7 @@ function saveMyBlock(ws,name,rows,definitionId=null,returnsValue=undefined,retur
    else if(['variables_get','variables_set','math_change'].includes(b.type))b.setFieldValue(models[index].getId(),'VAR');
   }
   for(const {call,args} of calls){
-   call.renameProcedure(call.getProcedureCall(),name);call.loadExtraState({name,params:rows.map(r=>r.name),outputs:names});
+   call.renameProcedure(call.getProcedureCall(),name);call.loadExtraState({name,params:rows.map(r=>r.name),outputs:names,...(call.type==='procedures_callreturn'?{output:Number(call.getFieldValue('RESULT')??0)}:{})});
    rows.forEach((r,i)=>{const a=args.find(a=>a.id===r.id);if(a?.state){let child=ws.getBlockById(a.state.id);if(!child)child=Blockly.serialization.blocks.append(a.state,ws);call.getInput('ARG'+i).connection.connect(child.outputConnection);}else{const n=ws.newBlock('math_number');n.setShadow(true);n.setFieldValue('0','NUM');call.getInput('ARG'+i).connection.connect(n.outputConnection);n.initSvg?.();n.render?.();}});
   }
   if(targetType==='procedures_defreturn')names.forEach((_,i)=>{const key=i?'RETURN'+i:'RETURN';if(!target.getInputTargetBlock(key)){const n=ws.newBlock('math_number');n.setShadow(true);n.setFieldValue(0,'NUM');target.getInput(key).connection.connect(n.outputConnection);n.initSvg?.();n.render?.();}});
@@ -538,7 +554,7 @@ workspace.registerToolboxCategoryCallback('PROCEDURE',ws=>{
  for(const def of ws.getAllBlocks(false).filter(b=>isMyBlockDefinition(b))){
   const key='EV3_EDIT_'+def.id,name=def.getFieldValue('NAME'),models=def.getVarModels();
   workspace.registerButtonCallback(key,()=>openMyBlockDialog(def.id));
-  items.push({kind:'block',type:outputNames(def).length>1?'ev3_call_outputs':def.type==='procedures_defreturn'?'procedures_callreturn':'procedures_callnoreturn',extraState:{name,params:models.map(m=>m.getName()),outputs:outputNames(def)},inputs:Object.fromEntries(models.map((m,i)=>['ARG'+i,shadow(0)]))},{kind:'button',text:'「'+name+'」を編集',callbackKey:key});
+  items.push({kind:'block',type:def.type==='procedures_defreturn'?'procedures_callreturn':'procedures_callnoreturn',extraState:{name,params:models.map(m=>m.getName()),outputs:outputNames(def)},inputs:Object.fromEntries(models.map((m,i)=>['ARG'+i,shadow(0)]))},{kind:'button',text:'「'+name+'」を編集',callbackKey:key});
  }
  for(const def of ws.getAllBlocks(false).filter(b=>outputNames(b).length>1))items.push({kind:'block',type:'ev3_return_values',extraState:{outputs:outputNames(def)},inputs:Object.fromEntries(outputNames(def).map((_,i)=>['VALUE'+i,shadow(0)]))});
  items.push({kind:'block',type:'ev3_return_value',inputs:{VALUE:{shadow:{type:'math_number',fields:{NUM:0}}}}});
@@ -581,7 +597,7 @@ function updateButtons(){
 // 丸い数値ブロック・条件ブロックを中間データへ変換する。センサやボタンの実測はここでは行わない。
 function expression(x){
  if(!x)throw Error('数値・条件の空欄にブロックを入れてください。');
- if(x.type==='procedures_callreturn'){const def=Blockly.Procedures.getDefinition(x.getProcedureCall(),workspace);if(def?.type!=='procedures_defreturn')throw Error('数値を返すマイブロックの定義を確認してください。');if(outputNames(def).length>1)throw Error('複数の戻り値は、各値を変数に受け取る呼び出しブロックを使ってください。');return {callValue:{name:x.getProcedureCall(),args:def.getVarModels().map((_,i)=>value(x,'ARG'+i))}};}
+ if(x.type==='procedures_callreturn'){const def=Blockly.Procedures.getDefinition(x.getProcedureCall(),workspace);if(def?.type!=='procedures_defreturn')throw Error('数値を返すマイブロックの定義を確認してください。');const output=Number(x.getFieldValue('RESULT')??0);if(output<0||output>=outputNames(def).length||(x.returnNames_??['値']).join('\0')!==outputNames(def).join('\0'))throw Error('戻り値の選択を確認してください。呼び出しを置き直してください。');return {callValue:{name:x.getProcedureCall(),args:def.getVarModels().map((_,i)=>value(x,'ARG'+i)),...(outputNames(def).length>1?{output}:{})}};}
  if(x.type==='ev3_text')return {text:x.getFieldValue('TEXT')};
  if(x.type==='ev3_text_get')return {textVar:x.getFieldValue('NAME')};
  if(x.type==='ev3_text_join')return {textOp:'join',a:value(x,'A'),b:value(x,'B')};
@@ -1016,7 +1032,7 @@ $('myBlockForm').onsubmit=event=>{
  try{const rows=[...$('myBlockArguments').children].map(row=>({id:row.dataset.parameterId,name:row.querySelector('input').value}));
   const def=saveMyBlock(workspace,$('myBlockName').value,rows,editingMyBlockId,$('myBlockReturn').value==='number',[...$('myBlockReturns').children].map(row=>row.querySelector('input').value.trim()));
   ensureArgumentInputs();workspace.refreshToolboxSelection();dirty=true;check();saveLocal();$('myBlockDialog').close();workspace.centerOnBlock(def.id);
-  feedback(def.type==='procedures_defreturn'?(outputNames(def).length>1?'定義の各「返す値」に計算式を入れます。呼び出しブロックで、戻り値を受け取る変数を選びます。':'定義の「返す値」に数値・演算などを入れます。マイブロックの丸い呼び出しを数値入力へ入れて使います。'):'定義の中に命令をつなぎ、マイブロックの同じ名前のブロックをスタートにつなげて使います。');
+  feedback(def.type==='procedures_defreturn'?(outputNames(def).length>1?'定義の各「返す値」に計算式を入れます。丸い呼び出しの「戻り値」で使う値を選びます。呼び出すたびに定義を実行します。':'定義の「返す値」に数値・演算などを入れます。マイブロックの丸い呼び出しを数値入力へ入れて使います。'):'定義の中に命令をつなぎ、マイブロックの同じ名前のブロックをスタートにつなげて使います。');
  }catch(error){$('myBlockError').textContent=error.message;}
 };
 
@@ -1137,5 +1153,5 @@ $('sampleConfirmCancel').onclick=()=>{pendingSample=null;$('sampleConfirmDialog'
 $('sampleConfirmDialog').oncancel=()=>{pendingSample=null;};
 $('sampleConfirmOpen').onclick=()=>{const id=pendingSample;pendingSample=null;$('sampleConfirmDialog').close();if(id)openSelectedSample(id);};
 
-function multiReturnSampleState(){return {"variables":[{"id":"multi-値1","name":"値1"},{"id":"multi-値2","name":"値2"},{"id":"multi-sum","name":"合計"},{"id":"multi-difference","name":"差分"}],"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":40,"y":35,"next":{"block":{"type":"ev3_call_outputs","extraState":{"name":"和と差","params":["値1","値2"],"outputs":["和","差"]},"inputs":{"ARG0":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"ARG1":{"shadow":{"type":"math_number","fields":{"NUM":220}}}},"fields":{"OUT0":{"id":"multi-sum"},"OUT1":{"id":"multi-difference"}},"next":{"block":{"type":"ev3_display_clear","next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":0,"FONT":"1","DECIMALS":1},"inputs":{"VALUE":{"block":{"type":"variables_get","fields":{"VAR":{"id":"multi-sum"}}}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":32,"FONT":"1","DECIMALS":1},"inputs":{"VALUE":{"block":{"type":"variables_get","fields":{"VAR":{"id":"multi-difference"}}}}},"next":{"block":{"type":"ev3_tone","fields":{"VOLUME":25},"inputs":{"FREQUENCY":{"block":{"type":"variables_get","fields":{"VAR":{"id":"multi-sum"}}}},"MS":{"shadow":{"type":"math_number","fields":{"NUM":400}}}},"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":2}}}}}}}}}}}}}}}}},{"type":"procedures_defreturn","x":650,"y":35,"fields":{"NAME":"和と差"},"extraState":{"params":[{"id":"multi-値1","name":"値1"},{"id":"multi-値2","name":"値2"}],"outputs":["和","差"]},"inputs":{"RETURN":{"block":{"type":"ev3_op_add","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"multi-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"multi-値2"},"fields":{"ARG_NAME":"値2"}}}}}},"RETURN1":{"block":{"type":"ev3_op_sub","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"multi-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"multi-値2"},"fields":{"ARG_NAME":"値2"}}}}}}}}]}};}
-sampleAction('multiReturnSample').onclick=()=>{loading=true;try{Blockly.serialization.workspaces.load(multiReturnSampleState(),workspace);$('programName').value='MultiReturn';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('和と差を1回の呼び出しで受け取ります。本体画面の上に660、下に220を表示し、660Hzの音を鳴らします。モーターは動かしません。');};
+function multiReturnSampleState(){return {"variables":[{"id":"multi-値1","name":"値1"},{"id":"multi-値2","name":"値2"}],"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":40,"y":35,"next":{"block":{"type":"ev3_display_clear","next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":0,"FONT":"1","DECIMALS":1},"inputs":{"VALUE":{"block":{"type":"procedures_callreturn","extraState":{"name":"和と差","params":["値1","値2"],"outputs":["和","差"],"output":0},"inputs":{"ARG0":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"ARG1":{"shadow":{"type":"math_number","fields":{"NUM":220}}}}}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":32,"FONT":"1","DECIMALS":1},"inputs":{"VALUE":{"block":{"type":"procedures_callreturn","extraState":{"name":"和と差","params":["値1","値2"],"outputs":["和","差"],"output":1},"inputs":{"ARG0":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"ARG1":{"shadow":{"type":"math_number","fields":{"NUM":220}}}}}}},"next":{"block":{"type":"ev3_tone","fields":{"VOLUME":25},"inputs":{"FREQUENCY":{"shadow":{"type":"math_number","fields":{"NUM":660}}},"MS":{"shadow":{"type":"math_number","fields":{"NUM":400}}}},"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":2}}}}}}}}}}}}}}},{"type":"procedures_defreturn","x":650,"y":35,"fields":{"NAME":"和と差"},"extraState":{"params":[{"id":"multi-値1","name":"値1"},{"id":"multi-値2","name":"値2"}],"outputs":["和","差"]},"inputs":{"RETURN":{"block":{"type":"ev3_op_add","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"multi-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"multi-値2"},"fields":{"ARG_NAME":"値2"}}}}}},"RETURN1":{"block":{"type":"ev3_op_sub","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"multi-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"multi-値2"},"fields":{"ARG_NAME":"値2"}}}}}}}}]}};}
+sampleAction('multiReturnSample').onclick=()=>{loading=true;try{Blockly.serialization.workspaces.load(multiReturnSampleState(),workspace);$('programName').value='MultiReturn';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('丸い呼び出しで「和」「差」を選びます。それぞれ呼び出すたびに定義を実行します。本体画面の上に660、下に220を表示し、660Hzの音を鳴らします。モーターは動かしません。');};

@@ -1,7 +1,7 @@
 {
   "format": "ev3-block-lab",
   "version": 1,
-  "appVersion": "0.25.0",
+  "appVersion": "0.25.1",
   "ev3ProjectName": "EV3Lab",
   "programName": "MultiReturn",
   "pairMode": "independent",
@@ -14,14 +14,6 @@
       {
         "id": "multi-値2",
         "name": "値2"
-      },
-      {
-        "id": "multi-sum",
-        "name": "合計"
-      },
-      {
-        "id": "multi-difference",
-        "name": "差分"
       }
     ],
     "blocks": {
@@ -33,63 +25,94 @@
           "y": 35,
           "next": {
             "block": {
-              "type": "ev3_call_outputs",
-              "extraState": {
-                "name": "和と差",
-                "params": [
-                  "値1",
-                  "値2"
-                ],
-                "outputs": [
-                  "和",
-                  "差"
-                ]
-              },
-              "inputs": {
-                "ARG0": {
-                  "shadow": {
-                    "type": "math_number",
-                    "fields": {
-                      "NUM": 440
-                    }
-                  }
-                },
-                "ARG1": {
-                  "shadow": {
-                    "type": "math_number",
-                    "fields": {
-                      "NUM": 220
-                    }
-                  }
-                }
-              },
-              "fields": {
-                "OUT0": {
-                  "id": "multi-sum"
-                },
-                "OUT1": {
-                  "id": "multi-difference"
-                }
-              },
+              "type": "ev3_display_clear",
               "next": {
                 "block": {
-                  "type": "ev3_display_clear",
+                  "type": "ev3_display_number",
+                  "fields": {
+                    "X": 0,
+                    "Y": 0,
+                    "FONT": "1",
+                    "DECIMALS": 1
+                  },
+                  "inputs": {
+                    "VALUE": {
+                      "block": {
+                        "type": "procedures_callreturn",
+                        "extraState": {
+                          "name": "和と差",
+                          "params": [
+                            "値1",
+                            "値2"
+                          ],
+                          "outputs": [
+                            "和",
+                            "差"
+                          ],
+                          "output": 0
+                        },
+                        "inputs": {
+                          "ARG0": {
+                            "shadow": {
+                              "type": "math_number",
+                              "fields": {
+                                "NUM": 440
+                              }
+                            }
+                          },
+                          "ARG1": {
+                            "shadow": {
+                              "type": "math_number",
+                              "fields": {
+                                "NUM": 220
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
                   "next": {
                     "block": {
                       "type": "ev3_display_number",
                       "fields": {
                         "X": 0,
-                        "Y": 0,
+                        "Y": 32,
                         "FONT": "1",
                         "DECIMALS": 1
                       },
                       "inputs": {
                         "VALUE": {
                           "block": {
-                            "type": "variables_get",
-                            "fields": {
-                              "VAR": {
-                                "id": "multi-sum"
+                            "type": "procedures_callreturn",
+                            "extraState": {
+                              "name": "和と差",
+                              "params": [
+                                "値1",
+                                "値2"
+                              ],
+                              "outputs": [
+                                "和",
+                                "差"
+                              ],
+                              "output": 1
+                            },
+                            "inputs": {
+                              "ARG0": {
+                                "shadow": {
+                                  "type": "math_number",
+                                  "fields": {
+                                    "NUM": 440
+                                  }
+                                }
+                              },
+                              "ARG1": {
+                                "shadow": {
+                                  "type": "math_number",
+                                  "fields": {
+                                    "NUM": 220
+                                  }
+                                }
                               }
                             }
                           }
@@ -97,62 +120,37 @@
                       },
                       "next": {
                         "block": {
-                          "type": "ev3_display_number",
+                          "type": "ev3_tone",
                           "fields": {
-                            "X": 0,
-                            "Y": 32,
-                            "FONT": "1",
-                            "DECIMALS": 1
+                            "VOLUME": 25
                           },
                           "inputs": {
-                            "VALUE": {
-                              "block": {
-                                "type": "variables_get",
+                            "FREQUENCY": {
+                              "shadow": {
+                                "type": "math_number",
                                 "fields": {
-                                  "VAR": {
-                                    "id": "multi-difference"
-                                  }
+                                  "NUM": 660
+                                }
+                              }
+                            },
+                            "MS": {
+                              "shadow": {
+                                "type": "math_number",
+                                "fields": {
+                                  "NUM": 400
                                 }
                               }
                             }
                           },
                           "next": {
                             "block": {
-                              "type": "ev3_tone",
-                              "fields": {
-                                "VOLUME": 25
-                              },
+                              "type": "ev3_wait_seconds",
                               "inputs": {
-                                "FREQUENCY": {
-                                  "block": {
-                                    "type": "variables_get",
-                                    "fields": {
-                                      "VAR": {
-                                        "id": "multi-sum"
-                                      }
-                                    }
-                                  }
-                                },
-                                "MS": {
+                                "SECONDS": {
                                   "shadow": {
                                     "type": "math_number",
                                     "fields": {
-                                      "NUM": 400
-                                    }
-                                  }
-                                }
-                              },
-                              "next": {
-                                "block": {
-                                  "type": "ev3_wait_seconds",
-                                  "inputs": {
-                                    "SECONDS": {
-                                      "shadow": {
-                                        "type": "math_number",
-                                        "fields": {
-                                          "NUM": 2
-                                        }
-                                      }
+                                      "NUM": 2
                                     }
                                   }
                                 }

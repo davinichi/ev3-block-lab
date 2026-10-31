@@ -9,6 +9,10 @@ const set=(name,value)=>({type:'set',var:name,value});
 const value=name=>({var:name});
 const param=name=>({param:name});
 const wait=seconds=>({type:'waitSeconds',seconds});
+test('selecting separate round results executes the definition for each call',()=>{
+ const r=run({main:[set('a',{callValue:{name:'pair',args:[],output:0}}),set('b',{callValue:{name:'pair',args:[],output:1}})],procedures:[{name:'pair',params:[],returns:true,body:[{type:'change',var:'calls',value:1}],results:[value('calls'),op('mul',value('calls'),10)]}]});
+ assert.equal(r.get('a'),1);assert.equal(r.get('b'),20);assert.equal(r.get('calls'),2);
+});
 function run(p,options){const build=compile(p);scanImage(build.data);const result=runParallel(build.data,options);const names=[];const visit=x=>{if(!x||typeof x!=='object')return;if(typeof x.var==='string'&&!names.includes(x.var))names.push(x.var);if(x.type==='callOutputs')for(const name of x.targets)if(!names.includes(name))names.push(name);Object.values(x).forEach(visit);};visit(build.program);return {...result,build,get:name=>result.shared.getFloat32(names.indexOf(name)*4,true)};}
 test('a receive-all call runs once and copies multiple fractional outputs into separate variables',()=>{
  const r=run({main:[{type:'callOutputs',name:'pair',args:[2.5],targets:['left','right']}],procedures:[{name:'pair',params:['n'],returns:true,body:[{type:'change',var:'calls',value:1}],results:[param('n'),op('mul',param('n'),2)]}]});

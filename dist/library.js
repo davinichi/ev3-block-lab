@@ -17,7 +17,7 @@ export function inspectBlocks(blocks){
   function inspect(value,depth=0){
     if(depth>200)throw Error('ブロックの入れ子が深すぎます。');
     if(value && typeof value==='object'){
-      if(['procedures_defreturn','ev3_call_outputs','ev3_return_values'].includes(value.type)&&value.extraState?.outputs!==undefined){const names=value.extraState.outputs;if(!Array.isArray(names)||names.length<1||names.length>8||names.some(n=>typeof n!=='string'||!n.trim()||n.length>40)||new Set(names.map(n=>n.toLowerCase())).size!==names.length)throw Error('戻り値の名前・個数を確認してください（1〜8個）。');}
+      if(['procedures_defreturn','procedures_callreturn','ev3_call_outputs','ev3_return_values'].includes(value.type)&&value.extraState?.outputs!==undefined){const names=value.extraState.outputs;if(!Array.isArray(names)||names.length<1||names.length>8||names.some(n=>typeof n!=='string'||!n.trim()||n.length>40)||new Set(names.map(n=>n.toLowerCase())).size!==names.length)throw Error('戻り値の名前・個数を確認してください（1〜8個）。');}
       if(value.type && !types.has(value.type))throw Error(`未対応のブロック: ${value.type}`);
       if(value.type && ++count>1000)throw Error('ブロックは1000個までです。');
       for(const child of Object.values(value))inspect(child,depth+1);

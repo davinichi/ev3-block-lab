@@ -25,6 +25,19 @@ test('new stop palette offers three direct methods and retains each through libr
 });
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
 
+test('round multi-output calls select a named result and preserve selection through rename, save and library import',()=>{
+ const c=editor();
+ const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();
+ let inner=saveMyBlock(workspace,'計測',[],null,true,['距離','角度']);inner.getInputTargetBlock('RETURN').setFieldValue(12.5,'NUM');inner.getInputTargetBlock('RETURN1').setFieldValue(90,'NUM');
+ const outer=saveMyBlock(workspace,'使う',[],null,true),call=workspace.newBlock('procedures_callreturn');call.loadExtraState({name:'計測',params:[],outputs:['距離','角度'],output:1});outer.getInput('RETURN').connection.connect(call.outputConnection);
+ if(call.getFieldValue('RESULT')!=='1'||!call.outputConnection||call.previousConnection)throw Error('must be selected numeric reporter');
+ inner=saveMyBlock(workspace,'計測',[],inner.id,true,['長さ','向き']);if(call.getFieldValue('RESULT')!=='1'||call.getField('RESULT').getText()!=='向き')throw Error('rename lost selection');
+ const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);Blockly.Events.enable();JSON.stringify(Blockly.serialization.workspaces.save(workspace));`,c));
+ inspectBlocks(saved.blocks);const lib=createBlockLibrary(saved,'0.25.1');c.lesson=JSON.stringify(mergeBlockLibrary({blocks:{languageVersion:0,blocks:[{type:'ev3_start'}]}},lib));
+ const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();workspace.clear();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const start=workspace.getAllBlocks(false).find(b=>b.type==='ev3_start'),set=workspace.newBlock('variables_set'),outerCall=workspace.newBlock('procedures_callreturn');outerCall.loadExtraState({name:'使う',params:[],outputs:['値']});set.setFieldValue(workspace.getVariableMap().createVariable('結果').getId(),'VAR');start.nextConnection.connect(set.previousConnection);set.getInput('VALUE').connection.connect(outerCall.outputConnection);const p=program();Blockly.Events.enable();JSON.stringify(p);`,c));
+ assert.equal(p.procedures.find(x=>x.name==='使う').result.callValue.output,1);compile(p);
+});
+
 test('named multi-output definitions, receiving variables and early returns survive project and library reuse',()=>{
  const c=editor();
  const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();
