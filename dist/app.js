@@ -7,7 +7,7 @@ const sampleActions=new Map();
 function sampleAction(id){if(!sampleActions.has(id))sampleActions.set(id,{});return sampleActions.get(id);}
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.25.1';
+const VERSION='0.25.2';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -45,11 +45,11 @@ Blockly.defineBlocksWithJsonArray([
  {type:'ev3_motor_m_time',message0:'Mモーター %1 速さ %2 ％で %3 秒動かす',args0:[{type:'field_dropdown',name:'PORTS',options:[...singlePorts,...pairPorts]},{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'SECONDS',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'時間は0より大きく60秒以下。速さを負にすると逆回転します。2ポートは同時に指定時間だけ動かします。角度の同期・停止タイミング補正は角度指定のブロックを使ってください。'},
  {type:'ev3_wait_seconds',message0:'%1 秒待つ',args0:[{type:'input_value',name:'SECONDS',check:'Number'}],previousStatement:null,nextStatement:null,colour:'#d19636',tooltip:'0〜60秒。0.5秒などの小数も使えます。'},
  {type:'ev3_tread',message0:'トレッド（タイヤ中心どうしの間隔）を %1 mm にする',args0:[{type:'field_number',name:'TREAD',value:112,min:10,max:1000,precision:.1}],previousStatement:null,nextStatement:null,colour:'#ff4ccd',tooltip:'走行・旋回の前に設定します。設定用のマイブロックにまとめることもできます。左右のタイヤ中心間の距離を測ります。'},
- ...[['right','右'],['left','左']].map(([direction,label])=>({type:'ev3_spin_'+direction,message0:'速さ %1 ％で '+label+'に %2 度スピンターン',args0:[{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'ANGLE',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'ロボットの回転角度を指定。右回転は左輪が正転・右輪が逆転、左回転は反対です。タイヤはLモーター直結を想定します。'})),
- ...[['right','右'],['left','左']].map(([direction,label])=>({type:'ev3_pivot_'+direction,message0:'速さ %1 ％で '+label+'に %2 度ピボットターン',args0:[{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'ANGLE',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'ロボットの旋回角度を指定。右旋回は右輪をブレーキ停止して左輪を正転、左旋回は左輪を停止して右輪を正転。タイヤ直径・トレッドを先に設定。モーター角度＝2×トレッド÷タイヤ直径×旋回角度。タイヤ直結のLモーターを想定します。'})),
+ ...[['right','右'],['left','左']].map(([direction,label])=>({type:'ev3_spin_'+direction,message0:'速さ %1 ％で '+label+'に %2 度スピンターン',args0:[{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'ANGLE',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'速さは−100〜100％（0以外）。負の速さでは指定と逆向きに回転します。ロボットの回転角度を指定。右回転は左輪が正転・右輪が逆転、左回転は反対です。タイヤはLモーター直結を想定します。'})),
+ ...[['right','右'],['left','左']].map(([direction,label])=>({type:'ev3_pivot_'+direction,message0:'速さ %1 ％で '+label+'に %2 度ピボットターン',args0:[{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'ANGLE',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'速さは−100〜100％（0以外）。負の速さでは動く側のモーターが逆転します。ロボットの旋回角度を指定。右旋回は右輪をブレーキ停止して左輪を正転、左旋回は左輪を停止して右輪を正転。タイヤ直径・トレッドを先に設定。モーター角度＝2×トレッド÷タイヤ直径×旋回角度。タイヤ直結のLモーターを想定します。'})),
  {type:'ev3_tank',message0:'左の速さ %1 ％ 右の速さ %2 ％で回し続ける',args0:[{type:'input_value',name:'LEFT_SPEED',check:'Number'},{type:'input_value',name:'RIGHT_SPEED',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'左右それぞれ−100〜100％の速度を直接指定。負は逆転、0はその側のブレーキ停止。L/M共通。回し始めたら次の命令へ進み、停止命令や次のモーター命令まで続けます。後ろに待つ・条件待ち・繰り返しをつなぎます。加減速や角度同期は行いません。'},
  {type:'ev3_wheel',message0:'タイヤの直径を %1 mm にする',args0:[{type:'field_number',name:'DIAMETER',value:56,min:10,max:200,precision:.1}],previousStatement:null,nextStatement:null,colour:'#ff4ccd',tooltip:'走行前に設定します。設定用マイブロックにも入れられます。タイヤをLモーターに直接取り付ける場合の直径です。'},
- ...[['forward','前に進む'],['backward','後ろに下がる']].map(([direction,label])=>({type:'ev3_drive_'+direction,message0:'速さ %1 ％で %2 cm '+label,args0:[{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'CM',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'先頭にタイヤの直径を設定。速さ1〜100％、長さは正の整数。タイヤ直結・両輪の正回転が前進する取り付けを想定します。'}))
+ ...[['forward','前に進む'],['backward','後ろに下がる']].map(([direction,label])=>({type:'ev3_drive_'+direction,message0:'速さ %1 ％で %2 cm '+label,args0:[{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'CM',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'先頭にタイヤの直径を設定。速さは−100〜100％（0以外）。負の速さでは、前進は後退、後退は前進になります。長さは正の整数。タイヤ直結・両輪の正回転が前進する取り付けを想定します。'}))
 ]);
 
 

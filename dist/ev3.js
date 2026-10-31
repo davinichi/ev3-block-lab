@@ -213,9 +213,9 @@ export function validate(program) {
         case 'tank':if(![1,2,4,8].includes(b.leftPort)||![1,2,4,8].includes(b.rightPort)||b.leftPort===b.rightPort)throw Error('左右には異なるモーターポートを選んでください。');inRange(val('leftSpeed'),-100,100,'左モーターの速さ');inRange(val('rightSpeed'),-100,100,'右モーターの速さ');break;
         case 'motorRun':inRange(b.ports,1,15,'モーターポート');if(b.ports.toString(2).split('1').length-1>2)throw Error('モーターポートは2個まで指定できます。');inRange(val('speed'),-100,100,'速度');break;
         case 'motor': inRange(b.ports,1,15,'モーターポート'); inRange(val('speed'),-100,100,'速度');
-          if(b.pivotSource){inRange(sourceInt(b.pivotSource.angle),1,3600,'ロボットの回転角度');inRange(val('speed'),1,100,'ピボットターンの速さ（％）');}
-          if(b.spinSource){inRange(sourceInt(b.spinSource.angle),1,3600,'ロボットの回転角度');inRange(val('speed'),1,100,'スピンターンの速さ（％）');}
-          if(b.driveSource){inRange(sourceInt(b.driveSource.cm),1,1000,'進む長さ（cm）');inRange(sourceInt(b.driveSource.speed),1,100,'走行速度（％）');}
+          if(b.pivotSource){inRange(sourceInt(b.pivotSource.angle),1,3600,'ロボットの回転角度');inRange(val('speed'),-100,100,'ピボットターンの速さ（％）');}
+          if(b.spinSource){inRange(sourceInt(b.spinSource.angle),1,3600,'ロボットの回転角度');inRange(val('speed'),-100,100,'スピンターンの速さ（％）');}
+          if(b.driveSource){inRange(sourceInt(b.driveSource.cm),1,1000,'進む長さ（cm）');inRange(sourceInt(b.driveSource.speed),-100,100,'走行速度（％）');}
           if(b.mode!==undefined && !['independent','sync','feedback'].includes(b.mode))throw Error('2個のモーターの制御方式が不正です。');
           if(b.ports.toString(2).split('1').length-1>2)throw Error('1個のモーターブロックで指定できるポートは2個までです。');
           if(val('speed')===0) throw Error('角度指定のモーター速度を0にはできません。');
@@ -442,7 +442,9 @@ export function compile(program,folder='EV3Lab') {
       const ports=[0,1,2,3].filter(i=>b.ports&(1<<i));
       const reg=()=>local(alloc());
       const direction=reg(),base=reg(),limit=reg(),began=reg(),elapsed=reg(),sum=reg(),cap=reg();
-      const portDirection=port=>b.portDirections?constant(b.portDirections[port]):direction;
+      // 左右の回転方向に、速度の正負も掛け合わせる。進捗計測と補正指令で同じ符号を使う。
+      const signs=b.portDirections?Object.fromEntries(ports.map(port=>[port,reg()])):null;
+      const portDirection=port=>signs?signs[port]:direction;
       const start=ports.map(reg),current=ports.map(reg),progress=ports.map(reg),remaining=ports.map(reg),busy=ports.map(reg),speed=ports.map(reg),difference=ports.map(reg);
       const threshold=reg(),handle=reg(),recordAt=bytes;bytes+=17*4;
       const record=Array.from({length:17},(_,i)=>local(recordAt+4*i));
@@ -459,6 +461,7 @@ export function compile(program,folder='EV3Lab') {
       emit(OP.MOVE32,constant(1),direction);emit(OP.MOVE32,expr(b.speed),base);
       const positive=jump(OP.JR_GT32,[base,constant(0)]);
       emit(OP.MOVE32,constant(-1),direction);emit(OP.SUB32,constant(0),base,base);patch(positive,code.length);
+      if(signs)ports.forEach(port=>emit(OP.MUL32,direction,constant(b.portDirections[port]),signs[port]));
       // Generous watchdog scaled to distance and nominal speed. This bounds a
       // stalled/disconnected motor without accepting an incomplete movement.
       emit(OP.MUL32,expr(b.degrees),constant(500),limit);emit(OP.DIV32,limit,base,limit);emit(OP.ADD32,limit,constant(5000),limit);if(usesSensors||usesForever||usesFloat)guard(limit,1,180000);
@@ -531,7 +534,8 @@ export function compile(program,folder='EV3Lab') {
       const reg=()=>local(alloc()),c=constant;
       const mode=globalVar(rampOffset),up=reg(),down=reg(),base=reg(),sign=reg(),cap=reg(),began=reg(),elapsed=reg(),limit=reg();
       const ports=[0,1,2,3].filter(i=>b.ports&(1<<i)),timed=b.type==='motorTimed';
-      const direction=port=>b.portDirections?c(b.portDirections[port]):sign;
+      const signs=b.portDirections?Object.fromEntries(ports.map(port=>[port,reg()])):null;
+      const direction=port=>signs?signs[port]:sign;
       const finishes=[];
       const clamp=(value,min,max)=>{const above=jump(OP.JR_GT32,[value,c(min-1)]);emit(OP.MOVE32,c(min),value);patch(above,code.length);const below=jump(OP.JR_LT32,[value,c(max+1)]);emit(OP.MOVE32,c(max),value);patch(below,code.length);};
       // Q1000 smoothstep: 3u²−2u³ has zero acceleration at both ends.
@@ -546,6 +550,7 @@ export function compile(program,folder='EV3Lab') {
       emit(OP.MOVE32,globalVar(rampOffset+4),up);emit(OP.MOVE32,globalVar(rampOffset+8),down);
       emit(OP.MOVE32,expr(b.speed),base);guard(base,-100,100);nonzero(base);emit(OP.MOVE32,c(1),sign);
       const positive=jump(OP.JR_GT32,[base,c(0)]);emit(OP.MOVE32,c(-1),sign);emit(OP.SUB32,c(0),base,base);patch(positive,code.length);
+      if(signs)ports.forEach(port=>emit(OP.MUL32,sign,c(b.portDirections[port]),signs[port]));
       const target=reg();emit(OP.MOVE32,expr(timed?(b.secondsAreMs?b.seconds:scaled(b.seconds,1000)):b.degrees),target);guard(target,1,timed?60000:36000);
       // Reject disconnected/wrong devices before starting either shaft.
       ports.forEach(port=>integerExpr({sensor:{kind:'encoder',port:port+1}}));
@@ -652,9 +657,9 @@ export function compile(program,folder='EV3Lab') {
         if(shared){lock.acquire();lockDepth++;}
         if(usesSensors||usesForever||usesFloat||usesRamps){
           const checked=(source,min,max)=>{const at=alloc();emit(OP.MOVE32,expr(source),local(at));guard(local(at),min,max);return {register:at};};
-          if(b.driveSource){const cm=checked(b.driveSource.cm,1,1000),speed=checked(b.driveSource.speed,1,100);b={...b,speed:scaled(speed,b.driveSource.direction==='backward'?-1:1),degrees:{geometry:{kind:'distance',value:cm}}};}
-          if(b.pivotSource){const angle=checked(b.pivotSource.angle,1,3600),speed=checked(b.pivotSource.speed,1,100);b={...b,speed,degrees:{geometry:{kind:'pivot',value:angle}}};}
-          if(b.spinSource){const angle=checked(b.spinSource.angle,1,3600),speed=checked(b.spinSource.speed,1,100);b={...b,speed,degrees:{geometry:{kind:'spin',value:angle}}};}
+          if(b.driveSource){const cm=checked(b.driveSource.cm,1,1000),speed=checked(b.driveSource.speed,-100,100);b={...b,speed:scaled(speed,b.driveSource.direction==='backward'?-1:1),degrees:{geometry:{kind:'distance',value:cm}}};}
+          if(b.pivotSource){const angle=checked(b.pivotSource.angle,1,3600),speed=checked(b.pivotSource.speed,-100,100);b={...b,speed,degrees:{geometry:{kind:'pivot',value:angle}}};}
+          if(b.spinSource){const angle=checked(b.spinSource.angle,1,3600),speed=checked(b.spinSource.speed,-100,100);b={...b,speed,degrees:{geometry:{kind:'spin',value:angle}}};}
           const fields={motorRun:{speed:[-100,100]},motor:{speed:[-100,100],degrees:[1,36000]},motorTimed:{speed:[-100,100],seconds:[1,60000]},tone:{frequency:[250,10000],ms:[1,30000]},wait:{ms:[0,60000]},repeat:{count:[0,1000]}}[b.type];
           if(fields){b={...b};for(const [name,range]of Object.entries(fields)){const at=alloc();let source=b[name];if(b.type==='motorTimed'&&name==='seconds')source=scaled(source,1000);emit(OP.MOVE32,expr(source),local(at));guard(local(at),...range);b[name]={register:at};}
             if(b.type==='motor'||b.type==='motorTimed')nonzero(expr(b.speed));

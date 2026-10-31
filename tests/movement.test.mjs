@@ -10,6 +10,20 @@ const build=(main,procedures=[],threads=[])=>{const b=compile({main,procedures,t
 const call=name=>({type:'call',name,args:[]});
 const unknown={sensor:{kind:'touch',port:1}};
 
+test('negative motion speeds reverse travel with constants, variables and ramp modes',()=>{
+ for(const mode of ['off','trapezoid','scurve'])for(const type of ['drive','spin','pivot'])for(const direction of type==='drive'?['forward','backward']:['left','right']){
+  const positions=[];
+  for(const speed of [20,-20]){
+   const command={type,direction,movement:true,speed:{var:'速度'},...(type==='drive'?{cm:5,mode:'independent'}:{angle:45})};
+   const b=build([setup(8,1),{type:'wheel',diameter:56},{type:'tread',mm:112},{type:'ramp',mode,upSeconds:.1,downSeconds:.1},{type:'set',var:'速度',value:speed},command]),motors=new Motors();
+   const result=runParallel(b.data,{motorDriver:motors,maxTime:20000});assert.equal(result.stopped,false,JSON.stringify({mode,type,direction,speed}));assert.equal(result.tasks,0);positions.push(motors.position);
+   build([setup(),{type:'wheel',diameter:56},{type:'tread',mm:112},{...command,speed}]);
+  }
+  for(const port of [0,3])assert.ok(Math.abs(positions[0][port]+positions[1][port])<3,JSON.stringify({mode,type,direction,positions}));
+ }
+ for(const speed of [0,-101,101])for(const type of ['drive','spin','pivot'])assert.throws(()=>build([setup(),{type:'wheel',diameter:56},{type:'tread',mm:112},{type,movement:true,direction:type==='drive'?'forward':'right',speed,cm:5,angle:45}]),/速度|速さ/);
+});
+
 test('movement setup alone never starts motors; same ordered setup does not stop them',()=>{
  let r=runParallel(build([setup(),setup()]).data);
  assert.equal(r.events.filter(e=>['motorSync','motorRun','motor'].includes(e.type)).length,0);

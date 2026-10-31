@@ -523,7 +523,7 @@ test('opposite-direction feedback records signed angles and halts if a wheel sta
 });
 test('invalid spin settings fail before generating a transfer file',()=>{
  const p={main:[{type:'wheel',diameter:56},{type:'tread',mm:112},{type:'spin',leftPort:2,rightPort:4,speed:20,angle:90,direction:'right'}],procedures:[]};
- for(const change of [{leftPort:4},{rightPort:0},{speed:0},{speed:-20},{angle:0},{angle:3601},{direction:'invalid'}]){const x=structuredClone(p);Object.assign(x.main[2],change);assert.throws(()=>compile(x));}
+ for(const change of [{leftPort:4},{rightPort:0},{speed:0},{speed:-101},{angle:0},{angle:3601},{direction:'invalid'}]){const x=structuredClone(p);Object.assign(x.main[2],change);assert.throws(()=>compile(x));}
  assert.throws(()=>compile({...p,main:[p.main[0],p.main[2]]}),/トレッド/);
  const x=structuredClone(p);x.main[1].mm=0;assert.throws(()=>compile(x),/トレッド/);
 });
@@ -673,7 +673,8 @@ test('sensor-derived geometry and paired feedback retain checked values and fini
   const motors=new SimulatedMotors(),log=[];interpret(compile(p).data,{sensorRead:()=>10,motorDriver:motors,sensorLog:log});
   assert.deepEqual(motors.position.slice(1,3),[205,205]);assert.equal(log.length,1);
   p.main[1].speed={op:'sub',left:sensor('reflected'),right:60};
-  assert.equal(interpret(compile(p).data,{sensorRead:()=>50}).some(e=>e.type==='motor'),false);
+  const reverse=new SimulatedMotors();interpret(compile(p).data,{sensorRead:()=>50,motorDriver:reverse});assert.ok(reverse.position[1]<0);assert.equal(reverse.position[1],reverse.position[2]);
+  p.main[1].speed={op:'sub',left:sensor('reflected'),right:200};assert.equal(interpret(compile(p).data,{sensorRead:()=>50}).some(e=>e.type==='motor'),false);
 });
 
 test('continuous motors return immediately, change speed/direction and stop at zero or program end',()=>{
@@ -842,7 +843,7 @@ test('pivot geometry and ramp control work through My Block parameters and decim
 });
 test('pivot turn settings reject invalid geometry, duplicate ports, directions, angles and speeds',()=>{
  const p={main:[{type:'wheel',diameter:56},{type:'tread',mm:112},pivot('right')],procedures:[]};
- for(const change of [{leftPort:4},{rightPort:0},{direction:'unknown'},{angle:0},{angle:3601},{speed:0},{speed:-10},{speed:101}]){const changed=structuredClone(p);Object.assign(changed.main[2],change);assert.throws(()=>compile(changed));}
+ for(const change of [{leftPort:4},{rightPort:0},{direction:'unknown'},{angle:0},{angle:3601},{speed:0},{speed:-101},{speed:101}]){const changed=structuredClone(p);Object.assign(changed.main[2],change);assert.throws(()=>compile(changed));}
  assert.throws(()=>compile({...p,main:[p.main[1],p.main[2]]}),/直径/);assert.throws(()=>compile({...p,main:[p.main[0],p.main[2]]}),/トレッド/);
  const huge=structuredClone(p);huge.main[0].diameter=10;huge.main[1].mm=1000;huge.main[2].angle=3600;assert.throws(()=>compile(huge),/回転角度/);
 });

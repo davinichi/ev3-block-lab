@@ -25,6 +25,16 @@ test('new stop palette offers three direct methods and retains each through libr
 });
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
 
+test('all motor and movement speed sockets retain negative numbers through project reload',()=>{
+ const c=editor();
+ const result=JSON.parse(vm.runInContext(`Blockly.Events.disable();
+ const types=classroomMotorBlocks.map(b=>b.type).concat(['ev3_motor_speed_set','ev3_motor_l_run','ev3_motor_m_run','ev3_drive_forward','ev3_drive_backward','ev3_spin_left','ev3_spin_right','ev3_pivot_left','ev3_pivot_right','ev3_steering_run','ev3_steering_angle','ev3_steering_time']);
+ const items=types.map(type=>{const block=workspace.newBlock(type),input=block.getInput('SPEED'),n=workspace.newBlock('math_number');n.setFieldValue(-20,'NUM');input.connection.connect(n.outputConnection);return block;});
+ const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);
+ const values=workspace.getAllBlocks(false).filter(b=>b.getInput('SPEED')).map(b=>expression(b.getInputTargetBlock('SPEED')));Blockly.Events.enable();JSON.stringify(values);`,c));
+ assert.ok(result.length>=20);assert.ok(result.every(x=>x===-20));
+});
+
 test('round multi-output calls select a named result and preserve selection through rename, save and library import',()=>{
  const c=editor();
  const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();
