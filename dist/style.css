@@ -60,3 +60,6 @@ aside#connectionPanel{z-index:1000}
 
 /* 下部の確認結果は授業中にも読める大きさで表示。長文は折り返す。 */
 .editor-caption{align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;flex-shrink:0}.editor-caption .build-status{font-size:16px;font-weight:600;line-height:1.5;white-space:normal;overflow-wrap:anywhere;min-width:0;flex:1 1 260px;color:#176b61}.editor-caption .build-status.error{color:#ad3228}.editor-caption>span{font-size:11px;line-height:1.5}
+
+/* EBLの目印：プロジェクト名の行とグループ一覧を淡い青にそろえる。 */
+.projectbar{background:#e8f3ff}.blocklyToolbox,.blocklyToolboxDiv{background:#e8f3ff!important;border-right-color:#cddff0!important}.manual-html{display:inline-flex;align-items:center;white-space:nowrap;color:#215c92;font-size:12px;text-underline-offset:3px}.manual-html:hover{color:#123e68}.manual-html:focus-visible{outline:3px solid #d3a238;outline-offset:3px}

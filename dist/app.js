@@ -4,7 +4,7 @@ import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.
 const $=id=>document.getElementById(id);
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.23.2';
+const VERSION='0.23.3';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
