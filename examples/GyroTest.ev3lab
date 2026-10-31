@@ -1,0 +1,212 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "projectName": "EV3Lab",
+  "programName": "GyroTest",
+  "workspace": {
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "x": 40,
+          "y": 35,
+          "next": {
+            "block": {
+              "type": "ev3_wait_seconds",
+              "inputs": {
+                "SECONDS": {
+                  "shadow": {
+                    "type": "math_number",
+                    "fields": {
+                      "NUM": 1
+                    }
+                  }
+                }
+              },
+              "next": {
+                "block": {
+                  "type": "ev3_gyro_reset",
+                  "fields": {
+                    "PORT": "1"
+                  },
+                  "next": {
+                    "block": {
+                      "type": "ev3_tone",
+                      "inputs": {
+                        "FREQUENCY": {
+                          "shadow": {
+                            "type": "math_number",
+                            "fields": {
+                              "NUM": 440
+                            }
+                          }
+                        },
+                        "MS": {
+                          "shadow": {
+                            "type": "math_number",
+                            "fields": {
+                              "NUM": 200
+                            }
+                          }
+                        }
+                      },
+                      "fields": {
+                        "VOLUME": 25
+                      },
+                      "next": {
+                        "block": {
+                          "type": "ev3_log_start",
+                          "fields": {
+                            "FILE": "Gyro"
+                          },
+                          "next": {
+                            "block": {
+                              "type": "ev3_display_clear",
+                              "next": {
+                                "block": {
+                                  "type": "controls_repeat_ext",
+                                  "inputs": {
+                                    "TIMES": {
+                                      "shadow": {
+                                        "type": "math_number",
+                                        "fields": {
+                                          "NUM": 50
+                                        }
+                                      }
+                                    },
+                                    "DO": {
+                                      "block": {
+                                        "type": "ev3_log_value",
+                                        "fields": {
+                                          "LABEL": "angle_deg"
+                                        },
+                                        "inputs": {
+                                          "VALUE": {
+                                            "block": {
+                                              "type": "ev3_gyro_angle",
+                                              "fields": {
+                                                "PORT": "1"
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "next": {
+                                          "block": {
+                                            "type": "ev3_log_value",
+                                            "fields": {
+                                              "LABEL": "rate_deg_s"
+                                            },
+                                            "inputs": {
+                                              "VALUE": {
+                                                "block": {
+                                                  "type": "ev3_gyro_rate",
+                                                  "fields": {
+                                                    "PORT": "1"
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            "next": {
+                                              "block": {
+                                                "type": "ev3_display_number",
+                                                "fields": {
+                                                  "X": 0,
+                                                  "Y": 0,
+                                                  "FONT": "2",
+                                                  "DECIMALS": 0
+                                                },
+                                                "inputs": {
+                                                  "VALUE": {
+                                                    "block": {
+                                                      "type": "ev3_gyro_angle",
+                                                      "fields": {
+                                                        "PORT": "1"
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                "next": {
+                                                  "block": {
+                                                    "type": "ev3_display_number",
+                                                    "fields": {
+                                                      "X": 0,
+                                                      "Y": 32,
+                                                      "FONT": "2",
+                                                      "DECIMALS": 0
+                                                    },
+                                                    "inputs": {
+                                                      "VALUE": {
+                                                        "block": {
+                                                          "type": "ev3_gyro_rate",
+                                                          "fields": {
+                                                            "PORT": "1"
+                                                          }
+                                                        }
+                                                      }
+                                                    },
+                                                    "next": {
+                                                      "block": {
+                                                        "type": "ev3_wait_seconds",
+                                                        "inputs": {
+                                                          "SECONDS": {
+                                                            "shadow": {
+                                                              "type": "math_number",
+                                                              "fields": {
+                                                                "NUM": 0.2
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "next": {
+                                    "block": {
+                                      "type": "ev3_log_end",
+                                      "next": {
+                                        "block": {
+                                          "type": "ev3_wait_seconds",
+                                          "inputs": {
+                                            "SECONDS": {
+                                              "shadow": {
+                                                "type": "math_number",
+                                                "fields": {
+                                                  "NUM": 2
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "appVersion": "0.21.0",
+  "name": "DisplayTest",
+  "ev3ProjectName": "EV3Lab",
+  "pairMode": "independent"
+}

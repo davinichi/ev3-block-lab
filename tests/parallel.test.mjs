@@ -95,3 +95,11 @@ test('event-only projects, absent receivers, nested geometry and resource limits
  const b=build({main:[send('nobody',true),tone(880)],threads:[start([wait(.01)])]});assert.equal(runParallel(b.data).events.filter(e=>e.type==='tone').length,1);
  assert.throws(()=>compile({main:[tone(880)],procedures:[],threads:Array.from({length:16},()=>start([wait(.1)]))}),/16個/);
 });
+
+test('gyro angle and rate run concurrently while a reset baseline is shared with event and My Block readers',()=>{
+ const angle={sensor:{kind:'gyroAngle',port:1}},rate={sensor:{kind:'gyroRate',port:1}};
+ const p={main:[{type:'gyroReset',port:1},send('開始',true),wait(.5)],threads:[receive('開始',[{type:'call',name:'計測',args:[]}]),{kind:'condition',condition:{op:'gte',left:angle,right:240},body:[tone(880),{type:'programEnd'}]}],procedures:[{name:'計測',params:[],body:[set('angle',angle),set('rate',rate)]}]};
+ const b=build(p),result=runParallel(b.data,{sensorRead:({time})=>[100+time,25],maxTime:1000});
+ assert.equal(float(b,result,'rate'),25);assert.ok(float(b,result,'angle')>=0&&float(b,result,'angle')<100);assert.ok(result.sensorLog.some(s=>s.time===float(b,result,'angle')));assert.ok(result.events.some(e=>e.type==='tone'&&e.frequency===880));assert.ok(result.sensorLog.every(s=>s.type===32&&s.mode===3));
+ assert.throws(()=>compile({main:[{type:'gyroReset',port:1}],threads:[start([set('touch',{sensor:{kind:'touch',port:1}})])],procedures:[]}),/異なるモード/);
+});

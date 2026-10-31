@@ -676,3 +676,27 @@ test('duplicate copies the complete downstream stack and nested inputs with fres
  assert.equal(result.roots,2);assert.equal(result.originalNext,'controls_repeat_ext');
  assert.equal(result.counts.ev3_wait_seconds,2);assert.equal(result.counts.controls_repeat_ext,1);assert.equal(result.counts.ev3_stop,1);
 });
+
+test('gyro blocks survive project loading and My Block export/import with ports and both comparisons',()=>{
+ const context=editor();
+ const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();const def=saveMyBlock(workspace,'ジャイロ計測',[]);let tail=def.getInput('STACK').connection;
+ const reset=workspace.newBlock('ev3_gyro_reset');reset.setFieldValue('4','PORT');tail.connect(reset.previousConnection);tail=reset.nextConnection;
+ for(const [i,type]of ['ev3_gyro_angle','ev3_gyro_rate','ev3_gyro_compare','ev3_gyro_compare'].entries()){
+  const block=workspace.newBlock(type);block.setFieldValue('4','PORT');
+  if(type==='ev3_gyro_compare'){block.setFieldValue(i===2?'gyroAngle':'gyroRate','MEASURE');block.setFieldValue('gte','OP');const n=workspace.newBlock('math_number');n.setFieldValue(-90,'NUM');block.getInput('VALUE').connection.connect(n.outputConnection);}
+  const variable=workspace.getVariableMap().createVariable('計測'+i),set=workspace.newBlock('variables_set');set.setFieldValue(variable.getId(),'VAR');set.getInput('VALUE').connection.connect(block.outputConnection);tail.connect(set.previousConnection);tail=set.nextConnection;
+ }
+ const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);Blockly.Events.enable();JSON.stringify(Blockly.serialization.workspaces.save(workspace));`,context));
+ inspectBlocks(saved.blocks);context.lesson=JSON.stringify(mergeBlockLibrary({blocks:{languageVersion:0,blocks:[{type:'ev3_start'}]}},createBlockLibrary(saved,'0.21.0')));
+ const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const start=workspace.getTopBlocks(false).find(b=>b.type==='ev3_start'),call=workspace.newBlock('procedures_callnoreturn');call.loadExtraState({name:'ジャイロ計測',params:[]});start.nextConnection.connect(call.previousConnection);const p=program();Blockly.Events.enable();JSON.stringify(p);`,context));
+ assert.deepEqual(p.procedures[0].body[0],{type:'gyroReset',port:4});
+ const values=p.procedures[0].body.slice(1).map(b=>b.value);
+ assert.deepEqual(values,[{sensor:{kind:'gyroAngle',port:4}},{sensor:{kind:'gyroRate',port:4}},{op:'gte',left:{sensor:{kind:'gyroAngle',port:4}},right:-90},{op:'gte',left:{sensor:{kind:'gyroRate',port:4}},right:-90}]);compile(p);
+});
+test('gyro sample is loadable, compiles to a standalone program and matches the downloadable example',()=>{
+ const context=editor(),sample=JSON.parse(readFileSync(new URL('../examples/GyroTest.ev3lab',import.meta.url),'utf8'));
+ inspectBlocks(sample.workspace.blocks);assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(gyroSampleState())',context)),sample.workspace);
+ context.lesson=JSON.stringify(sample.workspace);const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const p=program();Blockly.Events.enable();JSON.stringify(p);`,context));
+ assert.equal(p.main[1].type,'gyroReset');assert.equal(p.main[2].frequency,440);assert.ok(compile(p).logFiles.includes('Gyro'));
+ assert.deepEqual(JSON.parse(readFileSync(new URL('../dist/samples/GyroTest.ev3lab',import.meta.url),'utf8')),sample);
+});

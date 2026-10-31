@@ -61,10 +61,10 @@ function buttonConfiguration(button){
 function sensorConfiguration(sensor){
  const {kind,port,channel}=sensor;
  if(!Number.isInteger(port)||port<1||port>4)throw Error('センサの種類・ポートを確認してください。');
- const configs={color:{type:29,mode:2,min:0,max:7},reflected:{type:29,mode:0,min:0,max:100},distance:{type:30,mode:0,min:0,max:255},touch:{type:16,mode:0,min:0,max:1},infrared:{type:33,mode:0,min:0,max:100},irRemote:{type:33,mode:2,min:0,max:11,count:4},irBeaconDistance:{type:33,mode:1,min:0,max:100,count:8},irBeaconHeading:{type:33,mode:1,min:-25,max:25,count:8},irBeaconDetected:{type:33,mode:1,min:0,max:1,count:8},encoder:{encoder:true},motorSpeed:{motor:true}};
+ const configs={color:{type:29,mode:2,min:0,max:7},reflected:{type:29,mode:0,min:0,max:100},distance:{type:30,mode:0,min:0,max:255},touch:{type:16,mode:0,min:0,max:1},infrared:{type:33,mode:0,min:0,max:100},irRemote:{type:33,mode:2,min:0,max:11,count:4},irBeaconDistance:{type:33,mode:1,min:0,max:100,count:8},irBeaconHeading:{type:33,mode:1,min:-25,max:25,count:8},irBeaconDetected:{type:33,mode:1,min:0,max:1,count:8},gyroAngle:{type:32,mode:3,min:-32767,max:32767,count:2,index:0},gyroRate:{type:32,mode:3,min:-440,max:440,count:2,index:1},encoder:{encoder:true},motorSpeed:{motor:true}};
  if(!Object.hasOwn(configs,kind))throw Error('センサの種類・ポートを確認してください。');
  const config=configs[kind];
- if(config.count&&(!Number.isInteger(channel)||channel<1||channel>4))throw Error('赤外線センサのチャンネルは1〜4から選んでください。');
+ if(kind.startsWith('ir')&&config.count&&(!Number.isInteger(channel)||channel<1||channel>4))throw Error('赤外線センサのチャンネルは1〜4から選んでください。');
  return config;
 }
 // 転送前の検証用に式を評価する。確定する値は計算し、実測が必要な値はUNKNOWNとして後段の検査へ渡す。
@@ -194,6 +194,7 @@ export function validate(program) {
         case 'wait': if(b.secondsSource!==undefined){const seconds=evaluate(b.secondsSource,env);if(seconds!==UNKNOWN&&(!Number.isFinite(seconds)||seconds<0||seconds>60))throw Error('待ち時間は0〜60秒にしてください。');} inRange(val('ms'),0,60000,'待ち時間'); break;
         case 'motorTimed': inRange(b.ports,1,15,'モーターポート');if(b.ports.toString(2).split('1').length-1>2)throw Error('モーターポートは2個まで指定できます。');inRange(val('speed'),-100,100,'モーターの速さ');if(val('speed')===0)throw Error('モーターの速さは0以外にしてください。');{const seconds=val('seconds');if(seconds!==UNKNOWN&&(!Number.isFinite(seconds)||seconds<=0||seconds>60))throw Error('モーターの時間は0より大きく60秒以下にしてください。');} break;
         case 'timerReset':break;
+        case 'gyroReset':sensorConfiguration({kind:'gyroAngle',port:b.port});break;
         case 'encoderReset':inRange(b.port,1,4,'リセットするモーターポート');break;
         case 'broadcast':if(typeof b.message!=='string'||!b.message.trim()||b.message.length>40||b.message.includes('\0'))throw Error('メッセージ名は1〜40文字にしてください。');break;
         case 'programEnd':return 'programEnd';
@@ -231,15 +232,17 @@ export function compile(program,folder='EV3Lab') {
   program=prepareProgram(program);
   validate(program);
   const parallel=parallelPlan(program);
-  const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false,usesTimer=false,usesStopModes=false;
-  const collect=x=>{if(x&&typeof x==='object'){if(x.type==='stopMode'||x.stopMode!==undefined)usesStopModes=true;if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
+  const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false,usesTimer=false,usesStopModes=false,usesGyro=false;
+  const collect=x=>{if(x&&typeof x==='object'){if(x.sensor?.kind?.startsWith('gyro')||x.type==='gyroReset'){usesGyro=true;usesSensors=true;}if(x.type==='stopMode'||x.stopMode!==undefined)usesStopModes=true;if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
   collect(program);if(variableNames.size>32)throw Error('変数は32個までです。');
   // 通常変数・寸法・加減速設定・共有タイマーを重ならない位置へ配置する。各数値の領域は4バイト。
   const globalOffsets=new Map([...variableNames].map((name,i)=>[name,i*4]));
   const diameterOffset=globalOffsets.size*4,treadOffset=diameterOffset+4,rampOffset=diameterOffset+(usesGeometry?8:0);
   const timerOffset=rampOffset+(usesRamps?12:0);
   const stopModeOffset=timerOffset+(usesTimer?4:0);
-  const baseGlobalBytes=stopModeOffset+(usesStopModes?16:0);
+  // 角度のゼロ点はポート別・プログラム全体で共有。物理的な再校正やモード切替はしない。
+  const gyroOffset=stopModeOffset+(usesStopModes?16:0);
+  const baseGlobalBytes=gyroOffset+(usesGyro?16:0);
   const extras=extraLayout(program,baseGlobalBytes,directory);
   // Bind a diagnostic record to this compiler revision and exact project.
   let diagnosticTag=0x811c9dc5;
@@ -270,7 +273,7 @@ export function compile(program,folder='EV3Lab') {
     let lockDepth=0;
     const locked=fn=>{if(!lock||lockDepth)return fn();lock.acquire();lockDepth++;const result=fn();lockDepth--;lock.release();return result;};
     // 整数を要求するハードウェア命令やセンサ値を扱う層。出力マスクと入力ポート番号の取り違えに注意。
-    const integerExpr=x=>{
+    const integerExpr=(x,{rawGyro=false}={})=>{
       if(typeof x==='number')return constant(x);
       if(x?.register!==undefined)return local(x.register);
       if(x?.button){
@@ -308,8 +311,11 @@ export function compile(program,folder='EV3Lab') {
           else{const source=kind==='irBeaconHeading'?heading:distance;floatGuard(source);emit(OP.MOVEF32,source,result);guard(result,config.min,config.max);}
           patch(absent,code.length);patch(absentRaw,code.length);return result;
         }
-        const source=raw[kind==='irRemote'?channel-1:0];floatGuard(source);
-        emit(OP.MOVEF32,source,result);guard(result,config.min,config.max);return result;
+        const source=raw[kind==='irRemote'?channel-1:(config.index??0)];floatGuard(source);
+        emit(OP.MOVEF32,source,result);guard(result,config.min,config.max);
+        // 同じ GYRO-G&A モードの2データから選ぶ。読み取りのたびに角度を消さない。
+        if(kind==='gyroAngle'&&!rawGyro)emit(OP.SUB32,result,globalVar(gyroOffset+4*(port-1)),result);
+        return result;
       }
       if(x?.geometry){
         const value=expr(x.geometry.value),result=local(alloc()),divisor=local(alloc()),half=local(alloc());
@@ -637,6 +643,7 @@ export function compile(program,folder='EV3Lab') {
           case 'tone': emit(OP.SOUND,constant(1),constant(b.volume),expr(b.frequency),expr(b.ms)); emit(OP.SOUND_READY); break;
           case 'wait': emit(OP.WAIT,expr(b.ms),local(timer)); emit(OP.READY,local(timer)); break;
           case 'timerReset':emit(OP.TIMER_READ,globalVar(timerOffset));break;
+          case 'gyroReset':{const raw=integerExpr({sensor:{kind:'gyroAngle',port:b.port}},{rawGyro:true});emit(OP.MOVE32,raw,globalVar(gyroOffset+4*(b.port-1)));break;}
           case 'encoderReset':integerExpr({sensor:{kind:'encoder',port:b.port}});emit(OP.MOTOR_CLEAR_COUNT,constant(0),constant(1<<(b.port-1)));break;
           case 'programEnd':emit(OP.STOP,constant(0),constant(15),constant(1));emit(OP.PROGRAM_STOP,constant(-1));return;
           case 'myblockReturn':if(!p.subcall)throw Error('マイブロックの終了は定義の中だけで使えます。');emit(OP.RETURN);return;
@@ -670,6 +677,7 @@ export function compile(program,folder='EV3Lab') {
     if(index===0&&usesRamps)for(const at of [rampOffset,rampOffset+4,rampOffset+8])emit(OP.MOVE32,constant(0),globalVar(at));
     if(index===0&&usesTimer)emit(OP.MOVE32,constant(0),globalVar(timerOffset));
     if(index===0&&usesStopModes)for(let i=0;i<4;i++)emit(OP.MOVE32,constant(0),globalVar(stopModeOffset+4*i));
+    if(index===0&&usesGyro)for(let i=0;i<4;i++)emit(OP.MOVE32,constant(0),globalVar(gyroOffset+4*i));
     if(index===0)dataOps.init();
     const pause=ms=>{emit(OP.WAIT,constant(ms),local(timer));emit(OP.READY,local(timer));};
     if(p.boot){

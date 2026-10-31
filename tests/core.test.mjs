@@ -932,3 +932,26 @@ test('string-to-number validates signed decimal/exponent syntax before calling s
  for(const n of ['12.5','-2.5','3','100','0.5','-0.025'])assert.ok(csv.includes('"'+n+'"'),csv);
  for(const v of ['', 'abc', '1..2', '+-2', '1e', '2junk'])assert.equal(csvRun([begin,record('bad',tdata('number',txt(v)))]).csv,'time_s,item,value\r\n',v);
 });
+
+// 複合モードの先頭が角度、2番目が回転速度。リセットはポート別の共有基準点。
+test('gyro angle and rate read signed values on all four ports without switching modes',()=>{
+ for(let port=1;port<=4;port++)for(const [angle,rate]of [[90,120],[-360,-40],[1080,0],[-32767,440]]){
+  const main=[['gyroAngle',angle],['gyroRate',rate]].map(([kind,right])=>({type:'if',condition:{op:'eq',left:sensor(kind,port),right},then:[beep(880)],else:[beep(440)]})),log=[];
+  const events=interpret(compile({main,procedures:[]}).data,{sensorRead:()=>[angle,rate],sensorLog:log});
+  assert.deepEqual(events.filter(e=>e.type==='tone').map(e=>e.frequency),[880,880]);assert.ok(log.every(x=>x.port===port&&x.type===32&&x.mode===3));
+ }
+});
+test('gyro resets use fresh absolute baselines per port and remain shared across My Block calls',()=>{
+ const readings=[100,140,180,190,700,200,750],assertValue=(port,right)=>({type:'if',condition:{op:'eq',left:sensor('gyroAngle',port),right},then:[beep(880)],else:[beep(440)]});
+ const main=[{type:'gyroReset',port:1},assertValue(1,40),{type:'call',name:'ゼロ',args:[]},assertValue(1,10),{type:'gyroReset',port:2},assertValue(1,20),assertValue(2,50),{type:'if',condition:{op:'eq',left:sensor('gyroRate',1),right:-30},then:[beep(880)],else:[beep(440)]}];
+ const events=interpret(compile({main,procedures:[{name:'ゼロ',params:[],body:[{type:'gyroReset',port:1}]}]}).data,{sensorRead:()=>[readings.shift()??900,-30]});
+ assert.deepEqual(events.filter(e=>e.type==='tone').map(e=>e.frequency),[880,880,880,880,880]);
+});
+test('invalid gyro input stops before movement and invalid reset ports are rejected',()=>{
+ for(const [kind,options]of [['gyroAngle',{sensorRead:()=>[NaN,0]}],['gyroRate',{sensorRead:()=>[0,Infinity]}],['gyroAngle',{sensorRead:()=>[-32768,0]}],['gyroRate',{sensorRead:()=>[0,441]}],['gyroAngle',{sensorRead:()=>[10,0],sensorType:29}],['gyroRate',{sensorRead:()=>[0,10],sensorMode:1}]]){
+  const events=interpret(compile({main:[{type:'set',var:'v',value:sensor(kind,1)},{type:'motorRun',ports:2,speed:20}],procedures:[]}).data,options);
+  assert.equal(events.some(e=>e.type==='motorRun'),false);assert.equal(events.at(-1).frequency,300);
+ }
+ const events=interpret(compile({main:[{type:'gyroReset',port:4},{type:'motorRun',ports:2,speed:20}],procedures:[]}).data,{sensorRead:()=>[NaN,0]});assert.equal(events.some(e=>e.type==='motorRun'),false);
+ for(const port of [0,5,1.5])for(const main of [[{type:'gyroReset',port}],[{type:'set',var:'v',value:sensor('gyroAngle',port)}]])assert.throws(()=>compile({main,procedures:[]}),/ポート/);
+});

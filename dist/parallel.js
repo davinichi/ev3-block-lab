@@ -14,8 +14,8 @@ export function parallelPlan(program) {
   if(!['start','condition','changed','message'].includes(r.kind)||!Array.isArray(r.body))throw Error('イベントの種類を確認してください。');
   if(['condition','changed'].includes(r.kind)&&r.condition===undefined)throw Error('イベントの条件・値を入れてください。');
   if(r.kind==='message')message(r.message);
-  const inspect=x=>{if(!x||typeof x!=='object')return;if(x.sensor&&!['encoder','motorSpeed'].includes(x.sensor.kind)){
-    const s=x.sensor,mode=['color','reflected'].includes(s.kind)?s.kind:['irRemote','irBeaconDistance','irBeaconHeading','irBeaconDetected','infrared'].includes(s.kind)?(s.kind==='irRemote'?'remote':s.kind==='infrared'?'proximity':'beacon'):s.kind;
+  const inspect=x=>{if(!x||typeof x!=='object')return;const sensor=x.sensor??(x.type==='gyroReset'?{kind:'gyroAngle',port:x.port}:null);if(sensor&&!['encoder','motorSpeed'].includes(sensor.kind)){
+    const s=sensor,mode=['gyroAngle','gyroRate'].includes(s.kind)?'gyroCombined':['color','reflected'].includes(s.kind)?s.kind:['irRemote','irBeaconDistance','irBeaconHeading','irBeaconDetected','infrared'].includes(s.kind)?(s.kind==='irRemote'?'remote':s.kind==='infrared'?'proximity':'beacon'):s.kind;
     const previous=modes.get(s.port)??[];
     if(previous.some(p=>p.root!==i&&p.mode!==mode))throw Error(`センサ${s.port}を並行処理で異なるモードにはできません。同じモードにそろえてください。`);
     previous.push({root:i,mode});modes.set(s.port,previous);

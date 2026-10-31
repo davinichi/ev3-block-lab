@@ -79,3 +79,8 @@ test('data, UTF-8 strings, CSV and steering frames match firmware operand signat
  const p={main:[{type:'logStart',file:'Test'},{type:'call',name:'記録',args:[1.5]},{type:'steering',leftPort:8,rightPort:1,speed:20,turn:-35,action:'time',seconds:1},{type:'led',color:1,mode:'pulse'}],procedures:[{name:'記録',params:['値'],body:[{type:'textSet',name:'表示',value:{textOp:'join',a:{text:'値='},b:{textOp:'number',value:{param:'値'}}}},{type:'listAdd',list:'値',value:{param:'値'}},{type:'logValue',label:'日本語',value:{textVar:'表示'}},{type:'logValue',label:'平均',value:{listData:{op:'average',list:'値'}}}]}]};
  const build=compile(p),ops=scanImage(build.data).map(x=>x.op);for(const op of [0x7d,0xc0,0xc1,0xc3,0xc4,0xc8,0xcc,0xb1,0x82])assert.ok(ops.includes(op));
 });
+
+test('gyro combined datasets, reset and sensor events retain native firmware boundaries',()=>{
+ const program={main:[{type:'gyroReset',port:4},{type:'call',name:'計測',args:[]}],threads:[{kind:'changed',condition:{sensor:{kind:'gyroAngle',port:4}},body:[tone(880)]}],procedures:[{name:'計測',params:[],body:[{type:'set',var:'rate',value:{sensor:{kind:'gyroRate',port:4}}}]}]};
+ const built=compile(program);scanImage(built.data);assert.equal(built.usesSensors,true);
+});

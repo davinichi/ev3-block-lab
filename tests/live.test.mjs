@@ -64,3 +64,9 @@ test('CSV exports survive reconnect, exceed the RBF read limit, retain UTF-8 and
  await assert.rejects(connection.readCsv('Class1','../Log'),/CSV/);
  const running=brick({running:true});await assert.rejects(running.connection.readCsv('Class1','Log'),/停止/);assert.ok(!running.calls.some(x=>x.system===0x94));
 });
+
+test('gyro monitor labels distinguish raw angle, angular speed and unavailable data',()=>{
+ assert.deepEqual(sensorReading({type:32,mode:3,value:-270}),{label:'ジャイロ・角度（センサ生値）',text:'-270 度'});
+ assert.deepEqual(sensorReading({type:32,mode:1,value:-30}),{label:'ジャイロ・回転速度',text:'-30 度／秒'});
+ assert.equal(sensorReading({type:32,mode:0,value:null}).text,'読み取り待ち');
+});

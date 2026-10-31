@@ -4,7 +4,7 @@ import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.
 const $=id=>document.getElementById(id);
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.20.1';
+const VERSION='0.21.0';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -18,7 +18,7 @@ Blockly.Blocks.procedures_callnoreturn.init=function(){
   originalCallInit.call(this);
   this.setInputsInline(true);
 };
-const deviceNames={7:'Lモーター',8:'Mモーター',16:'EV3 タッチセンサ',29:'EV3 カラーセンサ',30:'EV3 超音波センサ',33:'EV3 赤外線センサ'};
+const deviceNames={7:'Lモーター',8:'Mモーター',16:'EV3 タッチセンサ',29:'EV3 カラーセンサ',30:'EV3 超音波センサ',32:'EV3 ジャイロセンサ',33:'EV3 赤外線センサ'};
 const deviceName=type=>deviceNames[type]??([0,125,126,127].includes(type)?'未接続／認識中':'未対応機器（種類 '+type+'）');
 // 出力ポートの選択値はA=1、B=2、C=4、D=8のビットマスク。2個の指定は値を足したもの。
 const singlePorts=[['A','1'],['B','2'],['C','4'],['D','8']];
@@ -90,6 +90,11 @@ const colorNames=[['赤','5'],['黒','1'],['青','2'],['緑','3'],['黄','4'],['
 const sensorPort=()=>({type:'field_dropdown',name:'PORT',options:sensorPorts});
 const comparison=()=>({type:'field_dropdown',name:'OP',options:[['＜','lt'],['＝','eq'],['＞','gt'],['≦','lte'],['≧','gte'],['≠','neq']]});
 Blockly.defineBlocksWithJsonArray([
+ // ジャイロは角度・回転速度を同じ複合モードで取得し、並行計測時の切替を避ける。
+ {type:'ev3_gyro_angle',message0:'ジャイロセンサ %1 の角度（度）',args0:[sensorPort()],output:'Number',colour:'#34ccf1',tooltip:'現在の回転角度。逆方向は負になります。角度を0にするブロック以降は、その向きからの角度を返します。取付方向で符号が変わります。'},
+ {type:'ev3_gyro_rate',message0:'ジャイロセンサ %1 の回転速度（度／秒）',args0:[sensorPort()],output:'Number',colour:'#34ccf1',tooltip:'1秒あたりの回転角度。逆方向は負です。角度と同時に使っても測定モードは切り替えません。'},
+ {type:'ev3_gyro_compare',message0:'ジャイロセンサ %1 の %2 が %3 %4',args0:[sensorPort(),{type:'field_dropdown',name:'MEASURE',options:[['角度（度）','gyroAngle'],['回転速度（度／秒）','gyroRate']]},comparison(),{type:'input_value',name:'VALUE',check:'Number'}],output:'Boolean',inputsInline:true,colour:'#34ccf1',tooltip:'角度または回転速度を指定値と比較します。「まで待つ」「もし」「イベント」の条件に使えます。'},
+ {type:'ev3_gyro_reset',message0:'ジャイロセンサ %1 の角度を0にする',args0:[sensorPort()],previousStatement:null,nextStatement:null,colour:'#34ccf1',tooltip:'現在の向きをこのプログラム内の0度にします。ゼロ点は同じポートを使う全処理で共有します。センサ本体の再校正ではなく、接続中のポート表示の生値は変わりません。静止した状態で実行してください。'},
  {type:'ev3_color_is',message0:'カラーセンサ %1 の色が %2',args0:[sensorPort(),{type:'field_dropdown',name:'COLOR',options:colorNames}],output:'Boolean',inputsInline:true,colour:'#34ccf1',tooltip:'EV3カラーセンサ。選んだ色なら成り立ちます。'},
  {type:'ev3_color_value',message0:'カラーセンサ %1 の色（番号）',args0:[sensorPort()],output:'Number',colour:'#34ccf1',tooltip:'0:色なし、1:黒、2:青、3:緑、4:黄、5:赤、6:白、7:茶。'},
  {type:'ev3_reflected',message0:'カラーセンサ %1 の反射光（％）',args0:[sensorPort()],output:'Number',colour:'#34ccf1',tooltip:'0〜100％。反射する光の強さを読みます。'},
@@ -234,7 +239,7 @@ const toolbox={kind:'categoryToolbox',contents:[
  {kind:'category',name:'スタート',colour:'#d3a238',contents:[{kind:'block',type:'ev3_start'}]},
  {kind:'category',name:'モーター',colour:'#0090f5',contents:classroomMotorToolbox()},
  {kind:'category',name:'動き',colour:'#ff4ccd',contents:[{kind:'block',type:'ev3_wheel'},{kind:'block',type:'ev3_tread'},{kind:'block',type:'ev3_tank',inputs:{LEFT_SPEED:shadow(20),RIGHT_SPEED:shadow(20)}},{kind:'block',type:'ev3_spin_right',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_spin_left',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_pivot_right',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_pivot_left',inputs:{SPEED:shadow(20),ANGLE:shadow(90)}},{kind:'block',type:'ev3_drive_forward',inputs:{SPEED:shadow(20),CM:shadow(20)}},{kind:'block',type:'ev3_drive_backward',inputs:{SPEED:shadow(20),CM:shadow(20)}}]},
- {kind:'category',name:'センサー',colour:'#34ccf1',contents:[{kind:'label',text:'タイマー'},{kind:'block',type:'ev3_timer'},{kind:'block',type:'ev3_timer_reset'},{kind:'label',text:'モーターのエンコーダ'},{kind:'block',type:'ev3_encoder'},{kind:'block',type:'ev3_encoder_reset'},{kind:'label',text:'EV3 タッチセンサ'},{kind:'block',type:'ev3_touch'},{kind:'block',type:'ev3_touch_value'},{kind:'label',text:'EV3 赤外線センサ'},{kind:'block',type:'ev3_ir_proximity'},{kind:'block',type:'ev3_ir_compare',inputs:{VALUE:shadow(20)}},{kind:'block',type:'ev3_ir_button'},{kind:'block',type:'ev3_ir_remote'},{kind:'block',type:'ev3_ir_beacon_detected'},{kind:'block',type:'ev3_ir_beacon_heading'},{kind:'block',type:'ev3_ir_beacon_distance'},{kind:'label',text:'EV3 カラーセンサ'},{kind:'block',type:'ev3_color_is'},{kind:'block',type:'ev3_color_value'},{kind:'block',type:'ev3_reflected_compare',inputs:{VALUE:shadow(50)}},{kind:'block',type:'ev3_reflected'},{kind:'label',text:'EV3 超音波センサ'},{kind:'block',type:'ev3_distance_compare',inputs:{VALUE:shadow(15)}},{kind:'block',type:'ev3_distance'}]},
+ {kind:'category',name:'センサー',colour:'#34ccf1',contents:[{kind:'label',text:'タイマー'},{kind:'block',type:'ev3_timer'},{kind:'block',type:'ev3_timer_reset'},{kind:'label',text:'モーターのエンコーダ'},{kind:'block',type:'ev3_encoder'},{kind:'block',type:'ev3_encoder_reset'},{kind:'label',text:'EV3 ジャイロセンサ'},{kind:'block',type:'ev3_gyro_angle'},{kind:'block',type:'ev3_gyro_rate'},{kind:'block',type:'ev3_gyro_compare',inputs:{VALUE:shadow(90)}},{kind:'block',type:'ev3_gyro_reset'},{kind:'label',text:'EV3 タッチセンサ'},{kind:'block',type:'ev3_touch'},{kind:'block',type:'ev3_touch_value'},{kind:'label',text:'EV3 赤外線センサ'},{kind:'block',type:'ev3_ir_proximity'},{kind:'block',type:'ev3_ir_compare',inputs:{VALUE:shadow(20)}},{kind:'block',type:'ev3_ir_button'},{kind:'block',type:'ev3_ir_remote'},{kind:'block',type:'ev3_ir_beacon_detected'},{kind:'block',type:'ev3_ir_beacon_heading'},{kind:'block',type:'ev3_ir_beacon_distance'},{kind:'label',text:'EV3 カラーセンサ'},{kind:'block',type:'ev3_color_is'},{kind:'block',type:'ev3_color_value'},{kind:'block',type:'ev3_reflected_compare',inputs:{VALUE:shadow(50)}},{kind:'block',type:'ev3_reflected'},{kind:'label',text:'EV3 超音波センサ'},{kind:'block',type:'ev3_distance_compare',inputs:{VALUE:shadow(15)}},{kind:'block',type:'ev3_distance'}]},
  {kind:'category',name:'音',colour:'#a570b3',contents:[{kind:'block',type:'ev3_tone',inputs:{FREQUENCY:shadow(440),MS:shadow(200)}}]},
  {kind:'category',name:'制御',colour:controlColour,contents:[{kind:'block',type:'ev3_wait_seconds',inputs:{SECONDS:shadow(1)}},{kind:'block',type:'controls_if'},{kind:'block',type:'controls_if',extraState:{hasElse:true}},{kind:'block',type:'ev3_forever'},{kind:'block',type:'controls_repeat_ext',inputs:{TIMES:shadow(10)}},{kind:'block',type:'controls_whileUntil',fields:{MODE:'UNTIL'}},{kind:'block',type:'controls_whileUntil',fields:{MODE:'WHILE'}},{kind:'block',type:'ev3_wait_until'},{kind:'block',type:'ev3_program_end'},{kind:'block',type:'ev3_myblock_return'}]},
  {kind:'category',name:'演算',colour:operatorColour,contents:[num(0),...['add','sub','mul','div'].map(op=>({kind:'block',type:'ev3_op_'+op,inputs:{A:shadow(1),B:shadow(1)}})),{kind:'block',type:'ev3_math_function',inputs:{VALUE:shadow(1)}},...['lt','eq','gt','lte','gte','neq'].map(op=>({kind:'block',type:'ev3_op_'+op,inputs:{A:shadow(0),B:shadow(100)}})),...['and','or'].map(op=>({kind:'block',type:'ev3_op_'+op})),{kind:'block',type:'logic_negate'},{kind:'block',type:'logic_boolean'}]},
@@ -377,6 +382,11 @@ function saveMyBlock(ws,name,rows,definitionId=null){
 
 // Blocklyの色・表示・操作を初期化する。独自ブロックの型名は保存データの互換性にも関わる。
 // 授業で独立して試せる、走行＋計測・センサイベント・メッセージの3例。
+// 実機確認用。モーターを動かさず、ポート1の角度と回転速度を約10秒記録する。
+function gyroSampleState(){
+ return {"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":40,"y":35,"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":1}}}},"next":{"block":{"type":"ev3_gyro_reset","fields":{"PORT":"1"},"next":{"block":{"type":"ev3_tone","inputs":{"FREQUENCY":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"MS":{"shadow":{"type":"math_number","fields":{"NUM":200}}}},"fields":{"VOLUME":25},"next":{"block":{"type":"ev3_log_start","fields":{"FILE":"Gyro"},"next":{"block":{"type":"ev3_display_clear","next":{"block":{"type":"controls_repeat_ext","inputs":{"TIMES":{"shadow":{"type":"math_number","fields":{"NUM":50}}},"DO":{"block":{"type":"ev3_log_value","fields":{"LABEL":"angle_deg"},"inputs":{"VALUE":{"block":{"type":"ev3_gyro_angle","fields":{"PORT":"1"}}}},"next":{"block":{"type":"ev3_log_value","fields":{"LABEL":"rate_deg_s"},"inputs":{"VALUE":{"block":{"type":"ev3_gyro_rate","fields":{"PORT":"1"}}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":0,"FONT":"2","DECIMALS":0},"inputs":{"VALUE":{"block":{"type":"ev3_gyro_angle","fields":{"PORT":"1"}}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":32,"FONT":"2","DECIMALS":0},"inputs":{"VALUE":{"block":{"type":"ev3_gyro_rate","fields":{"PORT":"1"}}}},"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":0.2}}}}}}}}}}}}}}},"next":{"block":{"type":"ev3_log_end","next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":2}}}}}}}}}}}}}}}}}}}}}]}};
+}
+
 function parallelSampleState(kind){
  const n=value=>({shadow:{type:'math_number',fields:{NUM:value}}});
  const seq=blocks=>{for(let i=0;i<blocks.length-1;i++)blocks[i].next={block:blocks[i+1]};return blocks[0];};
@@ -514,6 +524,7 @@ function expression(x){
  if(x.type==='ev3_timer')return {timer:true};
  if(x.type==='ev3_motor_speed')return {sensor:{kind:'motorSpeed',port:Number(x.getFieldValue('PORT'))}};
  if(x.type==='ev3_encoder')return {sensor:{kind:'encoder',port:Number(x.getFieldValue('PORT'))}};
+ if(['ev3_gyro_angle','ev3_gyro_rate','ev3_gyro_compare'].includes(x.type)){const reading={sensor:{kind:x.type==='ev3_gyro_rate'?'gyroRate':x.type==='ev3_gyro_angle'?'gyroAngle':x.getFieldValue('MEASURE'),port:Number(x.getFieldValue('PORT'))}};return x.type==='ev3_gyro_compare'?{op:x.getFieldValue('OP'),left:reading,right:expression(x.getInputTargetBlock('VALUE'))}:reading;}
  if(['ev3_touch','ev3_touch_value'].includes(x.type)){const reading={sensor:{kind:'touch',port:Number(x.getFieldValue('PORT'))}};return x.type==='ev3_touch'?{op:'eq',left:reading,right:Number(x.getFieldValue('STATE'))}:reading;}
  const infraredKinds={ev3_ir_proximity:'infrared',ev3_ir_compare:'infrared',ev3_ir_remote:'irRemote',ev3_ir_button:'irRemote',ev3_ir_beacon_detected:'irBeaconDetected',ev3_ir_beacon_heading:'irBeaconHeading',ev3_ir_beacon_distance:'irBeaconDistance'};
  if(infraredKinds[x.type]){const kind=infraredKinds[x.type],reading={sensor:{kind,port:Number(x.getFieldValue('PORT')),...(kind==='infrared'?{}:{channel:Number(x.getFieldValue('CHANNEL'))})}};
@@ -590,6 +601,7 @@ function chain(block){
       case 'ev3_tone':out.push({type:'tone',frequency:value(b,'FREQUENCY'),ms:value(b,'MS'),volume:Number(b.getFieldValue('VOLUME'))});break;
       case 'ev3_wait':out.push({type:'wait',ms:value(b,'MS')});break;
       case 'ev3_timer_reset':out.push({type:'timerReset'});break;
+      case 'ev3_gyro_reset':out.push({type:'gyroReset',port:Number(b.getFieldValue('PORT'))});break;
       case 'ev3_encoder_reset':out.push({type:'encoderReset',port:Number(b.getFieldValue('PORT'))});break;
       case 'ev3_motor_stop':case 'ev3_stop_port':out.push({type:'stop',ports:Number(b.getFieldValue('PORTS')),...(b.getFieldValue('STOP_MODE')&&b.getFieldValue('STOP_MODE')!=='default'?{stopMode:b.getFieldValue('STOP_MODE')}:{})});break;
       case 'ev3_stop':out.push({type:'stop'});break;
@@ -984,4 +996,11 @@ $('displaySample').onclick=()=>{
  if(dirty&&!confirm('編集中の内容を「本体画面の表示」に置き換えます。必要な作品は先に保存してください。'))return;
  loading=true;try{Blockly.serialization.workspaces.load(displaySampleState(),workspace);$('programName').value='DisplayTest';workspace.clearUndo();}finally{loading=false;}
  check();saveLocal();dirty=false;$('sampleMenu').open=false;
+};
+
+$('gyroSample').onclick=()=>{
+ if(dirty&&!confirm('編集中の内容を「ジャイロの角度・回転速度」に置き換えます。必要な作品は先に保存してください。'))return;
+ loading=true;try{Blockly.serialization.workspaces.load(gyroSampleState(),workspace);$('programName').value='GyroTest';workspace.clearUndo();}finally{loading=false;}
+ check();saveLocal();dirty=false;$('sampleMenu').open=false;
+ feedback('ジャイロをポート1に接続して静止させてください。開始音の後、約10秒間、手で向きを変えると角度・回転速度を画面表示しCSVに記録します。');
 };
