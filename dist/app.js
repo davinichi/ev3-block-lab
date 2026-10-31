@@ -4,7 +4,7 @@ import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.
 const $=id=>document.getElementById(id);
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.23.1';
+const VERSION='0.23.2';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -837,6 +837,15 @@ $('driveSample').onclick=()=>{
 };
 $('soundSample').onclick=()=>replaceSample('sound');$('motorSample').onclick=()=>replaceSample('motor');
 $('undo').onclick=()=>workspace.undo(false);$('redo').onclick=()=>workspace.undo(true);
+$('zoomToFit').onclick=()=>{
+ // パレットを閉じて編集領域全体を使う。ブロックの配置・接続は変更しない。
+ workspace.getToolbox()?.clearSelection();Blockly.svgResize(workspace);
+ if(!workspace.getAllBlocks(false).length)return;
+ // 大きく離れたブロックも収め、拡大操作でその倍率から戻れるようにする。
+ const zoom=workspace.options.zoomOptions,minimum=zoom.minScale;
+ try{zoom.minScale=Number.EPSILON;workspace.zoomToFit();}
+ finally{zoom.minScale=Math.min(minimum,workspace.scale);}
+};
 $('help').onclick=()=>$('helpDialog').showModal();
 $('newProject').onclick=()=>{
  if(workspace.getAllBlocks(false).length && !confirm('新しいプログラムを作ります。現在のプログラムが必要な場合は、先に「保存」してください。'))return;
