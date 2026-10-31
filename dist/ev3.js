@@ -1,3 +1,4 @@
+import {motorFeatures,stopModes} from './motor-features.js';
 import {parallelPlan,sharedLock} from './parallel.js';
 import {extraLayout,dataEmitter,isText,checkText} from './data.js';
 // EV3 bytecode and system-command implementation. No firmware image is modified.
@@ -27,7 +28,7 @@ export function constant(n) {
 export const local = n => n < 32 ? [0x40 | n] : n < 128 ? [0xc1, n] : n < 32768 ? [0xc2, ...u16(n)] : [0xc3,...u32(n)];
 export const globalVar = n => n < 32 ? [0x60 | n] : n < 128 ? [0xe1,n] : [0xe2,...u16(n)];
 export const OP = {END:0x0a, RETURN:0x08, CALL:0x09, PROGRAM_STOP:0x02, OBJECT_START:0x05, OBJECT_WAIT:0x07, JR:0x40, JR_LT32:0x66, JR_GT32:0x6a, MOVE32:0x3a, ADD32:0x12, SUB32:0x16, MUL32:0x1a, DIV32:0x1e,
-  INPUT_DEVICE:0x99, MOVEF32:0x3e, TIMER_READ:0x87, MOTOR_COUNT:0xb3, MOTOR_SPEED:0xa5, MOTOR_START:0xa6, MOTOR_TEST:0xa9,
+  INPUT_DEVICE:0x99, MOVEF32:0x3e, TIMER_READ:0x87, MOTOR_COUNT:0xb3, MOTOR_SPEED:0xa5, MOTOR_POWER:0xa4, MOTOR_READ:0xa8, MOTOR_START:0xa6, MOTOR_TEST:0xa9,
   WAIT:0x85, READY:0x86, SOUND:0x94, SOUND_READY:0x96, MOTOR_RESET:0xa2, MOTOR_CLEAR_COUNT:0xb2, STOP:0xa3, MOTOR:0xae, MOTOR_TIME:0xaf, MOTOR_SYNC:0xb0, MOTOR_READY:0xaa};
 // センサ・ボタンなど実行前に確定しない値を示す。0と区別して、未実行の測定値を決め打ちしない。
 const UNKNOWN=Symbol('runtime sensor value');
@@ -59,7 +60,7 @@ function buttonConfiguration(button){
 function sensorConfiguration(sensor){
  const {kind,port,channel}=sensor;
  if(!Number.isInteger(port)||port<1||port>4)throw Error('センサの種類・ポートを確認してください。');
- const configs={color:{type:29,mode:2,min:0,max:7},reflected:{type:29,mode:0,min:0,max:100},distance:{type:30,mode:0,min:0,max:255},touch:{type:16,mode:0,min:0,max:1},infrared:{type:33,mode:0,min:0,max:100},irRemote:{type:33,mode:2,min:0,max:11,count:4},irBeaconDistance:{type:33,mode:1,min:0,max:100,count:8},irBeaconHeading:{type:33,mode:1,min:-25,max:25,count:8},irBeaconDetected:{type:33,mode:1,min:0,max:1,count:8},encoder:{encoder:true}};
+ const configs={color:{type:29,mode:2,min:0,max:7},reflected:{type:29,mode:0,min:0,max:100},distance:{type:30,mode:0,min:0,max:255},touch:{type:16,mode:0,min:0,max:1},infrared:{type:33,mode:0,min:0,max:100},irRemote:{type:33,mode:2,min:0,max:11,count:4},irBeaconDistance:{type:33,mode:1,min:0,max:100,count:8},irBeaconHeading:{type:33,mode:1,min:-25,max:25,count:8},irBeaconDetected:{type:33,mode:1,min:0,max:1,count:8},encoder:{encoder:true},motorSpeed:{motor:true}};
  if(!Object.hasOwn(configs,kind))throw Error('センサの種類・ポートを確認してください。');
  const config=configs[kind];
  if(config.count&&(!Number.isInteger(channel)||channel<1||channel>4))throw Error('赤外線センサのチャンネルは1〜4から選んでください。');
@@ -113,6 +114,7 @@ function prepareProgram(input){
       if(!['forward','backward'].includes(b.direction))throw Error('走行方向が不正です。');
       return {...b,type:'motor',speed:scaled(b.speed,b.direction==='backward'?-1:1),degrees:{geometry:{kind:'distance',value:b.cm}},driveSource:b};
     }
+    if(b.type==='motorRotations')return {...b,type:'motor',degrees:scaled(b.rotations,360)};
     if(b.type==='waitSeconds')return {type:'wait',ms:scaled(b.seconds,1000),secondsSource:b.seconds};
     if(b.type==='repeat'||b.type==='while'||b.type==='forever')return {...b,body:sequence(b.body)};
     if(b.type==='if')return {...b,then:sequence(b.then),else:sequence(b.else)};
@@ -167,6 +169,13 @@ export function validate(program) {
           assignments(program);for(const key of globals.keys())globals.set(key,UNKNOWN);return walk(b.body,env,stack);
         }
         case 'while':{let count=0;while(true){const condition=val('condition');if(condition===UNKNOWN){for(const k of globals.keys())globals.set(k,UNKNOWN);const before={...geometry};walk(b.body,env,stack);for(const k of Object.keys(geometry))if(before[k]!==geometry[k])geometry[k]=0;for(const k of globals.keys())globals.set(k,UNKNOWN);break;}if(!!condition===!!b.until)break;if(++count>1000)throw Error('条件付き繰り返しは1000回以内に終わるようにしてください。変数の更新と条件を確認してください。');const exit=walk(b.body,env,stack);if(exit)return exit;}break;}
+        case 'stopMode':inRange(b.ports,1,15,'モーターポート');if(!Object.hasOwn(stopModes,b.mode))throw Error('停止方法を選んでください。');break;
+        case 'tankFinite':{
+          if(![1,2,4,8].includes(b.leftPort)||![1,2,4,8].includes(b.rightPort)||b.leftPort===b.rightPort)throw Error('左右には異なるモーターポートを選んでください。');
+          const left=val('leftSpeed'),right=val('rightSpeed');inRange(left,-100,100,'左モーターの速さ');inRange(right,-100,100,'右モーターの速さ');if(left===0&&right===0)throw Error('左右の速さを両方0にはできません。');
+          if(b.action==='angle')inRange(val('degrees'),1,36000,'速い側のモーターの角度');else if(b.action==='time'){const seconds=evaluate(b.seconds,env);if(seconds!==UNKNOWN&&(!Number.isFinite(seconds)||seconds<.001||seconds>60))throw Error('走行時間は0.001〜60秒にしてください。');}else throw Error('走行の指定を確認してください。');break;
+        }
+        case 'motorPower':case 'motorSpeedSet':inRange(b.ports,1,15,'モーターポート');inRange(val('speed'),-100,100,'速度・パワー');break;
         case 'tank':if(![1,2,4,8].includes(b.leftPort)||![1,2,4,8].includes(b.rightPort)||b.leftPort===b.rightPort)throw Error('左右には異なるモーターポートを選んでください。');inRange(val('leftSpeed'),-100,100,'左モーターの速さ');inRange(val('rightSpeed'),-100,100,'右モーターの速さ');break;
         case 'motorRun':inRange(b.ports,1,15,'モーターポート');if(b.ports.toString(2).split('1').length-1>2)throw Error('モーターポートは2個まで指定できます。');inRange(val('speed'),-100,100,'速度');break;
         case 'motor': inRange(b.ports,1,15,'モーターポート'); inRange(val('speed'),-100,100,'速度');
@@ -187,7 +196,7 @@ export function validate(program) {
         case 'broadcast':if(typeof b.message!=='string'||!b.message.trim()||b.message.length>40||b.message.includes('\0'))throw Error('メッセージ名は1〜40文字にしてください。');break;
         case 'programEnd':return 'programEnd';
         case 'myblockReturn':if(!stack.length)throw Error('マイブロックの終了は定義の中だけで使えます。');env[RETURNS].push({globals:new Map(globals),geometry:{...geometry}});return 'myblockReturn';
-        case 'stop': if(b.ports!==undefined)inRange(b.ports,1,15,'停止するモーターポート');break;
+        case 'stop': if(b.stopMode!==undefined&&!Object.hasOwn(stopModes,b.stopMode))throw Error('停止方法を選んでください。');if(b.ports!==undefined)inRange(b.ports,1,15,'停止するモーターポート');break;
         case 'repeat': {const n=val('count'); inRange(n,0,1000,'繰り返し回数'); if(n===UNKNOWN){for(const k of globals.keys())globals.set(k,UNKNOWN);const before={...geometry};walk(b.body,env,stack);for(const k of Object.keys(geometry))if(before[k]!==geometry[k])geometry[k]=0;for(const k of globals.keys())globals.set(k,UNKNOWN);}else for(let i=0;i<n;i++){const exit=walk(b.body,env,stack);if(exit)return exit;} break;}
         case 'call': {
           const p=map.get(b.name); if(!p)throw Error(`マイブロック「${b.name}」の定義がありません。`);
@@ -220,14 +229,15 @@ export function compile(program,folder='EV3Lab') {
   program=prepareProgram(program);
   validate(program);
   const parallel=parallelPlan(program);
-  const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false,usesTimer=false;
-  const collect=x=>{if(x&&typeof x==='object'){if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
+  const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false,usesTimer=false,usesStopModes=false;
+  const collect=x=>{if(x&&typeof x==='object'){if(x.type==='stopMode'||x.stopMode!==undefined)usesStopModes=true;if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
   collect(program);if(variableNames.size>32)throw Error('変数は32個までです。');
   // 通常変数・寸法・加減速設定・共有タイマーを重ならない位置へ配置する。各数値の領域は4バイト。
   const globalOffsets=new Map([...variableNames].map((name,i)=>[name,i*4]));
   const diameterOffset=globalOffsets.size*4,treadOffset=diameterOffset+4,rampOffset=diameterOffset+(usesGeometry?8:0);
   const timerOffset=rampOffset+(usesRamps?12:0);
-  const baseGlobalBytes=timerOffset+(usesTimer?4:0);
+  const stopModeOffset=timerOffset+(usesTimer?4:0);
+  const baseGlobalBytes=stopModeOffset+(usesStopModes?16:0);
   const extras=extraLayout(program,baseGlobalBytes,directory);
   // Bind a diagnostic record to this compiler revision and exact project.
   let diagnosticTag=0x811c9dc5;
@@ -274,11 +284,12 @@ export function compile(program,folder='EV3Lab') {
         const {kind,port,channel}=x.sensor,config=sensorConfiguration(x.sensor),result=local(alloc());
         const actualType=local(alloc()),actualMode=local(alloc());
         emit(OP.MOVE32,constant(0),actualType);emit(OP.MOVE32,constant(0),actualMode);
-        if(config.encoder){
+        if(config.encoder||config.motor){
           // Output ports are numbered 16..19 by INPUT_DEVICE, but 0..3 by
           // OUTPUT_GET_COUNT. Read the sensor counter without resetting it.
           emit(OP.INPUT_DEVICE,constant(5),constant(0),constant(15+port),actualType,actualMode);guard(actualType,7,8);
-          emit(OP.MOTOR_COUNT,constant(0),constant(port-1),result);return result;
+          if(config.motor){const raw=local(alloc()),steps=local(alloc());emit(OP.MOTOR_READ,constant(0),constant(port-1),raw,steps);emit(0x32,raw,result);guard(result,-100,100);}
+          else emit(OP.MOTOR_COUNT,constant(0),constant(port-1),result);return result;
         }
         const raw=Array.from({length:config.count??1},()=>local(alloc()));
         emit(OP.INPUT_DEVICE,constant(29),constant(0),constant(port-1),constant(config.type),constant(config.mode),constant(raw.length),...raw);
@@ -371,6 +382,7 @@ export function compile(program,folder='EV3Lab') {
       if(typeof x==='number')return constant(Math.trunc(finiteNumber(Math.fround(x))));
       const value=floatExpr(x),result=local(alloc());floatGuard(value);emit(OP.MOVEF32,value,result);return result;
     };
+    const motors=motorFeatures({emit,alloc,local,globalVar,constant,expr,guard,nonzero,jump,patch,position:()=>code.length},usesStopModes,stopModeOffset);
     const dataOps=dataEmitter({emit,alloc,local,globalVar,constant,zstr,floatExpr,expr,asFloat,guard,floatGuard,jump,patch,faults,floatConstant:floatingConstant,position:()=>code.length},extras);
     // 2個のモーターの進み具合をエンコーダで比較し、先行側の速度を調整する試作の補正制御。
     // 目標角度を優先し、停止時刻と途中経過を診断ファイルへ記録する。実行はすべてEV3内で行う。
@@ -406,8 +418,8 @@ export function compile(program,folder='EV3Lab') {
       if(b.portDirections){
         // Queue both finite movements before waiting. Each shaft has its own
         // direction; progress feedback compares absolute forward progress.
-        ports.forEach(port=>emit(OP.MOTOR,constant(0),constant(1<<port),expr(scaled(b.speed,b.portDirections[port])),constant(0),expr(b.degrees),constant(0),constant(1)));
-      }else emit(OP.MOTOR,constant(0),constant(b.ports),expr(b.speed),constant(0),expr(b.degrees),constant(0),constant(1));
+        ports.forEach(port=>emit(OP.MOTOR,constant(0),constant(1<<port),expr(scaled(b.speed,b.portDirections[port])),constant(0),expr(b.degrees),constant(0),motors.nativeBrake(1<<port)));
+      }else motors.finite(OP.MOTOR,b.ports,expr(b.speed),expr(b.degrees));
       const loop=code.length;
       ports.forEach((port,i)=>emit(OP.MOTOR_TEST,constant(0),constant(1<<port),busy[i]));
       emit(OP.TIMER_READ,elapsed);emit(OP.SUB32,elapsed,began,elapsed);
@@ -502,7 +514,7 @@ export function compile(program,folder='EV3Lab') {
       emit(OP.MOVE32,base,cap);const noRamp=jump(OP.JR_LT32,[up,c(1)]);emit(OP.MOVE32,c(1),cap);patch(noRamp,code.length);
       emit(OP.TIMER_READ,began);
       if(timed){emit(OP.MUL32,cap,sign,speed[0]);emit(OP.MOTOR_SPEED,c(0),c(b.ports),speed[0]);emit(OP.MOTOR_START,c(0),c(b.ports));}
-      else ports.forEach((port,i)=>{emit(OP.MUL32,cap,direction(port),speed[i]);emit(OP.MOTOR,c(0),c(1<<port),speed[i],c(0),target,c(0),c(1));});
+      else ports.forEach((port,i)=>{emit(OP.MUL32,cap,direction(port),speed[i]);emit(OP.MOTOR,c(0),c(1<<port),speed[i],c(0),target,c(0),motors.nativeBrake(1<<port));});
       const loop=code.length;
       emit(OP.TIMER_READ,elapsed);emit(OP.SUB32,elapsed,began,elapsed);
       if(timed){finishes.push(jump(OP.JR_GT32,[elapsed,target]));const equal=reg();emit(OP.SUB32,target,elapsed,equal);finishes.push(jump(OP.JR_LT32,[equal,c(1)]));}
@@ -548,14 +560,14 @@ export function compile(program,folder='EV3Lab') {
       }
       emit(OP.WAIT,c(20),local(timer));emit(OP.READY,local(timer));const again=jump(OP.JR,[]);patch(again,loop);
       for(const at of finishes)patch(at,code.length);
-      emit(OP.STOP,c(0),c(b.ports),c(1));
+      motors.stop(b.ports);
     };
 
     // 制御構造をEV3の比較・ジャンプ・呼び出し命令へ展開する。終了命令の後の同じ並びは生成しない。
     const sequence=nodes=>{
       for(const original of nodes) {
         let b=original;
-        const shared=['set','change','textSet','listAdd','listSet','listClear','listDelete','logStart','logValue','logEnd','broadcast','wheel','tread','ramp','timerReset'].includes(b.type)&&lock&&!lockDepth;
+        const shared=['set','change','textSet','listAdd','listSet','listClear','listDelete','logStart','logValue','logEnd','broadcast','wheel','tread','ramp','timerReset','stopMode'].includes(b.type)&&lock&&!lockDepth;
         if(shared){lock.acquire();lockDepth++;}
         if(usesSensors||usesForever||usesFloat||usesRamps){
           const checked=(source,min,max)=>{const at=alloc();emit(OP.MOVE32,expr(source),local(at));guard(local(at),min,max);return {register:at};};
@@ -570,7 +582,10 @@ export function compile(program,folder='EV3Lab') {
         }
         switch(b.type) {
           case 'led':emit(0x82,constant(27),constant(b.color===0?0:b.color+({on:0,flash:3,pulse:6}[b.mode])));break;
-          case 'steering':{const ports=b.leftPort|b.rightPort,speed=expr(b.speed),turn=expr(b.turn),nativeTurn=local(alloc());guard(speed,-100,100);guard(turn,-100,100);emit(OP.MUL32,turn,constant(b.leftPort<b.rightPort?2:-2),nativeTurn);if(b.action==='run'){emit(OP.MOTOR_SYNC,constant(0),constant(ports),speed,nativeTurn,constant(0),constant(0));}else{nonzero(speed);emit(OP.MOTOR_RESET,constant(0),constant(ports));const amount=b.action==='angle'?expr(b.degrees):expr(scaled(b.seconds,1000));guard(amount,1,b.action==='angle'?36000:60000);emit(b.action==='time'?0xb1:OP.MOTOR_SYNC,constant(0),constant(ports),speed,nativeTurn,amount,constant(1));emit(OP.MOTOR_READY,constant(0),constant(ports));}break;}
+          case 'steering':{const ports=b.leftPort|b.rightPort,speed=expr(b.speed),turn=expr(b.turn),nativeTurn=local(alloc());guard(speed,-100,100);guard(turn,-100,100);emit(OP.MUL32,turn,constant(b.leftPort<b.rightPort?2:-2),nativeTurn);if(b.action==='run'){emit(OP.MOTOR_SYNC,constant(0),constant(ports),speed,nativeTurn,constant(0),constant(0));}else{nonzero(speed);const brake=motors.nativeBrake(ports,true);emit(OP.MOTOR_RESET,constant(0),constant(ports));const amount=b.action==='angle'?expr(b.degrees):expr(scaled(b.seconds,1000));guard(amount,1,b.action==='angle'?36000:60000);emit(b.action==='time'?0xb1:OP.MOTOR_SYNC,constant(0),constant(ports),speed,nativeTurn,amount,brake);emit(OP.MOTOR_READY,constant(0),constant(ports));motors.finish(ports);}break;}
+          case 'stopMode':motors.configure(b);break;
+          case 'tankFinite':motors.tank(b);break;
+          case 'motorPower':case 'motorSpeedSet':{const speed=expr(b.speed);guard(speed,-100,100);emit(b.type==='motorPower'?OP.MOTOR_POWER:OP.MOTOR_SPEED,constant(0),constant(b.ports),speed);if(b.type==='motorPower')emit(OP.MOTOR_START,constant(0),constant(b.ports));break;}
           case 'textSet':case 'listAdd':case 'listSet':case 'listClear':case 'listDelete':case 'logStart':case 'logValue':case 'logEnd':dataOps.statement(b);break;
           case 'ramp':{emit(OP.MOVE32,constant({off:0,trapezoid:1,scurve:2}[b.mode]),globalVar(rampOffset));for(const [i,name]of ['upSeconds','downSeconds'].entries()){const time=expr(scaled(b[name],1000));guard(time,0,10000);emit(OP.MOVE32,time,globalVar(rampOffset+4+i*4));}break;}
           case 'wheel':emit(OP.MOVE32,constant(Math.round(b.diameter*10)),globalVar(diameterOffset));break;
@@ -588,7 +603,7 @@ export function compile(program,folder='EV3Lab') {
             emit(OP.MOVE32,constant(0),active);
             for(const [port,speed]of [[b.leftPort,left],[b.rightPort,right]]){
               const nonzeroSpeed=exprCompare(speed,constant(0)),run=jump(OP.JR_GT32,[nonzeroSpeed,constant(0)]);
-              emit(OP.STOP,constant(0),constant(port),constant(1));const done=jump(OP.JR,[]);
+              motors.stop(port);const done=jump(OP.JR,[]);
               patch(run,code.length);emit(OP.MOTOR_SPEED,constant(0),constant(port),speed);emit(OP.ADD32,active,constant(port),active);patch(done,code.length);
             }
             const allStopped=jump(OP.JR_LT32,[active,constant(1)]);
@@ -597,10 +612,10 @@ export function compile(program,folder='EV3Lab') {
           }
           case 'motorRun':{
             const speed=expr(b.speed),zero=local(alloc());emit(OP.MOVE32,constant(0),zero);emit(0x4e,speed,constant(0),zero);
-            const run=jump(OP.JR_LT32,[zero,constant(1)]);emit(OP.STOP,constant(0),constant(b.ports),constant(1));const done=jump(OP.JR,[]);
+            const run=jump(OP.JR_LT32,[zero,constant(1)]);motors.stop(b.ports);const done=jump(OP.JR,[]);
             patch(run,code.length);emit(OP.MOTOR_SPEED,constant(0),constant(b.ports),speed);emit(OP.MOTOR_START,constant(0),constant(b.ports));patch(done,code.length);break;
           }
-          case 'motorTimed':{let legacy,done;if(usesRamps){legacy=jump(OP.JR_LT32,[globalVar(rampOffset),constant(1)]);rampedMotion(b);done=jump(OP.JR,[]);patch(legacy,code.length);}emit(OP.MOTOR_TIME,constant(0),constant(b.ports),expr(b.speed),constant(0),expr(b.secondsAreMs?b.seconds:scaled(b.seconds,1000)),constant(0),constant(1));emit(OP.MOTOR_READY,constant(0),constant(b.ports));if(done!==undefined)patch(done,code.length);break;}
+          case 'motorTimed':{let legacy,done;if(usesRamps){legacy=jump(OP.JR_LT32,[globalVar(rampOffset),constant(1)]);rampedMotion(b);done=jump(OP.JR,[]);patch(legacy,code.length);}motors.finite(OP.MOTOR_TIME,b.ports,expr(b.speed),expr(b.secondsAreMs?b.seconds:scaled(b.seconds,1000)));emit(OP.MOTOR_READY,constant(0),constant(b.ports));motors.finish(b.ports);if(done!==undefined)patch(done,code.length);break;}
           case 'motor':{
             let legacy,done;if(usesRamps){legacy=jump(OP.JR_LT32,[globalVar(rampOffset),constant(1)]);rampedMotion(b);done=jump(OP.JR,[]);patch(legacy,code.length);}
             if((b.ports & (b.ports-1))!==0 && b.mode==='feedback'){
@@ -611,18 +626,18 @@ export function compile(program,folder='EV3Lab') {
               // The driver compares accumulated TachoCnt values, so unequal
               // old counts must not become part of a fresh relative movement.
               emit(OP.MOTOR_RESET,constant(0),constant(b.ports));
-              emit(OP.MOTOR_SYNC,constant(0),constant(b.ports),expr(b.speed),constant(0),expr(b.degrees),constant(1));
+              emit(OP.MOTOR_SYNC,constant(0),constant(b.ports),expr(b.speed),constant(0),expr(b.degrees),motors.nativeBrake(b.ports,true));
             }else{
-              emit(OP.MOTOR,constant(0),constant(b.ports),expr(b.speed),constant(0),expr(b.degrees),constant(0),constant(1));
+              motors.finite(OP.MOTOR,b.ports,expr(b.speed),expr(b.degrees));
             }
-            emit(OP.MOTOR_READY,constant(0),constant(b.ports));if(done!==undefined)patch(done,code.length);break;}
+            emit(OP.MOTOR_READY,constant(0),constant(b.ports));motors.finish(b.ports);if(done!==undefined)patch(done,code.length);break;}
           case 'tone': emit(OP.SOUND,constant(1),constant(b.volume),expr(b.frequency),expr(b.ms)); emit(OP.SOUND_READY); break;
           case 'wait': emit(OP.WAIT,expr(b.ms),local(timer)); emit(OP.READY,local(timer)); break;
           case 'timerReset':emit(OP.TIMER_READ,globalVar(timerOffset));break;
           case 'encoderReset':integerExpr({sensor:{kind:'encoder',port:b.port}});emit(OP.MOTOR_CLEAR_COUNT,constant(0),constant(1<<(b.port-1)));break;
           case 'programEnd':emit(OP.STOP,constant(0),constant(15),constant(1));emit(OP.PROGRAM_STOP,constant(-1));return;
           case 'myblockReturn':if(!p.subcall)throw Error('マイブロックの終了は定義の中だけで使えます。');emit(OP.RETURN);return;
-          case 'stop': emit(OP.STOP,constant(0),constant(b.ports??15),constant(1)); break;
+          case 'stop': motors.stop(b.ports??15,b.stopMode); break;
           case 'broadcast':{
             if(!parallel)break;
             const counter=messageAt(b.message),sent=local(alloc());guard(counter,0,2147483645);
@@ -651,6 +666,7 @@ export function compile(program,folder='EV3Lab') {
     if(index===0){for(const at of globalOffsets.values())emit(OP.MOVE32,constant(0),globalVar(at));if(usesGeometry)for(const at of [diameterOffset,treadOffset])emit(OP.MOVE32,constant(0),globalVar(at));}
     if(index===0&&usesRamps)for(const at of [rampOffset,rampOffset+4,rampOffset+8])emit(OP.MOVE32,constant(0),globalVar(at));
     if(index===0&&usesTimer)emit(OP.MOVE32,constant(0),globalVar(timerOffset));
+    if(index===0&&usesStopModes)for(let i=0;i<4;i++)emit(OP.MOVE32,constant(0),globalVar(stopModeOffset+4*i));
     if(index===0)dataOps.init();
     const pause=ms=>{emit(OP.WAIT,constant(ms),local(timer));emit(OP.READY,local(timer));};
     if(p.boot){

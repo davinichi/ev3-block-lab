@@ -599,3 +599,27 @@ test('all three parallel classroom samples reload and compile without losing eve
   const generated=JSON.parse(vm.runInContext('JSON.stringify(parallelSampleState(kind))',context));assert.deepEqual(generated,sample.workspace);
  }
 });
+
+test('new motor blocks retain stop choices, fractional rotations and measurements through project and library reuse',()=>{
+ const context=editor();const state=JSON.parse(vm.runInContext(`Blockly.Events.disable();
+ const n=value=>({shadow:{type:'math_number',fields:{NUM:value}}});
+ const steps=[{type:'ev3_motor_stop_mode',fields:{PORTS:'9',MODE:'coast'}},{type:'ev3_motor_m_pair_rotation',fields:{PORTS:'9'},inputs:{SPEED:n(-20),ROTATIONS:n(.5)}},{type:'ev3_tank_angle',fields:{LEFT_PORT:'8',RIGHT_PORT:'1'},inputs:{LEFT_SPEED:n(20),RIGHT_SPEED:n(-10),DEGREES:n(90)}},{type:'ev3_tank_time',fields:{LEFT_PORT:'8',RIGHT_PORT:'1'},inputs:{LEFT_SPEED:n(20),RIGHT_SPEED:n(10),SECONDS:n(.5)}},{type:'ev3_motor_power',fields:{PORTS:'1'},inputs:{POWER:n(25)}},{type:'ev3_motor_speed_set',fields:{PORTS:'1'},inputs:{SPEED:n(30)}},{type:'ev3_log_value',fields:{LABEL:'速度'},inputs:{VALUE:{block:{type:'ev3_motor_speed',fields:{PORT:'4'}}}}},{type:'ev3_stop_port',fields:{PORTS:'9',STOP_MODE:'hold'}}];
+ for(let i=0;i<steps.length-1;i++)steps[i].next={block:steps[i+1]};
+ Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'procedures_defnoreturn',fields:{NAME:'モーター追加'},inputs:{STACK:{block:steps[0]}}}]}},workspace);
+ const saved=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(saved,workspace);const result=Blockly.serialization.workspaces.save(workspace);Blockly.Events.enable();JSON.stringify(result);`,context));
+ inspectBlocks(state.blocks);const merged=mergeBlockLibrary({blocks:{languageVersion:0,blocks:[{type:'ev3_start'}]}},createBlockLibrary(state,'0.19.0'));context.newMotors=JSON.stringify(merged);
+ const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(newMotors),workspace);const start=workspace.getAllBlocks(false).find(b=>b.type==='ev3_start'),call=workspace.newBlock('procedures_callnoreturn');call.loadExtraState({name:'モーター追加',params:[]});start.nextConnection.connect(call.previousConnection);const p=program();Blockly.Events.enable();JSON.stringify(p);`,context));
+ const body=p.procedures[0].body;assert.equal(body[0].mode,'coast');assert.equal(body[1].rotations,.5);assert.equal(body[2].leftPort,8);assert.equal(body[3].seconds,.5);assert.equal(body[4].type,'motorPower');assert.deepEqual(body[6].value,{sensor:{kind:'motorSpeed',port:4}});assert.equal(body.at(-1).stopMode,'hold');compile(p);
+});
+
+test('old per-port stop files keep their original default and all new rotation palette entries exist for L and M',()=>{
+ const context=editor();const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'ev3_start',next:{block:{type:'ev3_stop_port',fields:{PORTS:'4'}}}}]}},workspace);for(const kind of ['l','m'])for(const group of ['single','pair']){const type='ev3_motor_'+kind+'_'+group+'_rotation';if(!toolbox.contents.find(c=>c.name==='モーター').contents.some(x=>x.type===type))throw Error(type);}const p=program();Blockly.Events.enable();JSON.stringify(p);`,context));assert.deepEqual(p.main,[{type:'stop',ports:4}]);compile(p);
+});
+
+test('motor feature samples round-trip and produce valid on-brick images with no unresolved blocks',()=>{
+ for(const [kind,name]of [['stop','MotorStopTest'],['tank','TankFiniteTest'],['power','MotorPowerTest']]){
+  const context=editor();context.kind=kind;const sample=JSON.parse(readFileSync(new URL('../examples/'+name+'.ev3lab',import.meta.url),'utf8'));inspectBlocks(sample.workspace.blocks);context.lesson=JSON.stringify(sample.workspace);
+  const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const saved=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(saved,workspace);const p=program();Blockly.Events.enable();JSON.stringify(p);`,context));const b=compile(p);assert.ok(b.data.length<65536);assert.deepEqual(b.logFiles,kind==='power'?['Power']:[]);
+  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(motorSampleState(kind))',context)),sample.workspace);
+ }
+});

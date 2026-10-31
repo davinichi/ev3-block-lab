@@ -1,0 +1,216 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "appVersion": "0.19.0",
+  "name": "MotorPowerTest",
+  "programName": "MotorPowerTest",
+  "ev3ProjectName": "EV3Lab",
+  "pairMode": "independent",
+  "workspace": {
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "x": 30,
+          "y": 30,
+          "next": {
+            "block": {
+              "type": "ev3_log_start",
+              "fields": {
+                "FILE": "Power"
+              },
+              "next": {
+                "block": {
+                  "type": "ev3_motor_l_single_run",
+                  "fields": {
+                    "PORTS": "2"
+                  },
+                  "inputs": {
+                    "SPEED": {
+                      "shadow": {
+                        "type": "math_number",
+                        "fields": {
+                          "NUM": 20
+                        }
+                      }
+                    }
+                  },
+                  "next": {
+                    "block": {
+                      "type": "ev3_wait_seconds",
+                      "inputs": {
+                        "SECONDS": {
+                          "shadow": {
+                            "type": "math_number",
+                            "fields": {
+                              "NUM": 0.5
+                            }
+                          }
+                        }
+                      },
+                      "next": {
+                        "block": {
+                          "type": "ev3_log_value",
+                          "fields": {
+                            "LABEL": "速度指定20"
+                          },
+                          "inputs": {
+                            "VALUE": {
+                              "block": {
+                                "type": "ev3_motor_speed",
+                                "fields": {
+                                  "PORT": "2"
+                                }
+                              }
+                            }
+                          },
+                          "next": {
+                            "block": {
+                              "type": "ev3_motor_speed_set",
+                              "fields": {
+                                "PORTS": "2"
+                              },
+                              "inputs": {
+                                "SPEED": {
+                                  "shadow": {
+                                    "type": "math_number",
+                                    "fields": {
+                                      "NUM": 30
+                                    }
+                                  }
+                                }
+                              },
+                              "next": {
+                                "block": {
+                                  "type": "ev3_wait_seconds",
+                                  "inputs": {
+                                    "SECONDS": {
+                                      "shadow": {
+                                        "type": "math_number",
+                                        "fields": {
+                                          "NUM": 0.5
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "next": {
+                                    "block": {
+                                      "type": "ev3_log_value",
+                                      "fields": {
+                                        "LABEL": "速度変更30"
+                                      },
+                                      "inputs": {
+                                        "VALUE": {
+                                          "block": {
+                                            "type": "ev3_motor_speed",
+                                            "fields": {
+                                              "PORT": "2"
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "next": {
+                                        "block": {
+                                          "type": "ev3_motor_power",
+                                          "fields": {
+                                            "PORTS": "2"
+                                          },
+                                          "inputs": {
+                                            "POWER": {
+                                              "shadow": {
+                                                "type": "math_number",
+                                                "fields": {
+                                                  "NUM": 20
+                                                }
+                                              }
+                                            }
+                                          },
+                                          "next": {
+                                            "block": {
+                                              "type": "ev3_wait_seconds",
+                                              "inputs": {
+                                                "SECONDS": {
+                                                  "shadow": {
+                                                    "type": "math_number",
+                                                    "fields": {
+                                                      "NUM": 0.5
+                                                    }
+                                                  }
+                                                }
+                                              },
+                                              "next": {
+                                                "block": {
+                                                  "type": "ev3_log_value",
+                                                  "fields": {
+                                                    "LABEL": "パワー指定20"
+                                                  },
+                                                  "inputs": {
+                                                    "VALUE": {
+                                                      "block": {
+                                                        "type": "ev3_motor_speed",
+                                                        "fields": {
+                                                          "PORT": "2"
+                                                        }
+                                                      }
+                                                    }
+                                                  },
+                                                  "next": {
+                                                    "block": {
+                                                      "type": "ev3_stop_port",
+                                                      "fields": {
+                                                        "PORTS": "2",
+                                                        "STOP_MODE": "hold"
+                                                      },
+                                                      "next": {
+                                                        "block": {
+                                                          "type": "ev3_wait_seconds",
+                                                          "inputs": {
+                                                            "SECONDS": {
+                                                              "shadow": {
+                                                                "type": "math_number",
+                                                                "fields": {
+                                                                  "NUM": 1
+                                                                }
+                                                              }
+                                                            }
+                                                          },
+                                                          "next": {
+                                                            "block": {
+                                                              "type": "ev3_log_end",
+                                                              "next": {
+                                                                "block": {
+                                                                  "type": "ev3_program_end"
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

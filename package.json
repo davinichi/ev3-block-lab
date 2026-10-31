@@ -1,1 +1,1 @@
-{"name":"ev3-block-lab","version":"0.18.0","private":true,"type":"module","scripts":{"test":"node --test tests/*.test.mjs","start":"node server.mjs"}}
+{"name":"ev3-block-lab","version":"0.19.0","private":true,"type":"module","scripts":{"test":"node --test tests/*.test.mjs","start":"node server.mjs"}}

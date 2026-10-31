@@ -42,20 +42,23 @@ export function runParallel(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorD
         case 0x85:{const ms=param(),at=param(4,true);m.setInt32(at,(time)+ms,true);events.push({type:'wait',ms});break;}
         case 0x86:{const deadline=param();while(time<deadline)yield {until:deadline};if(++completedWaits>=waitLimit)throw Error('TEST_WAIT_LIMIT');break;}
         case 0x87:{const at=param(4,true);m.setInt32(at,time,true);break;}
-        case 0xae:{assert.equal(param(1),0);const ports=param(1),speed=param(1);assert.equal(param(),0);const degrees=param();assert.equal(param(),0);assert.equal(param(1),1);events.push({type:'motor',ports,speed,degrees});motorDriver?.start(ports,speed,degrees);break;}
-        case 0xaf:{assert.equal(param(1),0);const ports=param(1),speed=param(1);assert.equal(param(),0);const ms=param();assert.equal(param(),0);assert.equal(param(1),1);events.push({type:'motorTimed',ports,speed,ms});break;}
+        case 0xae:{assert.equal(param(1),0);const ports=param(1),speed=param(1);assert.equal(param(),0);const degrees=param();assert.equal(param(),0);const brake=param(1);events.push({type:'motor',ports,speed,degrees,brake,time});motorDriver?.start(ports,speed,degrees);break;}
+        case 0xaf:{assert.equal(param(1),0);const ports=param(1),speed=param(1);assert.equal(param(),0);const ms=param();assert.equal(param(),0);const brake=param(1);events.push({type:'motorTimed',ports,speed,ms,brake,time});motorDriver?.startTimed?.(ports,speed,ms);break;}
+        case 0xa4:{assert.equal(param(1),0);const ports=param(1),power=param(1);for(let i=0;i<4;i++)if(ports&(1<<i))pendingSpeed[i]=power;events.push({type:'power',ports,power,time});motorDriver?.setPower?.(ports,power);break;}
+        case 0xa8:{assert.equal(param(1),0);const port=param(1),speed=param(1,true),steps=param(4,true);m.setInt8(speed,motorDriver?.actualSpeed?.(port)??motorDriver?.speed?.[port]??0);m.setInt32(steps,Math.round(motorDriver?.position?.[port]??0),true);break;}
+        case 0x32:{const v=param(1),at=param(4,true);m.setInt32(at,v,true);break;}
         case 0xa5:{assert.equal(param(1),0);const ports=param(1),speed=param(1);for(let i=0;i<4;i++)if(ports&(1<<i))pendingSpeed[i]=speed;motorDriver?.setSpeed(ports,speed);break;}
         case 0xa6:{assert.equal(param(1),0);const ports=param(1),selected=[0,1,2,3].filter(i=>ports&(1<<i)),speed=pendingSpeed[selected[0]],different=selected.some(i=>pendingSpeed[i]!==speed);events.push({type:'motorRun',ports,speed,...(different?{speeds:selected.map(i=>({port:i,speed:pendingSpeed[i]}))}:{})});if(different)for(const i of selected)motorDriver?.startContinuous(1<<i,pendingSpeed[i]);else motorDriver?.startContinuous(ports,speed);break;}
         case 0xa9:{assert.equal(param(1),0);const ports=param(1),at=param(1,true);m.setInt8(at,motorDriver?.busy(ports)?1:0);break;}
         case 0xb3:{assert.equal(param(1),0);const port=param(1),at=param(4,true);m.setInt32(at,motorDriver?Math.round(motorDriver.position[port]-encoderOffsets[port]):counts[port],true);break;}
         case 0xb2:{assert.equal(param(1),0);const ports=param(1);for(let i=0;i<4;i++)if(ports&(1<<i)){if(motorDriver)encoderOffsets[i]=motorDriver.position[i];else counts[i]=0;}break;}
         case 0xa2:{assert.equal(param(1),0);const ports=param(1);for(let i=0;i<4;i++)if(ports&(1<<i))counts[i]=0;break;}
-        case 0xb0:{assert.equal(param(1),0);const ports=param(1),speed=param(1),turn=param(2),degrees=param();const brake=param(1);assert.ok([0,1].includes(brake));events.push({type:'motorSync',ports,speed,turn,degrees});
+        case 0xb0:{assert.equal(param(1),0);const ports=param(1),speed=param(1),turn=param(2),degrees=param();const brake=param(1);assert.ok([0,1].includes(brake));events.push({type:'motorSync',ports,speed,turn,degrees,brake,time});motorDriver?.startSync?.(ports,speed,turn,degrees);
           // Firmware sync compares the two accumulated TachoCnt values. In the
           // ideal equal-count end state, an old offset reduces physical travel.
           for(let i=0;i<4;i++)if(ports&(1<<i)){movementLog.push({port:i,degrees:Math.sign(speed)*degrees-counts[i]});counts[i]=0;}break;}
         case 0xaa:{param(1);const ports=param(1);if(motorDriver)while(motorDriver.busy(ports))yield {until:time+5};break;}
-        case 0xa3:{param(1);const ports=param(1);param(1);motorDriver?.stop(ports);break;}
+        case 0xa3:{param(1);const ports=param(1),brake=param(1);events.push({type:'stop',ports,brake,time});motorDriver?.stop(ports);break;}
         case 0x02:{assert.equal(param(2),-1);if(motorDriver)motorDriver.aborted=true;stopped=true;return;}
         case 0x82:assert.equal(param(1),27);events.push({type:'led',pattern:param(1)});break;
         case 0x36:{const n=param(2),at=param(4,true);m.setInt32(at,n,true);break;}
@@ -67,7 +70,7 @@ export function runParallel(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorD
         case 0xc2:{const h=param(2),i=param(),v=fparam();assert.ok(i>=0&&i<arrays.get(h).length);arrays.get(h)[i]=v;break;}
         case 0xc3:{const h=param(2),i=param(),at=param(4,true);assert.ok(i>=0&&i<arrays.get(h).length);setFloat(at,arrays.get(h)[i]);break;}
         case 0xc4:{const h=param(2),v=fparam();arrays.get(h).push(v);break;}
-        case 0xb1:{assert.equal(param(1),0);events.push({type:'steeringTime',ports:param(1),speed:param(1),turn:param(2),ms:param(),brake:param(1)});break;}
+        case 0xb1:{assert.equal(param(1),0);const ports=param(1),speed=param(1),turn=param(2),ms=param(),brake=param(1);events.push({type:'steeringTime',ports,speed,turn,ms,brake,time});motorDriver?.startSyncTimed?.(ports,speed,turn,ms);break;}
         case 0xc0:{const command=param(1);
           if(command===2||command===0){const path=string(),at=param(2,true);if(command===2||!files.has(path))files.set(path,new Uint8Array());handles.set(1,path);m.setInt16(at,1,true);}
           else if(command===6){const handle=param(2);assert.equal(param(1),0);const src=pointer(),raw=[];for(let i=0;i<124&&src.get(i);i++)raw.push(src.get(i));const path=handles.get(handle);assert.ok(path);files.set(path,new Uint8Array([...files.get(path),...raw]));}

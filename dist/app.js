@@ -4,7 +4,7 @@ import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.
 const $=id=>document.getElementById(id);
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.18.0';
+const VERSION='0.19.0';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -28,7 +28,7 @@ Blockly.defineBlocksWithJsonArray([
  {type:'ev3_motor',message0:'Lモーター %1 速さ %2 ％で %3 度回す',args0:[{type:'field_dropdown',name:'PORTS',options:[singlePorts[1],singlePorts[0],singlePorts[2],singlePorts[3],...pairPorts]},{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'DEGREES',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'速度は-100〜100（0以外）。2ポートを選んだ場合の制御方式は「先生用の設定・計測」で選択します。標準は各モーターの指定角度を優先し、同期方式は検証用です。'},
  {type:'ev3_tone',message0:'音 %1 Hz を %2 ミリ秒 鳴らす 音量 %3',args0:[{type:'input_value',name:'FREQUENCY',check:'Number'},{type:'input_value',name:'MS',check:'Number'},{type:'field_number',name:'VOLUME',value:25,min:0,max:100,precision:1}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#a570b3'},
  {type:'ev3_wait',message0:'%1 ミリ秒 待つ（旧形式）',args0:[{type:'input_value',name:'MS',check:'Number'}],previousStatement:null,nextStatement:null,colour:'#d19636'},
- {type:'ev3_stop_port',message0:'モーター %1 を停止',args0:[{type:'field_dropdown',name:'PORTS',options:singlePorts}],previousStatement:null,nextStatement:null,colour:'#0090f5',tooltip:'L・M共通。選んだポートだけをブレーキ停止し、次の命令へ進みます。ほかのモーターは回転を続けます。プログラムが終了するとすべて停止します。'},
+ {type:'ev3_stop_port',message0:'モーター %1 を %2 で停止',args0:[{type:'field_dropdown',name:'PORTS',options:[...singlePorts,...pairPorts,['すべて','15']]},{type:'field_dropdown',name:'STOP_MODE',options:[['設定どおり','default'],['ブレーキ','brake'],['惰性','coast'],['保持','hold']]}],previousStatement:null,nextStatement:null,colour:'#0090f5',tooltip:'選んだポートだけを停止。ブレーキは100ms制動後に解放、惰性はすぐ解放、保持は停止位置を保ちます。保持はプログラム実行中だけ有効です。「設定どおり」で設定がない場合は従来の標準FWの制動です。'},
  {type:'ev3_stop',message0:'すべてのモーターを停止',previousStatement:null,nextStatement:null,colour:'#0090f5'}
 ]);
 
@@ -52,12 +52,12 @@ Blockly.defineBlocksWithJsonArray([{type:'ev3_ramp',message0:'加減速を %1 �
 // New classroom palette separates one motor from a pair. Keep legacy types
 // above unchanged so earlier saved projects retain their port choices.
 const classroomMotorBlocks=[];
-for(const [kind,label] of [['l','L'],['m','M']])for(const paired of [false,true])for(const action of ['run','angle','time']){
+for(const [kind,label] of [['l','L'],['m','M']])for(const paired of [false,true])for(const action of ['run','angle','rotation','time']){
  const type='ev3_motor_'+kind+'_'+(paired?'pair':'single')+'_'+action;
  const ports=paired?pairPorts:kind==='l'?[singlePorts[1],singlePorts[0],singlePorts[2],singlePorts[3]]:singlePorts;
- const suffix={run:'を速さ %2 ％で回し続ける',angle:'速さ %2 ％で %3 度回す',time:'速さ %2 ％で %3 秒動かす'}[action];
+ const suffix={run:'を速さ %2 ％で回し続ける',angle:'速さ %2 ％で %3 度回す',rotation:'速さ %2 ％で %3 回転する',time:'速さ %2 ％で %3 秒動かす'}[action];
  const tooltip=action==='run'?'速さ−100〜100％。負は逆転、0は停止。回し始めたら次の命令へ進みます。':action==='time'?'時間は0より大きく60秒以下。0.5秒なども使えます。速さは−100〜100％で0以外。':'速さは−100〜100％で0以外。指定角度まで回してから次の命令へ進みます。';
- classroomMotorBlocks.push({type,message0:label+'モーター'+(paired?'2個':'1個')+' %1 '+suffix,args0:[{type:'field_dropdown',name:'PORTS',options:ports},{type:'input_value',name:'SPEED',check:'Number'},...(action==='run'?[]:[{type:'input_value',name:action==='angle'?'DEGREES':'SECONDS',check:'Number'}])],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:tooltip+(paired?(action==='angle'?' 同期・停止タイミング補正の方式は「先生用の設定・計測」で選べます。':' 2個を同時に同じ速さの指定で始動します。角度同期の補正はしません。'):'')});
+ classroomMotorBlocks.push({type,message0:label+'モーター'+(paired?'2個':'1個')+' %1 '+suffix,args0:[{type:'field_dropdown',name:'PORTS',options:ports},{type:'input_value',name:'SPEED',check:'Number'},...(action==='run'?[]:[{type:'input_value',name:action==='angle'?'DEGREES':action==='rotation'?'ROTATIONS':'SECONDS',check:'Number'}])],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:tooltip+(paired?(action==='angle'?' 同期・停止タイミング補正の方式は「先生用の設定・計測」で選べます。':' 2個を同時に同じ速さの指定で始動します。角度同期の補正はしません。'):'')});
 }
 Blockly.defineBlocksWithJsonArray(classroomMotorBlocks);
 // L/Mそれぞれを単独・2個に分け、連続回転／角度／時間を同じ順番で表示する。
@@ -65,10 +65,21 @@ function classroomMotorToolbox(){
  const items=[{kind:'label',text:'加速・減速（L・M共通）'},{kind:'block',type:'ev3_ramp',inputs:{UP:shadow(.5),DOWN:shadow(.5)}}];
  for(const [kind,label] of [['l','L'],['m','M']])for(const paired of [false,true]){
   items.push({kind:'label',text:label+'モーター '+(paired?'2個（同期・同時）':'1個')});
-  for(const action of ['run','angle','time'])items.push({kind:'block',type:'ev3_motor_'+kind+'_'+(paired?'pair':'single')+'_'+action,inputs:{SPEED:shadow(20),...(action==='angle'?{DEGREES:shadow(90)}:action==='time'?{SECONDS:shadow(1)}:{})}});
+  for(const action of ['run','angle','rotation','time'])items.push({kind:'block',type:'ev3_motor_'+kind+'_'+(paired?'pair':'single')+'_'+action,inputs:{SPEED:shadow(20),...(action==='angle'?{DEGREES:shadow(90)}:action==='rotation'?{ROTATIONS:shadow(1)}:action==='time'?{SECONDS:shadow(1)}:{})}});
  }
- return [...items,{kind:'label',text:'モーターを停止（L・M共通）'},{kind:'block',type:'ev3_stop_port'},{kind:'block',type:'ev3_stop'}];
+ return [...items,{kind:'label',text:'L・M共通の速度・パワー・停止方法'},{kind:'block',type:'ev3_motor_speed_set',inputs:{SPEED:shadow(20)}},{kind:'block',type:'ev3_motor_power',inputs:{POWER:shadow(20)}},{kind:'block',type:'ev3_motor_stop_mode'},{kind:'label',text:'モーターを停止（L・M共通）'},{kind:'block',type:'ev3_stop_port'},{kind:'block',type:'ev3_stop'}];
 }
+
+// 速度調整（閉ループ）とパワー（出力率固定）を別のブロックとして示す。
+const stopOptions=[['ブレーキ','brake'],['惰性','coast'],['保持','hold']];
+const commonMotorPorts=()=>({type:'field_dropdown',name:'PORTS',options:[...singlePorts,...pairPorts,['すべて','15']]});
+Blockly.defineBlocksWithJsonArray([
+ {type:'ev3_motor_speed_set',message0:'モーター %1 の速さを %2 ％にする',args0:[commonMotorPorts(),{type:'input_value',name:'SPEED',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'L/M共通。動作中の速度を変更します。このブロックだけでは停止中のモーターを始動しません。角度制御中は目標角度を保ちます。速さは−100〜100％。'},
+ {type:'ev3_motor_power',message0:'モーター %1 をパワー %2 ％で回し続ける',args0:[commonMotorPorts(),{type:'input_value',name:'POWER',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'L/M共通。−100〜100％の出力率を固定し、速さの自動調整を行いません。同じ値でも負荷により回転速度が変わります。負は逆転、0は出力0。停止や条件待ちと組み合わせます。'},
+ {type:'ev3_motor_stop_mode',message0:'モーター %1 の動作後の停止方法を %2 にする',args0:[commonMotorPorts(),{type:'field_dropdown',name:'MODE',options:stopOptions}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'この後の角度・回転数・時間・距離・旋回の完了時と、設定どおりの停止に適用します。同期走行の2ポートは同じ設定にしてください。保持は本体でプログラムを終了すると解除されます。'},
+ {type:'ev3_motor_speed',message0:'モーター %1 の実際の速さ（％）',args0:[{type:'field_dropdown',name:'PORT',options:singlePorts.map(([label],i)=>[label,String(i+1)])}],output:'Number',colour:'#34ccf1',tooltip:'L/M共通。設定した速さではなく、本体が測定した現在の回転速度を−100〜100％で返します。逆回転は負になります。'},
+ ...['angle','time'].map(action=>({type:'ev3_tank_'+action,message0:'左 %1 速さ %2 ％ 右 %3 速さ %4 ％で '+(action==='angle'?'速い側を %5 度回す':'%5 秒走る'),args0:[{type:'field_dropdown',name:'LEFT_PORT',options:[singlePorts[1],singlePorts[0],singlePorts[2],singlePorts[3]]},{type:'input_value',name:'LEFT_SPEED',check:'Number'},{type:'field_dropdown',name:'RIGHT_PORT',options:[singlePorts[2],singlePorts[0],singlePorts[1],singlePorts[3]]},{type:'input_value',name:'RIGHT_SPEED',check:'Number'},{type:'input_value',name:action==='angle'?'DEGREES':'SECONDS',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'同じ種類の2モーターで使います。左右−100〜100％、両方0は使えません。指定量が終わるまで待ちます。角度は速い側のモーター軸が基準。左右の回転量は速度比に応じて変わります。標準FWの比率は約1％刻み。加減速設定は適用しません。'}))
+]);
 
 // 入力センサのポート番号は1〜4。モーター出力のビットマスクとは別の番号体系。
 const sensorPorts=[['1','1'],['2','2'],['3','3'],['4','4']];
@@ -224,6 +235,8 @@ const toolbox={kind:'categoryToolbox',contents:[
 // 本体ボタンは互換読み込みのため定義を残し、新規の一覧だけから一時的に外す。
 const group=name=>toolbox.contents.find(c=>c.name===name).contents;
 toolbox.contents.splice(1,0,{kind:'category',name:'イベント',colour:'#d3a238',contents:[{kind:'label',text:'センサ・比較を条件の欄に入れます'},{kind:'block',type:'ev3_when_condition'},{kind:'block',type:'ev3_when_changed'},{kind:'label',text:'名前が同じメッセージで連携します'},{kind:'block',type:'ev3_when_message'},{kind:'block',type:'ev3_message_send'},{kind:'block',type:'ev3_message_wait'}]});
+group('センサー').splice(5,0,{kind:'block',type:'ev3_motor_speed'});
+group('動き').splice(2,0,...['angle','time'].map(action=>({kind:'block',type:'ev3_tank_'+action,inputs:{LEFT_SPEED:shadow(30),RIGHT_SPEED:shadow(15),...(action==='angle'?{DEGREES:shadow(360)}:{SECONDS:shadow(1)})}})));
 group('動き').splice(2,0,...['run','angle','time'].map(action=>({kind:'block',type:'ev3_steering_'+action,inputs:{TURN:shadow(25),SPEED:shadow(20),...(action==='angle'?{DEGREES:shadow(360)}:action==='time'?{SECONDS:shadow(2)}:{})}})));
 group('演算').push(...['mod','random','min','max'].map(op=>({kind:'block',type:'ev3_data_'+op,inputs:{A:shadow(1),B:shadow(10)}})),{kind:'block',type:'ev3_data_round',inputs:{A:shadow(1.5)}},{kind:'block',type:'ev3_data_clamp',inputs:{A:shadow(120),LOW:shadow(-100),HIGH:shadow(100)}});
 const textShadow=t=>({shadow:{type:'ev3_text',fields:{TEXT:t}}});
@@ -374,6 +387,20 @@ function parallelSampleState(kind){
  return {variables,blocks:{languageVersion:0,blocks}};
 }
 
+// モーターの新機能を単独で確認できる作品例。転送だけでは動かず、実行操作で動く。
+function motorSampleState(kind){
+ const n=value=>({shadow:{type:'math_number',fields:{NUM:value}}});
+ const wait=seconds=>({type:'ev3_wait_seconds',inputs:{SECONDS:n(seconds)}});
+ const setting=(ports,mode)=>({type:'ev3_motor_stop_mode',fields:{PORTS:ports,MODE:mode}});
+ const log=label=>({type:'ev3_log_value',fields:{LABEL:label},inputs:{VALUE:{block:{type:'ev3_motor_speed',fields:{PORT:'2'}}}}});
+ let steps;
+ if(kind==='stop')steps=['coast','brake','hold'].flatMap(mode=>[setting('2',mode),{type:'ev3_motor_l_single_rotation',fields:{PORTS:'2'},inputs:{SPEED:n(20),ROTATIONS:n(.25)}},wait(1)]);
+ else if(kind==='tank')steps=[setting('6','hold'),{type:'ev3_tank_angle',fields:{LEFT_PORT:'2',RIGHT_PORT:'4'},inputs:{LEFT_SPEED:n(30),RIGHT_SPEED:n(15),DEGREES:n(180)}},wait(.5),{type:'ev3_tank_time',fields:{LEFT_PORT:'2',RIGHT_PORT:'4'},inputs:{LEFT_SPEED:n(30),RIGHT_SPEED:n(-30),SECONDS:n(.5)}},wait(.5)];
+ else steps=[{type:'ev3_log_start',fields:{FILE:'Power'}},{type:'ev3_motor_l_single_run',fields:{PORTS:'2'},inputs:{SPEED:n(20)}},wait(.5),log('速度指定20'),{type:'ev3_motor_speed_set',fields:{PORTS:'2'},inputs:{SPEED:n(30)}},wait(.5),log('速度変更30'),{type:'ev3_motor_power',fields:{PORTS:'2'},inputs:{POWER:n(20)}},wait(.5),log('パワー指定20'),{type:'ev3_stop_port',fields:{PORTS:'2',STOP_MODE:'hold'}},wait(1),{type:'ev3_log_end'}];
+ steps.push({type:'ev3_program_end'});for(let i=0;i<steps.length-1;i++)steps[i].next={block:steps[i+1]};
+ return {blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:30,y:30,next:{block:steps[0]}}]}};
+}
+
 const theme=Blockly.Theme.defineTheme('ev3lab',{base:Blockly.Themes.Classic,fontStyle:{family:'"Yu Gothic UI", Meiryo, sans-serif',size:12},blockStyles:{procedure_blocks:{colourPrimary:'#aa597e'},math_blocks:{colourPrimary:'#668b6d'},variable_blocks:{colourPrimary:'#c58245'},loop_blocks:{colourPrimary:'#d19636'}},componentStyles:{workspaceBackgroundColour:'#fbfcfd',toolboxBackgroundColour:'#f4f7f8',flyoutBackgroundColour:'#eef3f5',flyoutOpacity:1,scrollbarColour:'#b9c9ce',insertionMarkerColour:'#126c67',insertionMarkerOpacity:.3}});
 const workspace=Blockly.inject('blocklyDiv',{toolbox,theme,renderer:'zelos',media:'vendor/media/',trashcan:true,scrollbars:true,grid:{spacing:24,length:2,colour:'#e5ebee',snap:false},zoom:{controls:true,wheel:true,startScale:.85,minScale:.35,maxScale:1.5,scaleSpeed:1.1},move:{scrollbars:true,drag:true,wheel:true},sounds:false});
 workspace.registerToolboxCategoryCallback('ARGUMENTS',argumentFlyout);
@@ -448,6 +475,7 @@ function expression(x){
 
  if(['ev3_brick_button','ev3_brick_button_value'].includes(x.type)){const reading={button:{id:Number(x.getFieldValue('BUTTON'))}};return x.type==='ev3_brick_button'?{op:'eq',left:reading,right:Number(x.getFieldValue('STATE'))}:reading;}
  if(x.type==='ev3_timer')return {timer:true};
+ if(x.type==='ev3_motor_speed')return {sensor:{kind:'motorSpeed',port:Number(x.getFieldValue('PORT'))}};
  if(x.type==='ev3_encoder')return {sensor:{kind:'encoder',port:Number(x.getFieldValue('PORT'))}};
  if(['ev3_touch','ev3_touch_value'].includes(x.type)){const reading={sensor:{kind:'touch',port:Number(x.getFieldValue('PORT'))}};return x.type==='ev3_touch'?{op:'eq',left:reading,right:Number(x.getFieldValue('STATE'))}:reading;}
  const infraredKinds={ev3_ir_proximity:'infrared',ev3_ir_compare:'infrared',ev3_ir_remote:'irRemote',ev3_ir_button:'irRemote',ev3_ir_beacon_detected:'irBeaconDetected',ev3_ir_beacon_heading:'irBeaconHeading',ev3_ir_beacon_distance:'irBeaconDistance'};
@@ -508,6 +536,11 @@ function chain(block){
       case 'ev3_motor_l_single_time':case 'ev3_motor_l_pair_time':case 'ev3_motor_m_single_time':case 'ev3_motor_m_pair_time':case 'ev3_motor_m_time':out.push({type:'motorTimed',ports:Number(b.getFieldValue('PORTS')),speed:value(b,'SPEED'),seconds:value(b,'SECONDS')});break;
       case 'ev3_wait_seconds':out.push({type:'waitSeconds',seconds:value(b,'SECONDS')});break;
       case 'ev3_tread':out.push({type:'tread',mm:Number(b.getFieldValue('TREAD'))});break;
+      case 'ev3_motor_speed_set':out.push({type:'motorSpeedSet',ports:Number(b.getFieldValue('PORTS')),speed:value(b,'SPEED')});break;
+      case 'ev3_motor_power':out.push({type:'motorPower',ports:Number(b.getFieldValue('PORTS')),speed:value(b,'POWER')});break;
+      case 'ev3_motor_stop_mode':out.push({type:'stopMode',ports:Number(b.getFieldValue('PORTS')),mode:b.getFieldValue('MODE')});break;
+      case 'ev3_tank_angle':case 'ev3_tank_time':out.push({type:'tankFinite',action:b.type==='ev3_tank_angle'?'angle':'time',leftPort:Number(b.getFieldValue('LEFT_PORT')),rightPort:Number(b.getFieldValue('RIGHT_PORT')),leftSpeed:value(b,'LEFT_SPEED'),rightSpeed:value(b,'RIGHT_SPEED'),...(b.getInput('DEGREES')?{degrees:value(b,'DEGREES')}:{seconds:value(b,'SECONDS')})});break;
+      case 'ev3_motor_l_single_rotation':case 'ev3_motor_l_pair_rotation':case 'ev3_motor_m_single_rotation':case 'ev3_motor_m_pair_rotation':out.push({type:'motorRotations',ports:Number(b.getFieldValue('PORTS')),speed:value(b,'SPEED'),rotations:value(b,'ROTATIONS'),mode:$('pairMode').value});break;
       case 'ev3_tank':out.push({type:'tank',leftPort:Number(b.getFieldValue('LEFT_PORT')),rightPort:Number(b.getFieldValue('RIGHT_PORT')),leftSpeed:value(b,'LEFT_SPEED'),rightSpeed:value(b,'RIGHT_SPEED')});break;
       case 'ev3_pivot_right':case 'ev3_pivot_left':out.push({type:'pivot',leftPort:Number(b.getFieldValue('LEFT_PORT')),rightPort:Number(b.getFieldValue('RIGHT_PORT')),speed:value(b,'SPEED'),angle:value(b,'ANGLE'),direction:b.type==='ev3_pivot_right'?'right':'left'});break;
       case 'ev3_spin_right':case 'ev3_spin_left':out.push({type:'spin',leftPort:Number(b.getFieldValue('LEFT_PORT')),rightPort:Number(b.getFieldValue('RIGHT_PORT')),speed:value(b,'SPEED'),angle:value(b,'ANGLE'),direction:b.type==='ev3_spin_right'?'right':'left'});break;
@@ -517,7 +550,7 @@ function chain(block){
       case 'ev3_wait':out.push({type:'wait',ms:value(b,'MS')});break;
       case 'ev3_timer_reset':out.push({type:'timerReset'});break;
       case 'ev3_encoder_reset':out.push({type:'encoderReset',port:Number(b.getFieldValue('PORT'))});break;
-      case 'ev3_stop_port':out.push({type:'stop',ports:Number(b.getFieldValue('PORTS'))});break;
+      case 'ev3_stop_port':out.push({type:'stop',ports:Number(b.getFieldValue('PORTS')),...(b.getFieldValue('STOP_MODE')&&b.getFieldValue('STOP_MODE')!=='default'?{stopMode:b.getFieldValue('STOP_MODE')}:{})});break;
       case 'ev3_stop':out.push({type:'stop'});break;
       case 'ev3_program_end':out.push({type:'programEnd'});return out;
       case 'ev3_myblock_return':if(b.getRootBlock().type!=='procedures_defnoreturn')throw Error('「このマイブロックを終了する」はマイブロックの定義の中で使ってください。');out.push({type:'myblockReturn'});return out;
@@ -891,4 +924,11 @@ for(const [id,kind,name]of [['parallelSample','parallel','ParallelMeasure'],['ev
  loading=true;try{Blockly.serialization.workspaces.load(parallelSampleState(kind),workspace);$('programName').value=name;workspace.clearUndo();}finally{loading=false;}
  check();saveLocal();dirty=false;$('sampleMenu').open=false;
  feedback(kind==='parallel'?'B+Cの走行と、超音波センサ2のCSV記録を並行します。ログ名はParallelです。':kind==='event'?'B+Cを回し続け、タッチセンサ1で全体を停止します。本体の戻るボタンでも停止できます。':'「測定」を送って待ち、超音波センサ2をCSVに記録します。ログ名はMessageです。');
+};
+
+for(const [id,kind,name]of [['motorStopSample','stop','MotorStopTest'],['tankFiniteSample','tank','TankFiniteTest'],['motorPowerSample','power','MotorPowerTest']])$(id).onclick=()=>{
+ if(dirty&&!confirm('編集内容をモーターのサンプルに置き換えます。必要なら先に保存してください。'))return;
+ loading=true;try{Blockly.serialization.workspaces.load(motorSampleState(kind),workspace);$('programName').value=name;workspace.clearUndo();}finally{loading=false;}
+ check();saveLocal();dirty=false;$('sampleMenu').open=false;
+ feedback(kind==='stop'?'モーターBを惰性→ブレーキ→保持の順で各0.25回転し、1秒ずつ待ちます。':kind==='tank'?'B+Cを左30％・右15％で速い側180度、次に左右逆回転で0.5秒動かします。':'モーターBの速度指定20％→30％→パワー20％を比較し、実測速度をCSV（Power）に記録します。');
 };
