@@ -4,7 +4,7 @@ import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.
 const $=id=>document.getElementById(id);
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.20.0';
+const VERSION='0.20.1';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -413,8 +413,33 @@ function motorSampleState(kind){
  return {blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:30,y:30,next:{block:steps[0]}}]}};
 }
 
+// 「複製」は選択ブロックから下の命令と、各命令の入力・入れ子もまとめてコピーする。
+// Blockly 標準の貼り付けを使い、新しい ID、配置、取り消しのまとまりを維持する。
+function stackCopyData(block){
+ const data=block.toCopyData(true);
+ if(!data)return null;
+ // 標準 toCopyData の個数は単体用なので、容量判定もスタック全体に合わせる。
+ data.typeCounts=Object.create(null);
+ for(const child of block.getDescendants(false))data.typeCounts[child.type]=(data.typeCounts[child.type]||0)+1;
+ return data;
+}
+function configureEditorInteractions(workspace){
+ Blockly.Msg.DUPLICATE_BLOCK='複製';
+ const duplicate=Blockly.ContextMenuRegistry.registry.getItem('blockDuplicate');
+ if(duplicate)duplicate.callback=({block})=>{
+  if(!block)return;
+  const data=stackCopyData(block);
+  if(data)Blockly.clipboard.paste(data,block.workspace);
+ };
+ // パレットから取り出しても開いたままにし、背景をクリックしたときだけ閉じる。
+ workspace.getFlyout().setAutoClose(false);
+ workspace.addChangeListener(event=>{
+  if(event.type===Blockly.Events.CLICK&&event.targetType==='workspace')workspace.getToolbox().clearSelection();
+ });
+}
 const theme=Blockly.Theme.defineTheme('ev3lab',{base:Blockly.Themes.Classic,fontStyle:{family:'"Yu Gothic UI", Meiryo, sans-serif',size:12},blockStyles:{procedure_blocks:{colourPrimary:'#aa597e'},math_blocks:{colourPrimary:'#668b6d'},variable_blocks:{colourPrimary:'#c58245'},loop_blocks:{colourPrimary:'#d19636'}},componentStyles:{workspaceBackgroundColour:'#fbfcfd',toolboxBackgroundColour:'#f4f7f8',flyoutBackgroundColour:'#eef3f5',flyoutOpacity:1,scrollbarColour:'#b9c9ce',insertionMarkerColour:'#126c67',insertionMarkerOpacity:.3}});
 const workspace=Blockly.inject('blocklyDiv',{toolbox,theme,renderer:'zelos',media:'vendor/media/',trashcan:true,scrollbars:true,grid:{spacing:24,length:2,colour:'#e5ebee',snap:false},zoom:{controls:true,wheel:true,startScale:.85,minScale:.35,maxScale:1.5,scaleSpeed:1.1},move:{scrollbars:true,drag:true,wheel:true},sounds:false});
+configureEditorInteractions(workspace);
 workspace.registerToolboxCategoryCallback('ARGUMENTS',argumentFlyout);
 workspace.registerToolboxCategoryCallback('VARIABLE',variableFlyout);
 workspace.registerButtonCallback('EV3_CREATE_VARIABLE',()=>openVariableDialog());

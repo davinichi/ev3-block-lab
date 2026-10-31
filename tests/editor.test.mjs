@@ -658,3 +658,21 @@ test('motor feature samples round-trip and produce valid on-brick images with no
   assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(motorSampleState(kind))',context)),sample.workspace);
  }
 });
+
+// 実際の Blockly のコピー形式で、下流の命令・入れ子・入力値を保持する回帰確認。
+test('duplicate copies the complete downstream stack and nested inputs with fresh ids',()=>{
+ const context=editor();
+ const result=JSON.parse(vm.runInContext(`Blockly.Events.disable();
+ const state={type:'ev3_wait_seconds',next:{block:{type:'controls_repeat_ext',next:{block:{type:'ev3_wait_seconds'}}}}};
+ state.inputs={SECONDS:{block:{type:'math_number',fields:{NUM:2}}}};
+ state.next.block.inputs={TIMES:{block:{type:'math_number',fields:{NUM:10}}},DO:{block:{type:'ev3_stop'}}};
+ const root=Blockly.serialization.blocks.append(state,workspace);
+ root.toCopyData=Blockly.BlockSvg.prototype.toCopyData;
+ const data=stackCopyData(root),copy=Blockly.serialization.blocks.append(data.blockState,workspace);
+ const originals=root.getDescendants(false),copies=copy.getDescendants(false);
+ const result={types:originals.map(b=>b.type),copies:copies.map(b=>b.type),distinct:copies.every(b=>!originals.some(a=>a.id===b.id)),counts:data.typeCounts,roots:workspace.getTopBlocks(false).length,originalNext:root.getNextBlock().type};
+ Blockly.Events.enable();JSON.stringify(result);`,context));
+ assert.deepEqual(result.copies,result.types);assert.equal(result.distinct,true);
+ assert.equal(result.roots,2);assert.equal(result.originalNext,'controls_repeat_ext');
+ assert.equal(result.counts.ev3_wait_seconds,2);assert.equal(result.counts.controls_repeat_ext,1);assert.equal(result.counts.ev3_stop,1);
+});
