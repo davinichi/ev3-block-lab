@@ -13,8 +13,8 @@ export function parallelPlan(program) {
   if(Array.isArray(node)){for(const n of node)visit(n,fn,seen);return;}
   fn(node);
   for(const value of Object.values(node))visit(value,fn,seen);
-  const call=node.callValue??(node.type==='call'?node:null);
-  if(call){if(node.callValue)fn({type:'call',...call});if(!seen.has(call.name)){seen.add(call.name);const p=procs.get(call.name);visit(p?.body,fn,seen);visit(p?.result,fn,seen);}}
+  const call=node.callValue??(['call','callOutputs'].includes(node.type)?node:null);
+  if(call){if(node.callValue||node.type==='callOutputs')fn({...call,type:'call'});if(!seen.has(call.name)){seen.add(call.name);const p=procs.get(call.name);visit(p?.body,fn,seen);visit(p?.results??p?.result,fn,seen);}}
  };
  const messages=new Map(),waits=roots.map(()=>new Set()),modes=new Map();
  const message=name=>{if(typeof name!=='string'||!name.trim()||name.length>40||name.includes('\0'))throw Error('メッセージ名は1〜40文字にしてください。');if(!messages.has(name))messages.set(name,messages.size);};

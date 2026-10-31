@@ -51,6 +51,7 @@ function unaryValue(fn,n){
 }
 // EV3のDATAFは32ビット浮動小数点。検証側もMath.froundを使い、本体と同じ丸めを再現する。
 function floatingConstant(n){const bytes=new Uint8Array(4);new DataView(bytes.buffer).setFloat32(0,finiteNumber(Math.fround(n)),true);return [0x83,...bytes];}
+const procedureResults=p=>p.returns?(p.results??[p.result]):[];
 const PARALLEL=Symbol('parallel');
 const GLOBALS=Symbol('globals'),GEOMETRY=Symbol('geometry'),RETURNS=Symbol('return states'),CALL_VALUE=Symbol('numeric call'),VALUE_RETURN=Symbol('numeric return');
 const arithmetic={add:(a,b)=>a+b,sub:(a,b)=>a-b,mul:(a,b)=>a*b,div:(a,b)=>{if(b===0)throw Error('0では割れません。');return Math.trunc(a/b);},eq:(a,b)=>+(a===b),neq:(a,b)=>+(a!==b),lt:(a,b)=>+(a<b),lte:(a,b)=>+(a<=b),gt:(a,b)=>+(a>b),gte:(a,b)=>+(a>=b),and:(a,b)=>+(!!a&&!!b),or:(a,b)=>+(!!a||!!b)};
@@ -145,23 +146,25 @@ export function validate(program) {
   for (const p of program.procedures) {
     if (!p.name || map.has(p.name)) throw Error('マイブロック名が重複しています。');
     if (p.params.length>8 || new Set(p.params).size!==p.params.length) throw Error('引数は重複のない名前で8個までです。');
+    if(p.returns&&(procedureResults(p).length<1||procedureResults(p).length>8))throw Error('戻り値は1〜8個にしてください。');
     map.set(p.name,p);
   }
   const parallel=parallelPlan(program);
   let visits=0;
   const globals=new Map(),geometry={diameter10:0,tread10:0};
-  function invoke(b,env,stack,wantsValue){
+  function invoke(b,env,stack,wantsValue,allValues=false){
     const p=map.get(b.name); if(!p)throw Error(`マイブロック「${b.name}」の定義がありません。`);
     if(!!p.returns!==wantsValue)throw Error(wantsValue?'数値を返すマイブロックを選んでください。':'数値を返すマイブロックは値の入力欄で使ってください。');
+    if(wantsValue&&!allValues&&(!Number.isInteger(b.output??0)||(b.output??0)<0||(b.output??0)>=procedureResults(p).length))throw Error('戻り値の選択を確認してください。');
     if(stack.includes(p.name))throw Error('試作版ではマイブロックの再帰呼び出しは使えません。');
     if(b.args.length!==p.params.length)throw Error(`「${p.name}」の引数の数が一致しません。`);
     const args=b.args.map(x=>evaluate(x,env)); args.forEach(n=>floatingMode?finiteNumber(n,'引数'):inRange(n,-2147483648,2147483647,'引数'));
-    const next=Object.fromEntries(p.params.map((n,i)=>[n,args[i]]));next[GLOBALS]=globals;next[GEOMETRY]=geometry;next[FLOATS]=floatingMode;next[PARALLEL]=!!parallel;next[RETURNS]=[];next[VALUE_RETURN]=wantsValue;const exit=walk(p.body,next,[...stack,p.name]);if(exit==='programEnd')return wantsValue?UNKNOWN:exit;
+    const next=Object.fromEntries(p.params.map((n,i)=>[n,args[i]]));next[GLOBALS]=globals;next[GEOMETRY]=geometry;next[FLOATS]=floatingMode;next[PARALLEL]=!!parallel;next[RETURNS]=[];next[VALUE_RETURN]=wantsValue?procedureResults(p).length:0;const exit=walk(p.body,next,[...stack,p.name]);if(exit==='programEnd')return allValues?procedureResults(p).map(()=>UNKNOWN):wantsValue?UNKNOWN:exit;
     // 途中で値を返した経路と末尾まで進む経路の状態を合流させる。
-    const states=next[RETURNS];if(exit!=='myblockReturn'){const value=wantsValue?evaluate(p.result,next):undefined;states.push({globals:new Map(globals),geometry:{...geometry},value});}
+    const states=next[RETURNS];if(exit!=='myblockReturn'){const value=wantsValue?procedureResults(p).map(x=>evaluate(x,next)):undefined;states.push({globals:new Map(globals),geometry:{...geometry},value});}
     if(states.length){globals.clear();for(const state of states)for(const k of state.globals.keys())globals.set(k,0);for(const k of globals.keys()){const value=states[0].globals.get(k)??0;globals.set(k,states.every(s=>(s.globals.get(k)??0)===value)?value:UNKNOWN);}for(const k of Object.keys(geometry)){const value=states[0].geometry[k];geometry[k]=states.every(s=>s.geometry[k]===value)?value:0;}}
 
-    if(wantsValue){const value=states[0]?.value??UNKNOWN;return states.every(s=>s.value===value)?value:UNKNOWN;}
+    if(wantsValue){const values=procedureResults(p).map((_,i)=>{const value=states[0]?.value?.[i]??UNKNOWN;return states.every(s=>s.value?.[i]===value)?value:UNKNOWN;});return allValues?values:values[b.output??0];}
   }
   // 検証中の状態を命令順に進める。programEndは全体終了、myblockReturnは呼び出し元へ戻る信号。
   function walk(nodes, env, stack) {
@@ -228,10 +231,11 @@ export function validate(program) {
         case 'encoderReset':inRange(b.port,1,4,'リセットするモーターポート');break;
         case 'broadcast':if(typeof b.message!=='string'||!b.message.trim()||b.message.length>40||b.message.includes('\0'))throw Error('メッセージ名は1〜40文字にしてください。');break;
         case 'programEnd':return 'programEnd';
-        case 'returnValue':if(!stack.length||!env[VALUE_RETURN])throw Error('値を返す終了ブロックは、数値を返すマイブロックの中だけで使えます。');{const value=evaluate(b.value,env);finiteNumber(value,'戻り値');env[RETURNS].push({globals:new Map(globals),geometry:{...geometry},value});return 'myblockReturn';}
+        case 'returnValue':case 'returnValues':if(!stack.length||!env[VALUE_RETURN])throw Error('値を返す終了ブロックは、数値を返すマイブロックの中だけで使えます。');{const expressions=b.type==='returnValues'?b.values:[b.value];if(expressions.length!==env[VALUE_RETURN])throw Error('返す値の数を定義の戻り値とそろえてください。');const value=expressions.map(x=>evaluate(x,env));value.forEach(n=>finiteNumber(n,'戻り値'));env[RETURNS].push({globals:new Map(globals),geometry:{...geometry},value});return 'myblockReturn';}
         case 'myblockReturn':if(env[VALUE_RETURN])throw Error('数値を返すマイブロックでは、値を返す終了ブロックを使ってください。');if(!stack.length)throw Error('マイブロックの終了は定義の中だけで使えます。');env[RETURNS].push({globals:new Map(globals),geometry:{...geometry}});return 'myblockReturn';
         case 'stop': if(b.stopMode!==undefined&&!Object.hasOwn(stopModes,b.stopMode))throw Error('停止方法を選んでください。');if(b.ports!==undefined)inRange(b.ports,1,15,'停止するモーターポート');break;
         case 'repeat': {const n=val('count'); inRange(n,0,1000,'繰り返し回数'); if(n===UNKNOWN){for(const k of globals.keys())globals.set(k,UNKNOWN);const before={...geometry};walk(b.body,env,stack);for(const k of Object.keys(geometry))if(before[k]!==geometry[k])geometry[k]=0;for(const k of globals.keys())globals.set(k,UNKNOWN);}else for(let i=0;i<n;i++){const exit=walk(b.body,env,stack);if(exit)return exit;} break;}
+        case 'callOutputs':{const outputs=invoke(b,env,stack,true,true);if(!Array.isArray(b.targets)||b.targets.length!==outputs.length||b.targets.some(n=>typeof n!=='string'||!n))throw Error('戻り値を受け取る変数を選んでください。');b.targets.forEach((name,i)=>globals.set(name,outputs[i]));break;}
         case 'call':if(invoke(b,env,stack,false)==='programEnd')return 'programEnd';break;
         default: throw Error(`未対応のブロック: ${b.type}`);
       }
@@ -253,7 +257,7 @@ export function compile(program,folder='EV3Lab') {
   validate(program);
   const parallel=parallelPlan(program);
   const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false,usesTimer=false,usesStopModes=false,usesGyro=false,usesMovement=false;
-  const collect=x=>{if(x&&typeof x==='object'){if(['movement','movementSetup'].includes(x.type))usesMovement=true;if(x.sensor?.kind?.startsWith('gyro')||x.type==='gyroReset'){usesGyro=true;usesSensors=true;}if(x.type==='stopMode'||x.stopMode!==undefined)usesStopModes=true;if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.battery||x.pid||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
+  const collect=x=>{if(x&&typeof x==='object'){if(['movement','movementSetup'].includes(x.type))usesMovement=true;if(x.sensor?.kind?.startsWith('gyro')||x.type==='gyroReset'){usesGyro=true;usesSensors=true;}if(x.type==='stopMode'||x.stopMode!==undefined)usesStopModes=true;if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.battery||x.pid||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);if(x.type==='callOutputs')for(const name of x.targets??[])variableNames.add(name);for(const v of Object.values(x))collect(v);}};
   collect(program);if(variableNames.size>32)throw Error('変数は32個までです。');
   // 通常変数・寸法・加減速設定・共有タイマーを重ならない位置へ配置する。各数値の領域は4バイト。
   const globalOffsets=new Map([...variableNames].map((name,i)=>[name,i*4]));
@@ -285,8 +289,8 @@ export function compile(program,folder='EV3Lab') {
     ...roots.flatMap((_,root)=>procs.filter(p=>needed[root].has(p.name)).map(p=>({...p,subcall:true,root})))]:[{params:[],body:program.main,name:'メイン'},...procs.map(p=>({...p,subcall:true}))];
   const objects=specs.map((p,index)=>{
     const ids=new Map(specs.flatMap((s,i)=>s.subcall&&s.root===p.root?[[s.name,i+1]]:[]));
-    const code=p.subcall ? [p.params.length+(p.returns?1:0),...p.params.map(()=>usesFloat?0x83:0x82),...(p.returns?[0x43]:[])] : [];
-    let bytes=(p.params.length+(p.returns?1:0))*4;
+    const code=p.subcall ? [p.params.length+procedureResults(p).length,...p.params.map(()=>usesFloat?0x83:0x82),...procedureResults(p).map(()=>0x43)] : [];
+    let bytes=(p.params.length+procedureResults(p).length)*4;
     const alloc=()=>{const at=bytes;bytes+=4;return at;};
     const timer=alloc();
     const emit=(op,...args)=>code.push(op,...args.flat());
@@ -379,17 +383,21 @@ export function compile(program,folder='EV3Lab') {
     const floatNonzero=value=>faults.push(jump(OP.JR_LT32,[floatCompare(0x53,value,floatingConstant(0)),constant(1)]));
     const asFloat=value=>{const result=local(alloc());emit(0x3b,value,result);return result;};
     // ユーザーの式・変数・引数は常に小数で計算する。ハードウェアへ渡す直前だけexprで整数に変換する。
+    // 全出力を呼び出し側のローカル領域に受け取る。変数への代入は呼び出し完了後に行う。
+    const callResults=call=>{
+      const suspended=!!(lock&&lockDepth);if(suspended){lockDepth--;lock.release();}
+      const id=ids.get(call.name),definition=procs.find(x=>x.name===call.name);if(!id||!definition)throw Error('戻り値のマイブロックが見つかりません。');
+      const args=call.args.map(floatExpr),results=procedureResults(definition).map(()=>local(alloc()));
+      emit(OP.CALL,constant(id),constant(args.length+results.length),...args,...results);
+      if(suspended){lock.acquire();lockDepth++;}results.forEach(floatGuard);return results;
+    };
+    const returnResults=expressions=>{const values=expressions.map(floatExpr);values.forEach(floatGuard);values.forEach((value,i)=>emit(0x3f,value,local((p.params.length+i)*4)));emit(OP.RETURN);};
     let returnedValues=new WeakMap();
     const floatExpr=x=>{
       if(typeof x==='number')return floatingConstant(x);
       if(x?.callValue){
         if(returnedValues.has(x))return returnedValues.get(x);
-        // 出力先は呼び出し側のローカル領域。入れ子・並行呼び出しでも結果を上書きしない。
-        const suspended=!!(lock&&lockDepth);if(suspended){lockDepth--;lock.release();}
-        const call=x.callValue,id=ids.get(call.name);if(!id)throw Error('戻り値のマイブロックが見つかりません。');
-        const args=call.args.map(floatExpr),result=local(alloc());
-        emit(OP.CALL,constant(id),constant(args.length+1),...args,result);
-        if(suspended){lock.acquire();lockDepth++;}floatGuard(result);returnedValues.set(x,result);return result;
+        const results=callResults(x.callValue),result=results[x.callValue.output??0];returnedValues.set(x,result);return result;
       }
       if(x?.battery!==undefined){const result=local(alloc());emit(0x81,constant(x.battery==='voltage'?1:2),result);floatGuard(result);return result;}
       if(x?.pid)return locked(()=>pidOps.compute(x.pid));
@@ -712,7 +720,8 @@ export function compile(program,folder='EV3Lab') {
           case 'gyroReset':{const raw=integerExpr({sensor:{kind:'gyroAngle',port:b.port}},{rawGyro:true});emit(OP.MOVE32,raw,globalVar(gyroOffset+4*(b.port-1)));break;}
           case 'encoderReset':integerExpr({sensor:{kind:'encoder',port:b.port}});emit(OP.MOTOR_CLEAR_COUNT,constant(0),constant(1<<(b.port-1)));break;
           case 'programEnd':emit(OP.STOP,constant(0),constant(15),constant(1));emit(OP.PROGRAM_STOP,constant(-1));return;
-          case 'returnValue':{const result=floatExpr(b.value);floatGuard(result);emit(0x3f,result,local(p.params.length*4));emit(OP.RETURN);return;}
+          case 'returnValue':returnResults([b.value]);return;
+          case 'returnValues':returnResults(b.values);return;
           case 'myblockReturn':if(!p.subcall)throw Error('マイブロックの終了は定義の中だけで使えます。');emit(OP.RETURN);return;
           case 'stop': motors.stop(b.ports??15,b.stopMode); break;
           case 'broadcast':{
@@ -727,6 +736,7 @@ export function compile(program,folder='EV3Lab') {
             }
             break;
           }
+          case 'callOutputs':{const results=callResults(b);locked(()=>results.forEach((value,i)=>emit(0x3f,value,globalVar(globalOffsets.get(b.targets[i])))));break;}
           case 'call': {const id=ids.get(b.name); if(!id)throw Error(`「${b.name}」の定義がありません。`); emit(OP.CALL,constant(id),constant(b.args.length),...b.args.map(usesFloat?floatExpr:expr)); break;}
           case 'repeat': {
             const counter=alloc(); emit(OP.MOVE32,expr(b.count),local(counter));
@@ -775,7 +785,7 @@ export function compile(program,folder='EV3Lab') {
       patch(idle,code.length);pause(20);const again=jump(OP.JR,[]);patch(again,top);
     }else{
       sequence(p.body);
-      if(p.subcall){if(p.returns){const result=floatExpr(p.result);floatGuard(result);emit(0x3f,result,local(p.params.length*4));}emit(OP.RETURN);}else if(!parallel)emit(OP.STOP,constant(0),constant(15),constant(1));
+      if(p.subcall){if(p.returns)returnResults(procedureResults(p));else emit(OP.RETURN);}else if(!parallel)emit(OP.STOP,constant(0),constant(15),constant(1));
     }
     // Firmware validation scans each object sequentially up to its first END.
     // Keep fault handlers inside that object, and skip them on normal completion.

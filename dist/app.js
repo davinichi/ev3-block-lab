@@ -7,7 +7,7 @@ const sampleActions=new Map();
 function sampleAction(id){if(!sampleActions.has(id))sampleActions.set(id,{});return sampleActions.get(id);}
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.24.1';
+const VERSION='0.25.0';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -345,26 +345,61 @@ for(const type of ['variables_get','variables_set','math_change']){
 }
 
 
-// A plain form replaces the procedure mutator, including on restored projects.
+// 複数の戻り値にも名前を付ける。旧作品の1個の戻り値は「値」として復元する。
+const outputNames=def=>def?.type==='procedures_defreturn'?(def.returnNames_??['値']):[];
+function setDefinitionOutputs(block,names){
+ block.returnNames_=[...names];block.callType_=names.length>1?'ev3_call_outputs':'procedures_callreturn';
+ for(let i=block.inputList.length-1;i>=0;i--){const name=block.inputList[i].name;if(/^RETURN[1-9]\d*$/.test(name)&&Number(name.slice(6))>=names.length)block.removeInput(name);}
+ names.forEach((name,i)=>{const key=i?'RETURN'+i:'RETURN';let input=block.getInput(key);if(!input)input=block.appendValueInput(key);input.setCheck('Number');
+  if(i===0){if(!block.getField('RETURN_LABEL0'))input.appendField(name,'RETURN_LABEL0');else block.setFieldValue(name,'RETURN_LABEL0');}
+  else if(!block.getField('RETURN_LABEL'+i))input.appendField('返す値 '+name,'RETURN_LABEL'+i);else block.setFieldValue('返す値 '+name,'RETURN_LABEL'+i);
+ });
+}
 for(const type of ['procedures_defnoreturn','procedures_defreturn']){
- const originalDefinitionInit=Blockly.Blocks[type].init;
- Blockly.Blocks[type].init=function(){
-  originalDefinitionInit.call(this);this.setMutator(null);
-  if(type==='procedures_defreturn')this.getInput('RETURN').setCheck('Number');
-  const menu=this.customContextMenu;
-  this.customContextMenu=function(options){menu?.call(this,options);options.unshift({text:'名前・引数・戻り値を編集',enabled:true,callback:()=>openMyBlockDialog(this.id)});};
+ const base=Blockly.Blocks[type],init=base.init,save=base.saveExtraState,load=base.loadExtraState;
+ base.init=function(){init.call(this);this.setMutator(null);if(type==='procedures_defreturn')setDefinitionOutputs(this,['値']);
+  const menu=this.customContextMenu;this.customContextMenu=function(options){menu?.call(this,options);options.unshift({text:'名前・引数・戻り値を編集',enabled:true,callback:()=>openMyBlockDialog(this.id)});};
+ };
+ if(type==='procedures_defreturn'){
+  base.saveExtraState=function(){return {...save.call(this),outputs:outputNames(this)};};
+  base.loadExtraState=function(state){load.call(this,state);setDefinitionOutputs(this,state.outputs??['値']);};
+ }
+}
+// 1回の呼び出しで全戻り値を別々の変数に受け取る。呼び出しごとの作業領域はEV3側でも独立する。
+{
+ const base=Blockly.Blocks.procedures_callnoreturn;
+ Blockly.Blocks.ev3_call_outputs={...base,defType_:'procedures_defreturn',
+  init(){base.init.call(this);this.setInputsInline(true);this.returnNames_=[];},
+  setReturnTargets(names){
+   this.returnNames_=[...names];
+   for(let i=this.inputList.length-1;i>=0;i--){const key=this.inputList[i].name;if(/^OUT\d+$/.test(key)&&Number(key.slice(3))>=names.length)this.removeInput(key);}
+   names.forEach((name,i)=>{const key='OUT'+i;if(!this.getInput(key))this.appendDummyInput(key).appendField(name+' →','OUT_LABEL'+i).appendField(new Blockly.FieldVariable(name),key);else this.setFieldValue(name+' →','OUT_LABEL'+i);const field=this.getField(key);if(!field.eblFiltered){const original=field.getOptions.bind(field);field.getOptions=function(cache){const ws=this.getSourceBlock().workspace.targetWorkspace??this.getSourceBlock().workspace,allowed=new Set(ordinaryVariables(ws).map(m=>m.getId()));return original(cache).filter(option=>!ws.getVariableMap().getVariableById(option[1])||allowed.has(option[1])||option[1]===this.getValue());};field.eblFiltered=true;}});
+  },
+  saveExtraState(){return {...base.saveExtraState.call(this),outputs:this.returnNames_};},
+  loadExtraState(state){base.loadExtraState.call(this,state);this.setReturnTargets(state.outputs??['値']);},
+  domToMutation(node){base.domToMutation.call(this,node);const def=Blockly.Procedures.getDefinition(this.getProcedureCall(),this.workspace);this.setReturnTargets(def?outputNames(def):this.returnNames_??['値']);}
  };
 }
+Blockly.Blocks.ev3_return_values={
+ init(){this.setPreviousStatement(true);this.setColour('#aa597e');this.setInputsInline(true);this.returnNames_=[];this.loadExtraState({outputs:['値1','値2']});},
+ saveExtraState(){return {outputs:this.returnNames_};},
+ loadExtraState(state){this.returnNames_=state.outputs??['値1','値2'];for(const input of [...this.inputList])if(/^VALUE\d+$/.test(input.name)&&Number(input.name.slice(5))>=this.returnNames_.length)this.removeInput(input.name);this.returnNames_.forEach((name,i)=>{const key='VALUE'+i;if(!this.getInput(key))this.appendValueInput(key).setCheck('Number').appendField(name,'LABEL'+i);else this.setFieldValue(name,'LABEL'+i);});if(!this.getInput('END'))this.appendDummyInput('END').appendField('を返してこのマイブロックを終了する');else this.moveInputBefore('END',null);}
+};
 // マイブロックの作成・編集。名前と引数を先に検証し、呼び出し側の入力式を保持したまま更新する。
 // 途中で失敗した場合はワークスペースの控えから復元し、半端な編集状態を残さない。
-function saveMyBlock(ws,name,rows,definitionId=null,returnsValue=undefined){
+function saveMyBlock(ws,name,rows,definitionId=null,returnsValue=undefined,returnNames=undefined){
  name=String(name).trim();rows=rows.map(row=>({name:String(row.name).trim(),id:row.id||''}));
  const defs=ws.getAllBlocks(false).filter(b=>isMyBlockDefinition(b));
  const def=definitionId?ws.getBlockById(definitionId):null;
  if(definitionId&&!def)throw Error('編集する定義が見つかりません。');
+ const names=(returnsValue??(def?.type==='procedures_defreturn'))?(returnNames??(outputNames(def).length?outputNames(def):['値'])):[];
  const targetType=(returnsValue??(def?.type==='procedures_defreturn'))?'procedures_defreturn':'procedures_defnoreturn';
  if(def&&def.type!==targetType&&Blockly.Procedures.getCallers(def.getFieldValue('NAME'),ws).length)throw Error('戻り値の有無を変える前に、この定義の呼び出しブロックを削除してください。形が変わるため、変更後に置き直します。');
  if(def?.type==='procedures_defreturn'&&targetType!==def.type&&def.getInputTargetBlock('RETURN')&&!def.getInputTargetBlock('RETURN').isShadow())throw Error('返す値のブロックを先に外してください。');
+ if(names.length>8||names.some(n=>!String(n).trim()||String(n).length>40)||new Set(names.map(n=>String(n).trim().toLowerCase())).size!==names.length)throw Error('戻り値は重複しない名前で1〜8個、名前は1〜40文字にしてください。');
+ if(targetType==='procedures_defreturn'&&!names.length)throw Error('戻り値を1個以上追加してください。');
+ if(def&&outputNames(def).length!==names.length&&Blockly.Procedures.getCallers(def.getFieldValue('NAME'),ws).length)throw Error('戻り値の数を変える前に呼び出しブロックを削除し、変更後に置き直してください。');
+ if(def)for(let i=names.length;i<outputNames(def).length;i++){const input=def.getInputTargetBlock(i?'RETURN'+i:'RETURN');if(input&&!input.isShadow())throw Error('削除する戻り値の計算ブロックを先に外してください。');}
  if(!name||name.length>60)throw Error('マイブロックの名前を1〜60文字で入力してください。');
  if(defs.some(b=>b!==def&&b.getFieldValue('NAME').toLowerCase()===name.toLowerCase()))throw Error('同じ名前のマイブロックがあります。');
  if(!def&&defs.length>=32)throw Error('マイブロックは32個までです。');
@@ -388,21 +423,21 @@ function saveMyBlock(ws,name,rows,definitionId=null,returnsValue=undefined){
   let target=def;
   if(def&&def.type!==targetType){
    const state=Blockly.serialization.blocks.save(def);state.type=targetType;
-   if(targetType==='procedures_defnoreturn'&&state.inputs)delete state.inputs.RETURN;
+   if(targetType==='procedures_defnoreturn'&&state.inputs)for(const key of Object.keys(state.inputs))if(/^RETURN\d*$/.test(key))delete state.inputs[key];
    def.dispose(false);target=Blockly.serialization.blocks.append(state,ws);
   }
   target??=ws.newBlock(targetType);
   target.setFieldValue(name,'NAME');
-  target.loadExtraState({params:models.map(m=>({name:m.getName(),id:m.getId()}))});
-  for(const previous of body){const b=ws.getBlockById(previous.id);if(!b)continue;const id=bodyIds.get(b.id);const index=rows.findIndex(r=>r.id===id);if(index<0)continue;
+  target.loadExtraState({params:models.map(m=>({name:m.getName(),id:m.getId()})),...(targetType==='procedures_defreturn'?{outputs:names.map(n=>String(n).trim())}:{})});
+  for(const previous of body){const b=ws.getBlockById(previous.id);if(!b)continue;if(b.type==='ev3_return_values'&&b.getRootBlock()===target)b.loadExtraState({outputs:names});const id=bodyIds.get(b.id);const index=rows.findIndex(r=>r.id===id);if(index<0)continue;
    if(b.type==='ev3_argument'){b.parameterId=models[index].getId();b.setFieldValue(rows[index].name,'ARG_NAME');}
    else if(['variables_get','variables_set','math_change'].includes(b.type))b.setFieldValue(models[index].getId(),'VAR');
   }
   for(const {call,args} of calls){
-   call.renameProcedure(call.getProcedureCall(),name);call.loadExtraState({name,params:rows.map(r=>r.name)});
+   call.renameProcedure(call.getProcedureCall(),name);call.loadExtraState({name,params:rows.map(r=>r.name),outputs:names});
    rows.forEach((r,i)=>{const a=args.find(a=>a.id===r.id);if(a?.state){let child=ws.getBlockById(a.state.id);if(!child)child=Blockly.serialization.blocks.append(a.state,ws);call.getInput('ARG'+i).connection.connect(child.outputConnection);}else{const n=ws.newBlock('math_number');n.setShadow(true);n.setFieldValue('0','NUM');call.getInput('ARG'+i).connection.connect(n.outputConnection);n.initSvg?.();n.render?.();}});
   }
-  if(targetType==='procedures_defreturn'&&!target.getInputTargetBlock('RETURN')){const n=ws.newBlock('math_number');n.setShadow(true);n.setFieldValue(0,'NUM');target.getInput('RETURN').connection.connect(n.outputConnection);n.initSvg?.();n.render?.();}
+  if(targetType==='procedures_defreturn')names.forEach((_,i)=>{const key=i?'RETURN'+i:'RETURN';if(!target.getInputTargetBlock(key)){const n=ws.newBlock('math_number');n.setShadow(true);n.setFieldValue(0,'NUM');target.getInput(key).connection.connect(n.outputConnection);n.initSvg?.();n.render?.();}});
   target.initSvg?.();target.render?.();
   if(!def){const bottom=Math.max(20,...ws.getTopBlocks(false).filter(b=>b!==target).map(b=>b.getRelativeToSurfaceXY().y+(b.getHeightWidth?.().height??80)));target.moveBy(60,bottom+60);}
   return target;
@@ -503,8 +538,9 @@ workspace.registerToolboxCategoryCallback('PROCEDURE',ws=>{
  for(const def of ws.getAllBlocks(false).filter(b=>isMyBlockDefinition(b))){
   const key='EV3_EDIT_'+def.id,name=def.getFieldValue('NAME'),models=def.getVarModels();
   workspace.registerButtonCallback(key,()=>openMyBlockDialog(def.id));
-  items.push({kind:'block',type:def.type==='procedures_defreturn'?'procedures_callreturn':'procedures_callnoreturn',extraState:{name,params:models.map(m=>m.getName())},inputs:Object.fromEntries(models.map((m,i)=>['ARG'+i,shadow(0)]))},{kind:'button',text:'「'+name+'」を編集',callbackKey:key});
+  items.push({kind:'block',type:outputNames(def).length>1?'ev3_call_outputs':def.type==='procedures_defreturn'?'procedures_callreturn':'procedures_callnoreturn',extraState:{name,params:models.map(m=>m.getName()),outputs:outputNames(def)},inputs:Object.fromEntries(models.map((m,i)=>['ARG'+i,shadow(0)]))},{kind:'button',text:'「'+name+'」を編集',callbackKey:key});
  }
+ for(const def of ws.getAllBlocks(false).filter(b=>outputNames(b).length>1))items.push({kind:'block',type:'ev3_return_values',extraState:{outputs:outputNames(def)},inputs:Object.fromEntries(outputNames(def).map((_,i)=>['VALUE'+i,shadow(0)]))});
  items.push({kind:'block',type:'ev3_return_value',inputs:{VALUE:{shadow:{type:'math_number',fields:{NUM:0}}}}});
  return items;
 });
@@ -545,7 +581,7 @@ function updateButtons(){
 // 丸い数値ブロック・条件ブロックを中間データへ変換する。センサやボタンの実測はここでは行わない。
 function expression(x){
  if(!x)throw Error('数値・条件の空欄にブロックを入れてください。');
- if(x.type==='procedures_callreturn'){const def=Blockly.Procedures.getDefinition(x.getProcedureCall(),workspace);if(def?.type!=='procedures_defreturn')throw Error('数値を返すマイブロックの定義を確認してください。');return {callValue:{name:x.getProcedureCall(),args:def.getVarModels().map((_,i)=>value(x,'ARG'+i))}};}
+ if(x.type==='procedures_callreturn'){const def=Blockly.Procedures.getDefinition(x.getProcedureCall(),workspace);if(def?.type!=='procedures_defreturn')throw Error('数値を返すマイブロックの定義を確認してください。');if(outputNames(def).length>1)throw Error('複数の戻り値は、各値を変数に受け取る呼び出しブロックを使ってください。');return {callValue:{name:x.getProcedureCall(),args:def.getVarModels().map((_,i)=>value(x,'ARG'+i))}};}
  if(x.type==='ev3_text')return {text:x.getFieldValue('TEXT')};
  if(x.type==='ev3_text_get')return {textVar:x.getFieldValue('NAME')};
  if(x.type==='ev3_text_join')return {textOp:'join',a:value(x,'A'),b:value(x,'B')};
@@ -656,6 +692,8 @@ function chain(block){
       case 'ev3_motor_stop':case 'ev3_stop_port':out.push({type:'stop',ports:Number(b.getFieldValue('PORTS')),...(b.getFieldValue('STOP_MODE')&&b.getFieldValue('STOP_MODE')!=='default'?{stopMode:b.getFieldValue('STOP_MODE')}:{})});break;
       case 'ev3_stop':out.push({type:'stop'});break;
       case 'ev3_program_end':out.push({type:'programEnd'});return out;
+      case 'ev3_call_outputs':{const name=b.getProcedureCall(),def=Blockly.Procedures.getDefinition(name,workspace);if(!def||!outputNames(def).length)throw Error('戻り値の定義を確認してください。');if(outputNames(def).join('\0')!==(b.returnNames_??[]).join('\0'))throw Error('戻り値の名前が変更されています。呼び出しを置き直してください。');out.push({type:'callOutputs',name,args:def.getVarModels().map((_,i)=>value(b,'ARG'+i)),targets:outputNames(def).map((_,i)=>{const m=b.getField('OUT'+i).getVariable(),root=b.getRootBlock();if(isMyBlockDefinition(root)&&root.getVarModels().some(p=>p.getId()===m.getId()))throw Error('戻り値は通常の変数に受け取ってください。引数には代入できません。');return m.getName();})});break;}
+      case 'ev3_return_values':{const def=b.getRootBlock();if(!isMyBlockDefinition(def)||outputNames(def).join('\0')!==b.returnNames_.join('\0'))throw Error('返す値の数を定義の戻り値とそろえてください。');out.push({type:'returnValues',values:b.returnNames_.map((_,i)=>value(b,'VALUE'+i))});return out;}
       case 'ev3_return_value':if(b.getRootBlock().type!=='procedures_defreturn')throw Error('「値を返して終了する」は数値を返すマイブロックの定義の中で使ってください。');out.push({type:'returnValue',value:value(b,'VALUE')});return out;
       case 'ev3_myblock_return':if(!isMyBlockDefinition(b.getRootBlock()))throw Error('「このマイブロックを終了する」はマイブロックの定義の中で使ってください。');out.push({type:'myblockReturn'});return out;
       case 'controls_repeat_ext':out.push({type:'repeat',count:value(b,'TIMES'),body:chain(b.getInputTargetBlock('DO'))});break;
@@ -680,14 +718,14 @@ function program(){
   const threads=[...starts.slice(1).map((b,i)=>({kind:'start',name:'スタート'+(i+2),body:chain(b.getNextBlock())})),...events.map(b=>({kind:b.type==='ev3_when_message'?'message':b.type==='ev3_when_changed'?'changed':'condition',...(b.type==='ev3_when_message'?{message:b.getFieldValue('MESSAGE').trim()}:{condition:value(b,b.type==='ev3_when_changed'?'VALUE':'BOOL')}),body:chain(b.getNextBlock())}))];
   function gather(node){
     if(!node||typeof node!=='object')return;
-    const call=node.callValue??(node.type==='call'?node:null);
+    const call=node.callValue??(['call','callOutputs'].includes(node.type)?node:null);
     if(call&&!used.has(call.name)){
       const def=Blockly.Procedures.getDefinition(call.name,workspace);
       if(!def||!def.isEnabled())throw Error('呼び出しているマイブロックの定義を確認してください。');
       const procedure={name:call.name,params:def.getVarModels().map(m=>m.name),body:[]};
       used.set(call.name,procedure);procedure.body=chain(def.getInputTargetBlock('STACK'));
-      if(def.type==='procedures_defreturn'){procedure.returns=true;procedure.result=value(def,'RETURN');}
-      gather(procedure.body);if(procedure.returns)gather(procedure.result);
+      if(def.type==='procedures_defreturn'){procedure.returns=true;const values=outputNames(def).map((_,i)=>value(def,i?'RETURN'+i:'RETURN'));if(values.length===1)procedure.result=values[0];else procedure.results=values;}
+      gather(procedure.body);if(procedure.returns)gather(procedure.results??procedure.result);
     }
     for(const child of Object.values(node))gather(child);
   }
@@ -710,7 +748,7 @@ function ensureArgumentInputs(){
         if(model)block.parameterId=model.getId();
         if(model && block.getFieldValue('ARG_NAME')!==model.name)block.setFieldValue(model.name,'ARG_NAME');
       }
-      if(!['procedures_callnoreturn','procedures_callreturn'].includes(block.type))continue;
+      if(!['procedures_callnoreturn','procedures_callreturn','ev3_call_outputs'].includes(block.type))continue;
       if(!block.getInputsInline())block.setInputsInline(true);
       for(const input of block.inputList){
         if(/^ARG\d+$/.test(input.name) && input.connection && !input.connection.targetBlock()){
@@ -956,23 +994,29 @@ function myBlockArgumentRow(name='',id=''){
  const remove=document.createElement('button');remove.type='button';remove.textContent='削除';remove.onclick=()=>row.remove();
  row.append(input,remove);$('myBlockArguments').append(row);
 }
+function myBlockReturnRow(name=''){
+ const row=document.createElement('div');row.className='myblock-argument';const input=document.createElement('input');input.value=name;input.maxLength=40;input.placeholder='例：距離';input.setAttribute('aria-label','戻り値の名前');const remove=document.createElement('button');remove.type='button';remove.textContent='削除';remove.onclick=()=>row.remove();row.append(input,remove);$('myBlockReturns').append(row);
+}
+function showMyBlockReturns(){$('myBlockReturnSettings').hidden=$('myBlockReturn').value!=='number';if($('myBlockReturn').value==='number'&&!$('myBlockReturns').children.length)myBlockReturnRow('値');}
 function openMyBlockDialog(id=null){
  editingMyBlockId=id;const def=id?workspace.getBlockById(id):null;
  $('myBlockTitle').textContent=def?'マイブロックを編集':'マイブロックを作る';
- $('myBlockReturn').value=def?.type==='procedures_defreturn'?'number':'none';
+ $('myBlockReturn').value=def?.type==='procedures_defreturn'?'number':'none';$('myBlockReturns').replaceChildren();for(const name of outputNames(def))myBlockReturnRow(name);showMyBlockReturns();
  $('myBlockName').value=def?.getFieldValue('NAME')??'';$('myBlockArguments').replaceChildren();$('myBlockError').textContent='';
  for(const m of def?.getVarModels()??[])myBlockArgumentRow(m.getName(),m.getId());
  $('myBlockSubmit').textContent=def?'変更を保存':'作る';$('myBlockDialog').showModal();$('myBlockName').focus();
 }
+$('myBlockReturn').onchange=showMyBlockReturns;
+$('myBlockAddReturn').onclick=()=>{if($('myBlockReturns').children.length>=8){$('myBlockError').textContent='戻り値は8個までです。';return;}myBlockReturnRow();$('myBlockReturns').lastElementChild.querySelector('input').focus();};
 $('createMyBlock').onclick=()=>openMyBlockDialog();
 $('myBlockAddArgument').onclick=()=>{if($('myBlockArguments').children.length>=8){$('myBlockError').textContent='引数は8個までです。';return;}myBlockArgumentRow();$('myBlockArguments').lastElementChild.querySelector('input').focus();};
 $('myBlockCancel').onclick=()=>$('myBlockDialog').close();
 $('myBlockForm').onsubmit=event=>{
  event.preventDefault();
  try{const rows=[...$('myBlockArguments').children].map(row=>({id:row.dataset.parameterId,name:row.querySelector('input').value}));
-  const def=saveMyBlock(workspace,$('myBlockName').value,rows,editingMyBlockId,$('myBlockReturn').value==='number');
+  const def=saveMyBlock(workspace,$('myBlockName').value,rows,editingMyBlockId,$('myBlockReturn').value==='number',[...$('myBlockReturns').children].map(row=>row.querySelector('input').value.trim()));
   ensureArgumentInputs();workspace.refreshToolboxSelection();dirty=true;check();saveLocal();$('myBlockDialog').close();workspace.centerOnBlock(def.id);
-  feedback(def.type==='procedures_defreturn'?'定義の「返す値」に数値・演算などを入れます。マイブロックの丸い呼び出しを数値入力へ入れて使います。':'定義の中に命令をつなぎ、マイブロックの同じ名前のブロックをスタートにつなげて使います。');
+  feedback(def.type==='procedures_defreturn'?(outputNames(def).length>1?'定義の各「返す値」に計算式を入れます。呼び出しブロックで、戻り値を受け取る変数を選びます。':'定義の「返す値」に数値・演算などを入れます。マイブロックの丸い呼び出しを数値入力へ入れて使います。'):'定義の中に命令をつなぎ、マイブロックの同じ名前のブロックをスタートにつなげて使います。');
  }catch(error){$('myBlockError').textContent=error.message;}
 };
 
@@ -1092,3 +1136,6 @@ $('sampleSelect').onchange=event=>{
 $('sampleConfirmCancel').onclick=()=>{pendingSample=null;$('sampleConfirmDialog').close();$('sampleSelect').focus();};
 $('sampleConfirmDialog').oncancel=()=>{pendingSample=null;};
 $('sampleConfirmOpen').onclick=()=>{const id=pendingSample;pendingSample=null;$('sampleConfirmDialog').close();if(id)openSelectedSample(id);};
+
+function multiReturnSampleState(){return {"variables":[{"id":"multi-値1","name":"値1"},{"id":"multi-値2","name":"値2"},{"id":"multi-sum","name":"合計"},{"id":"multi-difference","name":"差分"}],"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":40,"y":35,"next":{"block":{"type":"ev3_call_outputs","extraState":{"name":"和と差","params":["値1","値2"],"outputs":["和","差"]},"inputs":{"ARG0":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"ARG1":{"shadow":{"type":"math_number","fields":{"NUM":220}}}},"fields":{"OUT0":{"id":"multi-sum"},"OUT1":{"id":"multi-difference"}},"next":{"block":{"type":"ev3_display_clear","next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":0,"FONT":"1","DECIMALS":1},"inputs":{"VALUE":{"block":{"type":"variables_get","fields":{"VAR":{"id":"multi-sum"}}}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":32,"FONT":"1","DECIMALS":1},"inputs":{"VALUE":{"block":{"type":"variables_get","fields":{"VAR":{"id":"multi-difference"}}}}},"next":{"block":{"type":"ev3_tone","fields":{"VOLUME":25},"inputs":{"FREQUENCY":{"block":{"type":"variables_get","fields":{"VAR":{"id":"multi-sum"}}}},"MS":{"shadow":{"type":"math_number","fields":{"NUM":400}}}},"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":2}}}}}}}}}}}}}}}}},{"type":"procedures_defreturn","x":650,"y":35,"fields":{"NAME":"和と差"},"extraState":{"params":[{"id":"multi-値1","name":"値1"},{"id":"multi-値2","name":"値2"}],"outputs":["和","差"]},"inputs":{"RETURN":{"block":{"type":"ev3_op_add","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"multi-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"multi-値2"},"fields":{"ARG_NAME":"値2"}}}}}},"RETURN1":{"block":{"type":"ev3_op_sub","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"multi-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"multi-値2"},"fields":{"ARG_NAME":"値2"}}}}}}}}]}};}
+sampleAction('multiReturnSample').onclick=()=>{loading=true;try{Blockly.serialization.workspaces.load(multiReturnSampleState(),workspace);$('programName').value='MultiReturn';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('和と差を1回の呼び出しで受け取ります。本体画面の上に660、下に220を表示し、660Hzの音を鳴らします。モーターは動かしません。');};

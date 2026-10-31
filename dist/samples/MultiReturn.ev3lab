@@ -1,0 +1,262 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "appVersion": "0.25.0",
+  "ev3ProjectName": "EV3Lab",
+  "programName": "MultiReturn",
+  "pairMode": "independent",
+  "workspace": {
+    "variables": [
+      {
+        "id": "multi-値1",
+        "name": "値1"
+      },
+      {
+        "id": "multi-値2",
+        "name": "値2"
+      },
+      {
+        "id": "multi-sum",
+        "name": "合計"
+      },
+      {
+        "id": "multi-difference",
+        "name": "差分"
+      }
+    ],
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "x": 40,
+          "y": 35,
+          "next": {
+            "block": {
+              "type": "ev3_call_outputs",
+              "extraState": {
+                "name": "和と差",
+                "params": [
+                  "値1",
+                  "値2"
+                ],
+                "outputs": [
+                  "和",
+                  "差"
+                ]
+              },
+              "inputs": {
+                "ARG0": {
+                  "shadow": {
+                    "type": "math_number",
+                    "fields": {
+                      "NUM": 440
+                    }
+                  }
+                },
+                "ARG1": {
+                  "shadow": {
+                    "type": "math_number",
+                    "fields": {
+                      "NUM": 220
+                    }
+                  }
+                }
+              },
+              "fields": {
+                "OUT0": {
+                  "id": "multi-sum"
+                },
+                "OUT1": {
+                  "id": "multi-difference"
+                }
+              },
+              "next": {
+                "block": {
+                  "type": "ev3_display_clear",
+                  "next": {
+                    "block": {
+                      "type": "ev3_display_number",
+                      "fields": {
+                        "X": 0,
+                        "Y": 0,
+                        "FONT": "1",
+                        "DECIMALS": 1
+                      },
+                      "inputs": {
+                        "VALUE": {
+                          "block": {
+                            "type": "variables_get",
+                            "fields": {
+                              "VAR": {
+                                "id": "multi-sum"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "next": {
+                        "block": {
+                          "type": "ev3_display_number",
+                          "fields": {
+                            "X": 0,
+                            "Y": 32,
+                            "FONT": "1",
+                            "DECIMALS": 1
+                          },
+                          "inputs": {
+                            "VALUE": {
+                              "block": {
+                                "type": "variables_get",
+                                "fields": {
+                                  "VAR": {
+                                    "id": "multi-difference"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "next": {
+                            "block": {
+                              "type": "ev3_tone",
+                              "fields": {
+                                "VOLUME": 25
+                              },
+                              "inputs": {
+                                "FREQUENCY": {
+                                  "block": {
+                                    "type": "variables_get",
+                                    "fields": {
+                                      "VAR": {
+                                        "id": "multi-sum"
+                                      }
+                                    }
+                                  }
+                                },
+                                "MS": {
+                                  "shadow": {
+                                    "type": "math_number",
+                                    "fields": {
+                                      "NUM": 400
+                                    }
+                                  }
+                                }
+                              },
+                              "next": {
+                                "block": {
+                                  "type": "ev3_wait_seconds",
+                                  "inputs": {
+                                    "SECONDS": {
+                                      "shadow": {
+                                        "type": "math_number",
+                                        "fields": {
+                                          "NUM": 2
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defreturn",
+          "x": 650,
+          "y": 35,
+          "fields": {
+            "NAME": "和と差"
+          },
+          "extraState": {
+            "params": [
+              {
+                "id": "multi-値1",
+                "name": "値1"
+              },
+              {
+                "id": "multi-値2",
+                "name": "値2"
+              }
+            ],
+            "outputs": [
+              "和",
+              "差"
+            ]
+          },
+          "inputs": {
+            "RETURN": {
+              "block": {
+                "type": "ev3_op_add",
+                "inputs": {
+                  "A": {
+                    "block": {
+                      "type": "ev3_argument",
+                      "extraState": {
+                        "name": "値1",
+                        "parameterId": "multi-値1"
+                      },
+                      "fields": {
+                        "ARG_NAME": "値1"
+                      }
+                    }
+                  },
+                  "B": {
+                    "block": {
+                      "type": "ev3_argument",
+                      "extraState": {
+                        "name": "値2",
+                        "parameterId": "multi-値2"
+                      },
+                      "fields": {
+                        "ARG_NAME": "値2"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "RETURN1": {
+              "block": {
+                "type": "ev3_op_sub",
+                "inputs": {
+                  "A": {
+                    "block": {
+                      "type": "ev3_argument",
+                      "extraState": {
+                        "name": "値1",
+                        "parameterId": "multi-値1"
+                      },
+                      "fields": {
+                        "ARG_NAME": "値1"
+                      }
+                    }
+                  },
+                  "B": {
+                    "block": {
+                      "type": "ev3_argument",
+                      "extraState": {
+                        "name": "値2",
+                        "parameterId": "multi-値2"
+                      },
+                      "fields": {
+                        "ARG_NAME": "値2"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

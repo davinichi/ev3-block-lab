@@ -25,6 +25,39 @@ test('new stop palette offers three direct methods and retains each through libr
 });
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
 
+test('named multi-output definitions, receiving variables and early returns survive project and library reuse',()=>{
+ const c=editor();
+ const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();
+ const def=saveMyBlock(workspace,'計測',[],null,true,['距離','角度']);
+ def.getInputTargetBlock('RETURN').setFieldValue(12.5,'NUM');def.getInputTargetBlock('RETURN1').setFieldValue(90,'NUM');
+ const call=workspace.newBlock('ev3_call_outputs');call.loadExtraState({name:'計測',params:[],outputs:['距離','角度']});
+ const start=workspace.newBlock('ev3_start');start.nextConnection.connect(call.previousConnection);
+ const a=workspace.getVariableMap().createVariable('距離の結果'),b=workspace.getVariableMap().createVariable('角度の結果');call.setFieldValue(a.getId(),'OUT0');call.setFieldValue(b.getId(),'OUT1');
+ const early=workspace.newBlock('ev3_return_values');early.loadExtraState({outputs:['距離','角度']});
+ for(let i=0;i<2;i++){const n=workspace.newBlock('math_number');n.setFieldValue(i+1,'NUM');early.getInput('VALUE'+i).connection.connect(n.outputConnection);}def.getInput('STACK').connection.connect(early.previousConnection);
+ const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);const p=program();Blockly.Events.enable();JSON.stringify({state,p,variables:ordinaryVariables(workspace).map(m=>m.getName())});`,c));
+ assert.deepEqual(saved.p.main[0].targets,['距離の結果','角度の結果']);assert.deepEqual(saved.p.procedures[0].results,[12.5,90]);
+ assert.deepEqual(saved.p.procedures[0].body[0],{type:'returnValues',values:[1,2]});assert.ok(saved.variables.includes('距離の結果'));compile(saved.p);
+ const lib=createBlockLibrary(saved.state,'0.25.0');assert.deepEqual(lib.definitions[0].extraState.outputs,['距離','角度']);
+ const merged=mergeBlockLibrary({blocks:{languageVersion:0,blocks:[]}},lib);inspectBlocks(merged.blocks);
+ c.merged=JSON.stringify(merged);assert.deepEqual(JSON.parse(vm.runInContext(`Blockly.Events.disable();workspace.clear();Blockly.serialization.workspaces.load(JSON.parse(merged),workspace);const d=workspace.getAllBlocks(false).find(b=>b.type==='procedures_defreturn');Blockly.Events.enable();JSON.stringify(outputNames(d));`,c)),['距離','角度']);
+});
+
+test('nested receive-all calls preserve destination references through library import and output-label edits',()=>{
+ const c=editor();
+ const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();
+ let inner=saveMyBlock(workspace,'内側',[],null,true,['和','差']);inner.getInputTargetBlock('RETURN').setFieldValue(12,'NUM');inner.getInputTargetBlock('RETURN1').setFieldValue(4,'NUM');
+ const outer=saveMyBlock(workspace,'外側',[]),call=workspace.newBlock('ev3_call_outputs');call.loadExtraState({name:'内側',params:[],outputs:['和','差']});outer.getInput('STACK').connection.connect(call.previousConnection);
+ const a=workspace.getVariableMap().createVariable('合計'),b=workspace.getVariableMap().createVariable('差分');call.setFieldValue(a.getId(),'OUT0');call.setFieldValue(b.getId(),'OUT1');
+ inner=saveMyBlock(workspace,'内側',[],inner.id,true,['合算値','差の値']);if(call.returnNames_.join(',')!=='合算値,差の値'||call.getField('OUT0').getVariable().getName()!=='合計')throw Error('edit lost destinations');
+ const saved=Blockly.serialization.workspaces.save(workspace);Blockly.Events.enable();JSON.stringify(saved);`,c));
+ const lib=createBlockLibrary(saved,'0.25.0');assert.ok(lib.variables.some(v=>v.name==='合計'));assert.ok(lib.variables.some(v=>v.name==='差分'));
+ let id=0;const merged=mergeBlockLibrary({variables:[{id:'existing','name':'合計'}],blocks:{languageVersion:0,blocks:[{type:'ev3_start'}]}},lib,()=>`imported-${++id}`);
+ c.lesson=JSON.stringify(merged);
+ const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();workspace.clear();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const s=workspace.getAllBlocks(false).find(b=>b.type==='ev3_start'),outerCall=workspace.newBlock('procedures_callnoreturn');outerCall.loadExtraState({name:'外側',params:[]});s.nextConnection.connect(outerCall.previousConnection);const p=program();Blockly.Events.enable();JSON.stringify(p);`,c));
+ assert.deepEqual(p.procedures.find(x=>x.name==='外側').body[0].targets,['合計','差分']);compile(p);
+});
+
 test('sample picker protects edits on cancel, resets the selection, and permits repeated loading',async()=>{
  const c=editor();
  vm.runInContext(`let dirty=true,opened=0;function feedback(){};

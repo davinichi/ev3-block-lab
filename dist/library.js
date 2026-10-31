@@ -2,7 +2,7 @@
 // 独自ブロックを追加したときは、この許可一覧にも型名を登録して保存ファイルから復元できるようにする。
 const isDefinition=b=>['procedures_defnoreturn','procedures_defreturn'].includes(b?.type);
 const types=new Set(['add','sub','mul','div','lt','eq','gt','lte','gte','neq','and','or'].map(op=>'ev3_op_'+op));
-for(const type of ['procedures_defreturn','procedures_callreturn','ev3_return_value','ev3_movement_setup','ev3_battery_voltage','ev3_battery_current','ev3_pid','ev3_pid_reset'])types.add(type);
+for(const type of ['ev3_call_outputs','ev3_return_values','procedures_defreturn','procedures_callreturn','ev3_return_value','ev3_movement_setup','ev3_battery_voltage','ev3_battery_current','ev3_pid','ev3_pid_reset'])types.add(type);
 for(const type of ['ev3_when_condition','ev3_when_changed','ev3_when_message','ev3_message_send','ev3_message_wait'])types.add(type);
 // 本体ボタン・終了命令も、作品ファイルとマイブロック集の両方から復元できるよう許可する。
 for(const type of ['ev3_brick_button','ev3_brick_button_value','ev3_program_end','ev3_myblock_return'])types.add(type);
@@ -17,6 +17,7 @@ export function inspectBlocks(blocks){
   function inspect(value,depth=0){
     if(depth>200)throw Error('ブロックの入れ子が深すぎます。');
     if(value && typeof value==='object'){
+      if(['procedures_defreturn','ev3_call_outputs','ev3_return_values'].includes(value.type)&&value.extraState?.outputs!==undefined){const names=value.extraState.outputs;if(!Array.isArray(names)||names.length<1||names.length>8||names.some(n=>typeof n!=='string'||!n.trim()||n.length>40)||new Set(names.map(n=>n.toLowerCase())).size!==names.length)throw Error('戻り値の名前・個数を確認してください（1〜8個）。');}
       if(value.type && !types.has(value.type))throw Error(`未対応のブロック: ${value.type}`);
       if(value.type && ++count>1000)throw Error('ブロックは1000個までです。');
       for(const child of Object.values(value))inspect(child,depth+1);
@@ -29,7 +30,7 @@ function references(nodes){
   const ids=new Set();
   function visit(value){
     if(!value||typeof value!=='object')return;
-    if(value.fields?.VAR?.id)ids.add(value.fields.VAR.id);
+    for(const field of Object.values(value.fields??{}))if(field&&typeof field==='object'&&field.id)ids.add(field.id);
     if(value.extraState?.parameterId)ids.add(value.extraState.parameterId);
     if(isDefinition(value))for(const p of value.extraState?.params??[])if(p.id)ids.add(p.id);
     for(const child of Object.values(value))visit(child);
@@ -71,7 +72,7 @@ export function mergeBlockLibrary(current,library,makeId=()=>crypto.randomUUID()
   function remap(value){
     if(!value||typeof value!=='object')return;
     if(types.has(value.type))delete value.id;
-    if(value.fields?.VAR?.id)value.fields.VAR.id=mapping.get(value.fields.VAR.id);
+    for(const field of Object.values(value.fields??{}))if(field&&typeof field==='object'&&field.id)field.id=mapping.get(field.id);
     if(value.extraState?.parameterId)value.extraState.parameterId=mapping.get(value.extraState.parameterId);
     if(isDefinition(value))for(const p of value.extraState?.params??[])if(p.id)p.id=mapping.get(p.id);
     for(const child of Object.values(value))remap(child);

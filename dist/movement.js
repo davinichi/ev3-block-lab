@@ -4,8 +4,8 @@ export const movementId=(left,right)=>left*16+right;
 export function movementPlan(program){
  // 式中の呼び出しも、その式を実行する位置で追跡する。戻り値の中の設定を見落とさない。
  const calls=value=>{if(!value||typeof value!=='object')return [];if(Array.isArray(value))return value.flatMap(calls);const nested=Object.values(value).flatMap(calls);return value.callValue?[...nested,{type:'call',...value.callValue}]:nested;};
- const expand=nodes=>nodes.flatMap(b=>{const expressions=Object.fromEntries(Object.entries(b).filter(([k])=>!['body','then','else'].includes(k)));const node={...b};for(const k of ['body','then','else'])if(b[k])node[k]=expand(b[k]);return [...calls(expressions),node];});
- const procedures=new Map(program.procedures.map(p=>[p.name,{...p,body:expand([...p.body,...(p.returns?[{type:'returnValue',value:p.result}]:[])])}]));
+ const expand=nodes=>nodes.flatMap(b=>{const expressions=Object.fromEntries(Object.entries(b).filter(([k])=>!['body','then','else'].includes(k)));const node={...b,type:b.type==='callOutputs'?'call':b.type};for(const k of ['body','then','else'])if(b[k])node[k]=expand(b[k]);return [...calls(expressions),node];});
+ const procedures=new Map(program.procedures.map(p=>[p.name,{...p,body:expand([...p.body,...(p.returns?[{type:'returnValues',values:p.results??[p.result]}]:[])])}]));
  const pairs=new Map();let hasMovement=false,visits=0;
  const scan=(nodes,stack=[])=>{for(const b of nodes){
   if(++visits>20000)throw Error('動きの設定を確認する処理が多すぎます。');
@@ -17,7 +17,7 @@ export function movementPlan(program){
   if(b.movement)hasMovement=true;
   if(b.type==='call'&&!stack.includes(b.name))scan(procedures.get(b.name)?.body??[],[...stack,b.name]);
   for(const key of ['body','then','else'])if(b[key])scan(b[key],stack);
-  if(['programEnd','myblockReturn','returnValue'].includes(b.type))break;
+  if(['programEnd','myblockReturn','returnValue','returnValues'].includes(b.type))break;
  }};
  const roots=[expand(program.main),...(program.threads??[]).map(t=>[...calls(t.condition),...expand(t.body)])];roots.forEach(r=>scan(r));
  if(hasMovement&&!pairs.size)throw Error(movementError);
@@ -32,7 +32,7 @@ export function movementPlan(program){
    if(!active.length)break;
    if(b.movement&&!parallel&&active.includes(false))throw Error(movementError);
    if(b.type==='movementSetup')active=[true];
-   else if(['myblockReturn','returnValue'].includes(b.type)){returned.push(...active);active=[];}
+   else if(['myblockReturn','returnValue','returnValues'].includes(b.type)){returned.push(...active);active=[];}
    else if(b.type==='programEnd'){ended.push(...active);active=[];}
    else if(b.type==='call'){
     if(stack.includes(b.name))throw Error('マイブロックの再帰呼び出しは使えません。');

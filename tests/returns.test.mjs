@@ -9,7 +9,31 @@ const set=(name,value)=>({type:'set',var:name,value});
 const value=name=>({var:name});
 const param=name=>({param:name});
 const wait=seconds=>({type:'waitSeconds',seconds});
-function run(p,options){const build=compile(p);scanImage(build.data);const result=runParallel(build.data,options);const names=[];const visit=x=>{if(!x||typeof x!=='object')return;if(typeof x.var==='string'&&!names.includes(x.var))names.push(x.var);Object.values(x).forEach(visit);};visit(build.program);return {...result,build,get:name=>result.shared.getFloat32(names.indexOf(name)*4,true)};}
+function run(p,options){const build=compile(p);scanImage(build.data);const result=runParallel(build.data,options);const names=[];const visit=x=>{if(!x||typeof x!=='object')return;if(typeof x.var==='string'&&!names.includes(x.var))names.push(x.var);if(x.type==='callOutputs')for(const name of x.targets)if(!names.includes(name))names.push(name);Object.values(x).forEach(visit);};visit(build.program);return {...result,build,get:name=>result.shared.getFloat32(names.indexOf(name)*4,true)};}
+test('a receive-all call runs once and copies multiple fractional outputs into separate variables',()=>{
+ const r=run({main:[{type:'callOutputs',name:'pair',args:[2.5],targets:['left','right']}],procedures:[{name:'pair',params:['n'],returns:true,body:[{type:'change',var:'calls',value:1}],results:[param('n'),op('mul',param('n'),2)]}]});
+ assert.equal(r.get('left'),2.5);assert.equal(r.get('right'),5);assert.equal(r.get('calls'),1);assert.equal(r.tasks,0);
+ assert.deepEqual(r.build.objects[1].code.slice(0,4),[3,0x83,0x43,0x43]);
+});
+test('multiple early-return values and parallel callers retain independent outputs',()=>{
+ const def={name:'pair',params:['n'],returns:true,body:[wait(.05),{type:'if',condition:op('lt',param('n'),0),then:[{type:'returnValues',values:[-1,-2]}],else:[]}],results:[param('n'),op('mul',param('n'),2)]};
+ const r=run({main:[{type:'callOutputs',name:'pair',args:[-3],targets:['a','b']}],threads:[{kind:'start',body:[{type:'callOutputs',name:'pair',args:[7.25],targets:['c','d']}]}],procedures:[def]});
+ assert.equal(r.get('a'),-1);assert.equal(r.get('b'),-2);assert.equal(r.get('c'),7.25);assert.equal(r.get('d'),14.5);assert.equal(r.tasks,0);assert.ok(r.time<100);
+});
+test('eight results, nested numeric calls and selected scalar output use native output descriptors',()=>{
+ const eight={name:'eight',params:[],returns:true,body:[],results:Array.from({length:8},(_,i)=>i+.5)};
+ const r=run({main:[{type:'callOutputs',name:'eight',args:[],targets:Array.from({length:8},(_,i)=>'out'+i)},set('selected',{callValue:{name:'eight',args:[],output:7}})],procedures:[eight]});
+ for(let i=0;i<8;i++)assert.equal(r.get('out'+i),i+.5);assert.equal(r.get('selected'),7.5);
+ assert.deepEqual(r.build.objects[1].code.slice(0,9),[8,...Array(8).fill(0x43)]);
+});
+test('multi-output count mismatches and legacy single-value exits cannot silently drop outputs',()=>{
+ const pair={name:'pair',params:[],returns:true,body:[],results:[1,2]};
+ const main=[{type:'callOutputs',name:'pair',args:[],targets:['a','b']}];
+ assert.throws(()=>compile({main:[{...main[0],targets:['a']}],procedures:[pair]}),/変数/);
+ assert.throws(()=>compile({main,procedures:[{...pair,body:[{type:'returnValue',value:9}]}]}),/返す値の数/);
+ assert.throws(()=>compile({main,procedures:[{...pair,results:[]}]}),/1〜8/);
+ assert.throws(()=>compile({main:[set('bad',{callValue:{name:'pair',args:[],output:2}})],procedures:[pair]}),/選択/);
+});
 test('native output parameters support fractional results, nested calls and arithmetic snapshots',()=>{
  const p={main:[set('global',2),set('out',op('add',value('global'),call('sum',call('side'),call('sum',1.25,2.5))))],procedures:[
  {name:'sum',params:['a','b'],returns:true,body:[],result:op('add',param('a'),param('b'))},
