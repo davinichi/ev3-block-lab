@@ -4,7 +4,7 @@ import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.
 const $=id=>document.getElementById(id);
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.22.0';
+const VERSION='0.23.0';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -24,6 +24,7 @@ const deviceName=type=>deviceNames[type]??([0,125,126,127].includes(type)?'未�
 const singlePorts=[['A','1'],['B','2'],['C','4'],['D','8']];
 const pairPorts=[['B + C','6'],['A + B','3'],['A + C','5'],['A + D','9'],['B + D','10'],['C + D','12']];
 Blockly.defineBlocksWithJsonArray([
+ {type:'ev3_movement_setup',message0:'動きに使うモーターを 左 %1 右 %2 にする',args0:[{type:'field_dropdown',name:'LEFT_PORT',options:[singlePorts[1],singlePorts[0],singlePorts[2],singlePorts[3]]},{type:'field_dropdown',name:'RIGHT_PORT',options:[singlePorts[2],singlePorts[0],singlePorts[1],singlePorts[3]]}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'実行した時点から全処理・マイブロックで共有します。同じポートは選べません。設定だけでは回りません。変更時は以前の左右組を停止します。'},
  {type:'ev3_start',message0:'▶ スタート',nextStatement:null,colour:'#d3a238',tooltip:'EV3本体から起動すると、ここから実行します。複数置くと別々に並行して動きます。全部のスタートが終わると停止します。イベントがある場合はプログラム終了まで監視を続けます。'},
  {type:'ev3_motor',message0:'Lモーター %1 速さ %2 ％で %3 度回す',args0:[{type:'field_dropdown',name:'PORTS',options:[singlePorts[1],singlePorts[0],singlePorts[2],singlePorts[3],...pairPorts]},{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'DEGREES',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'速度は-100〜100（0以外）。2ポートを選んだ場合の制御方式は「先生用の設定・計測」で選択します。標準は各モーターの指定角度を優先し、同期方式は検証用です。'},
  {type:'ev3_tone',message0:'音 %1 Hz を %2 ミリ秒 鳴らす 音量 %3',args0:[{type:'input_value',name:'FREQUENCY',check:'Number'},{type:'input_value',name:'MS',check:'Number'},{type:'field_number',name:'VOLUME',value:25,min:0,max:100,precision:1}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#a570b3'},
@@ -39,11 +40,11 @@ Blockly.defineBlocksWithJsonArray([
  {type:'ev3_motor_m_time',message0:'Mモーター %1 速さ %2 ％で %3 秒動かす',args0:[{type:'field_dropdown',name:'PORTS',options:[...singlePorts,...pairPorts]},{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'SECONDS',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'時間は0より大きく60秒以下。速さを負にすると逆回転します。2ポートは同時に指定時間だけ動かします。角度の同期・停止タイミング補正は角度指定のブロックを使ってください。'},
  {type:'ev3_wait_seconds',message0:'%1 秒待つ',args0:[{type:'input_value',name:'SECONDS',check:'Number'}],previousStatement:null,nextStatement:null,colour:'#d19636',tooltip:'0〜60秒。0.5秒などの小数も使えます。'},
  {type:'ev3_tread',message0:'トレッド（タイヤ中心どうしの間隔）を %1 mm にする',args0:[{type:'field_number',name:'TREAD',value:112,min:10,max:1000,precision:.1}],previousStatement:null,nextStatement:null,colour:'#ff4ccd',tooltip:'走行・旋回の前に設定します。設定用のマイブロックにまとめることもできます。左右のタイヤ中心間の距離を測ります。'},
- ...[['right','右'],['left','左']].map(([direction,label])=>({type:'ev3_spin_'+direction,message0:'左モーター %1 右モーター %2 速さ %3 ％で '+label+'に %4 度スピンターン',args0:[{type:'field_dropdown',name:'LEFT_PORT',options:[singlePorts[1],...singlePorts.filter(p=>p[1]!=='2')]},{type:'field_dropdown',name:'RIGHT_PORT',options:[singlePorts[2],...singlePorts.filter(p=>p[1]!=='4')]},{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'ANGLE',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'ロボットの回転角度を指定。右回転は左輪が正転・右輪が逆転、左回転は反対です。タイヤはLモーター直結を想定します。'})),
- ...[['right','右'],['left','左']].map(([direction,label])=>({type:'ev3_pivot_'+direction,message0:'左モーター %1 右モーター %2 速さ %3 ％で '+label+'に %4 度ピボットターン',args0:[{type:'field_dropdown',name:'LEFT_PORT',options:[singlePorts[1],...singlePorts.filter(p=>p[1]!=='2')]},{type:'field_dropdown',name:'RIGHT_PORT',options:[singlePorts[2],...singlePorts.filter(p=>p[1]!=='4')]},{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'ANGLE',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'ロボットの旋回角度を指定。右旋回は右輪をブレーキ停止して左輪を正転、左旋回は左輪を停止して右輪を正転。タイヤ直径・トレッドを先に設定。モーター角度＝2×トレッド÷タイヤ直径×旋回角度。タイヤ直結のLモーターを想定します。'})),
- {type:'ev3_tank',message0:'左モーター %1 速さ %2 ％ 右モーター %3 速さ %4 ％で回し続ける',args0:[{type:'field_dropdown',name:'LEFT_PORT',options:[singlePorts[1],...singlePorts.filter(p=>p[1]!=='2')]},{type:'input_value',name:'LEFT_SPEED',check:'Number'},{type:'field_dropdown',name:'RIGHT_PORT',options:[singlePorts[2],...singlePorts.filter(p=>p[1]!=='4')]},{type:'input_value',name:'RIGHT_SPEED',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'左右それぞれ−100〜100％の速度を直接指定。負は逆転、0はその側のブレーキ停止。L/M共通。回し始めたら次の命令へ進み、停止命令や次のモーター命令まで続けます。後ろに待つ・条件待ち・繰り返しをつなぎます。加減速や角度同期は行いません。'},
+ ...[['right','右'],['left','左']].map(([direction,label])=>({type:'ev3_spin_'+direction,message0:'速さ %1 ％で '+label+'に %2 度スピンターン',args0:[{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'ANGLE',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'ロボットの回転角度を指定。右回転は左輪が正転・右輪が逆転、左回転は反対です。タイヤはLモーター直結を想定します。'})),
+ ...[['right','右'],['left','左']].map(([direction,label])=>({type:'ev3_pivot_'+direction,message0:'速さ %1 ％で '+label+'に %2 度ピボットターン',args0:[{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'ANGLE',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'ロボットの旋回角度を指定。右旋回は右輪をブレーキ停止して左輪を正転、左旋回は左輪を停止して右輪を正転。タイヤ直径・トレッドを先に設定。モーター角度＝2×トレッド÷タイヤ直径×旋回角度。タイヤ直結のLモーターを想定します。'})),
+ {type:'ev3_tank',message0:'左の速さ %1 ％ 右の速さ %2 ％で回し続ける',args0:[{type:'input_value',name:'LEFT_SPEED',check:'Number'},{type:'input_value',name:'RIGHT_SPEED',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'左右それぞれ−100〜100％の速度を直接指定。負は逆転、0はその側のブレーキ停止。L/M共通。回し始めたら次の命令へ進み、停止命令や次のモーター命令まで続けます。後ろに待つ・条件待ち・繰り返しをつなぎます。加減速や角度同期は行いません。'},
  {type:'ev3_wheel',message0:'タイヤの直径を %1 mm にする',args0:[{type:'field_number',name:'DIAMETER',value:56,min:10,max:200,precision:.1}],previousStatement:null,nextStatement:null,colour:'#ff4ccd',tooltip:'走行前に設定します。設定用マイブロックにも入れられます。タイヤをLモーターに直接取り付ける場合の直径です。'},
- ...[['forward','前に進む'],['backward','後ろに下がる']].map(([direction,label])=>({type:'ev3_drive_'+direction,message0:'Lモーター %1 速さ %2 ％で %3 cm '+label,args0:[{type:'field_dropdown',name:'PORTS',options:pairPorts},{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'CM',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'先頭にタイヤの直径を設定。速さ1〜100％、長さは正の整数。タイヤ直結・両輪の正回転が前進する取り付けを想定します。'}))
+ ...[['forward','前に進む'],['backward','後ろに下がる']].map(([direction,label])=>({type:'ev3_drive_'+direction,message0:'速さ %1 ％で %2 cm '+label,args0:[{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'CM',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'先頭にタイヤの直径を設定。速さ1〜100％、長さは正の整数。タイヤ直結・両輪の正回転が前進する取り付けを想定します。'}))
 ]);
 
 
@@ -80,7 +81,7 @@ Blockly.defineBlocksWithJsonArray([
  {type:'ev3_motor_stop',message0:'モーター %1 を %2 で停止',args0:[commonMotorPorts(),{type:'field_dropdown',name:'STOP_MODE',options:stopOptions}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'選んだポートを、ここで選んだ方法ですぐ停止します。ブレーキ：100ミリ秒制動後に力を抜く。惰性：すぐ力を抜く。保持：停止位置を保つ（プログラム実行中のみ）。動作後の停止方法の設定には依存しません。'},
  {type:'ev3_motor_stop_mode',message0:'モーター %1 の動作後の停止方法を %2 にする',args0:[commonMotorPorts(),{type:'field_dropdown',name:'MODE',options:stopOptions}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'この後の角度・回転数・時間・距離・旋回の完了時に適用します。直接停止するブロックでは、そのブロックで選んだ停止方法を使います。旧作品の「動作後の停止方法」の設定を使う停止にも適用します。同期走行の2ポートは同じ設定にしてください。保持は本体でプログラムを終了すると解除されます。'},
  {type:'ev3_motor_speed',message0:'モーター %1 の実際の速さ（％）',args0:[{type:'field_dropdown',name:'PORT',options:singlePorts.map(([label],i)=>[label,String(i+1)])}],output:'Number',colour:'#34ccf1',tooltip:'L/M共通。設定した速さではなく、本体が測定した現在の回転速度を−100〜100％で返します。逆回転は負になります。'},
- ...['angle','time'].map(action=>({type:'ev3_tank_'+action,message0:'左 %1 速さ %2 ％ 右 %3 速さ %4 ％で '+(action==='angle'?'速い側を %5 度回す':'%5 秒走る'),args0:[{type:'field_dropdown',name:'LEFT_PORT',options:[singlePorts[1],singlePorts[0],singlePorts[2],singlePorts[3]]},{type:'input_value',name:'LEFT_SPEED',check:'Number'},{type:'field_dropdown',name:'RIGHT_PORT',options:[singlePorts[2],singlePorts[0],singlePorts[1],singlePorts[3]]},{type:'input_value',name:'RIGHT_SPEED',check:'Number'},{type:'input_value',name:action==='angle'?'DEGREES':'SECONDS',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'同じ種類の2モーターで使います。左右−100〜100％、両方0は使えません。指定量が終わるまで待ちます。角度は速い側のモーター軸が基準。左右の回転量は速度比に応じて変わります。標準FWの比率は約1％刻み。加減速設定は適用しません。'}))
+ ...['angle','time'].map(action=>({type:'ev3_tank_'+action,message0:'左の速さ %1 ％ 右の速さ %2 ％で '+(action==='angle'?'速い側を %3 度回す':'%3 秒走る'),args0:[{type:'input_value',name:'LEFT_SPEED',check:'Number'},{type:'input_value',name:'RIGHT_SPEED',check:'Number'},{type:'input_value',name:action==='angle'?'DEGREES':'SECONDS',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'同じ種類の2モーターで使います。左右−100〜100％、両方0は使えません。指定量が終わるまで待ちます。角度は速い側のモーター軸が基準。左右の回転量は速度比に応じて変わります。標準FWの比率は約1％刻み。加減速設定は適用しません。'}))
 ]);
 
 // 入力センサのポート番号は1〜4。モーター出力のビットマスクとは別の番号体系。
@@ -195,7 +196,7 @@ const dataColour='#00b85b',stmt={previousStatement:null,nextStatement:null,input
 Blockly.defineBlocksWithJsonArray([
  {type:'ev3_led',message0:'本体のランプを %1 に %2',args0:[{type:'field_dropdown',name:'COLOR',options:[['緑','1'],['赤','2'],['オレンジ','3']]},{type:'field_dropdown',name:'MODE',options:[['点灯','on'],['点滅','flash'],['ゆっくり点滅','pulse']]}],...stmt,colour:'#9966ff',tooltip:'ランプを変えてすぐ次へ進みます。表示を保つには待つ命令などを続けます。終了後は本体の通常表示へ戻ります。'},
  {type:'ev3_led_off',message0:'本体のランプを消す',...stmt,colour:'#9966ff'},
- ...['run','angle','time'].map(action=>({type:'ev3_steering_'+action,message0:'左 %1 右 %2 ステアリング %3 速さ %4 ％で '+({run:'回し続ける',angle:'外側を %5 度回す',time:'%5 秒走る'}[action]),args0:[{type:'field_dropdown',name:'LEFT_PORT',options:[singlePorts[1],singlePorts[0],singlePorts[2],singlePorts[3]]},{type:'field_dropdown',name:'RIGHT_PORT',options:[singlePorts[2],singlePorts[0],singlePorts[1],singlePorts[3]]},numberInput('TURN'),numberInput('SPEED'),...(action==='run'?[]:[numberInput(action==='angle'?'DEGREES':'SECONDS')])],...stmt,colour:'#ff4ccd',tooltip:'L/M共通。ステアリング−100は左スピン、−50は左ピボット、0は直進、50は右ピボット、100は右スピン。角度は外側のモーター軸の角度です。加減速の設定は適用しません。'})),
+ ...['run','angle','time'].map(action=>({type:'ev3_steering_'+action,message0:'ステアリング %1 速さ %2 ％で '+({run:'回し続ける',angle:'外側を %3 度回す',time:'%3 秒走る'}[action]),args0:[numberInput('TURN'),numberInput('SPEED'),...(action==='run'?[]:[numberInput(action==='angle'?'DEGREES':'SECONDS')])],...stmt,colour:'#ff4ccd',tooltip:'L/M共通。ステアリング−100は左スピン、−50は左ピボット、0は直進、50は右ピボット、100は右スピン。角度は外側のモーター軸の角度です。加減速の設定は適用しません。'})),
  {type:'ev3_log_start',message0:'CSVログ %1 の記録を開始する',args0:[namedField('FILE','Log')],...stmt,colour:'#c58245',tooltip:'EV3のプロジェクトフォルダへ保存。同じログ名は上書き。半角英数字・-・_で31文字以内。1行ごとに閉じて保存します。PCを切り離しても記録できます。'},
  {type:'ev3_log_value',message0:'項目 %1 値 %2 をCSVに記録する',args0:[namedField('LABEL','値'),{type:'input_value',name:'VALUE',check:['Number','String']}],...stmt,colour:'#c58245',tooltip:'記録開始からの秒数・項目名・値を1行記録。変数、演算、センサ、文字列が使えます。1回の開始につき5000行まで。開始してから使ってください。'},
  {type:'ev3_log_end',message0:'CSVログの記録を終了する',...stmt,colour:'#c58245'},
@@ -259,6 +260,8 @@ toolbox.contents.splice(1,0,{kind:'category',name:'イベント',colour:'#d3a238
 group('センサー').splice(group('センサー').findIndex(x=>x.type==='ev3_encoder')+1,0,{kind:'block',type:'ev3_motor_speed'});
 group('動き').splice(2,0,...['angle','time'].map(action=>({kind:'block',type:'ev3_tank_'+action,inputs:{LEFT_SPEED:shadow(30),RIGHT_SPEED:shadow(15),...(action==='angle'?{DEGREES:shadow(360)}:{SECONDS:shadow(1)})}})));
 group('動き').splice(2,0,...['run','angle','time'].map(action=>({kind:'block',type:'ev3_steering_'+action,inputs:{TURN:shadow(25),SPEED:shadow(20),...(action==='angle'?{DEGREES:shadow(360)}:action==='time'?{SECONDS:shadow(2)}:{})}})));
+const movementOrder=['ev3_movement_setup','ev3_wheel','ev3_tread','ev3_steering_run','ev3_steering_angle','ev3_steering_time','ev3_tank_angle','ev3_tank_time','ev3_tank','ev3_spin_right','ev3_spin_left','ev3_pivot_right','ev3_pivot_left','ev3_drive_forward','ev3_drive_backward'];
+group('動き').push({kind:'block',type:'ev3_movement_setup'});group('動き').sort((a,b)=>movementOrder.indexOf(a.type)-movementOrder.indexOf(b.type));
 group('演算').push(...['mod','random','min','max'].map(op=>({kind:'block',type:'ev3_data_'+op,inputs:{A:shadow(1),B:shadow(10)}})),{kind:'block',type:'ev3_data_round',inputs:{A:shadow(1.5)}},{kind:'block',type:'ev3_data_clamp',inputs:{A:shadow(120),LOW:shadow(-100),HIGH:shadow(100)}});
 const textShadow=t=>({shadow:{type:'ev3_text',fields:{TEXT:t}}});
 toolbox.contents.splice(toolbox.contents.findIndex(c=>c.name==='変数'),0,
@@ -389,6 +392,13 @@ function saveMyBlock(ws,name,rows,definitionId=null){
 // 授業で独立して試せる、走行＋計測・センサイベント・メッセージの3例。
 // 実機確認用。モーターを動かさず、ポート1の角度と回転速度を約10秒記録する。
 // 本体での確認用。どちらのサンプルもモーターへ命令しない。
+function commonMovementSampleState(kind){return [{"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":35,"y":35,"next":{"block":{"type":"ev3_movement_setup","fields":{"LEFT_PORT":"2","RIGHT_PORT":"4"},"next":{"block":{"type":"ev3_wheel","fields":{"DIAMETER":56},"next":{"block":{"type":"ev3_drive_forward","inputs":{"SPEED":{"shadow":{"type":"math_number","fields":{"NUM":20}}},"CM":{"shadow":{"type":"math_number","fields":{"NUM":20}}}}}}}}}}}]}},{"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":35,"y":35,"next":{"block":{"type":"ev3_movement_setup","fields":{"LEFT_PORT":"2","RIGHT_PORT":"4"},"next":{"block":{"type":"ev3_wheel","fields":{"DIAMETER":56},"next":{"block":{"type":"ev3_drive_forward","inputs":{"SPEED":{"shadow":{"type":"math_number","fields":{"NUM":20}}},"CM":{"shadow":{"type":"math_number","fields":{"NUM":20}}}},"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":1}}}},"next":{"block":{"type":"ev3_movement_setup","fields":{"LEFT_PORT":"1","RIGHT_PORT":"8"},"next":{"block":{"type":"ev3_drive_backward","inputs":{"SPEED":{"shadow":{"type":"math_number","fields":{"NUM":20}}},"CM":{"shadow":{"type":"math_number","fields":{"NUM":20}}}}}}}}}}}}}}}}}]}},{"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":35,"y":35,"next":{"block":{"type":"ev3_movement_setup","fields":{"LEFT_PORT":"2","RIGHT_PORT":"4"},"next":{"block":{"type":"ev3_wheel","fields":{"DIAMETER":56},"next":{"block":{"type":"procedures_callnoreturn","extraState":{"name":"前進","params":["距離"]},"inputs":{"ARG0":{"shadow":{"type":"math_number","fields":{"NUM":20}}}}}}}}}}},{"type":"procedures_defnoreturn","x":520,"y":40,"fields":{"NAME":"前進"},"extraState":{"params":[{"name":"距離","id":"shared-distance"}]},"inputs":{"STACK":{"block":{"type":"ev3_drive_forward","inputs":{"SPEED":{"shadow":{"type":"math_number","fields":{"NUM":20}}},"CM":{"block":{"type":"ev3_argument","extraState":{"name":"距離","parameterId":"shared-distance"},"fields":{"ARG_NAME":"距離"}}}}}}}}]},"variables":[{"name":"距離","id":"shared-distance"}]}][{basic:0,switch:1,myblock:2}[kind]];}
+function movementSampleState(state,left='2',right='4'){
+ let found=false;
+ const scan=x=>{if(!x||typeof x!=='object')return;if(/^ev3_(drive_|spin_|pivot_|steering_|tank(?:_|$))/.test(x.type??'')){found=true;if(x.fields){delete x.fields.PORTS;delete x.fields.LEFT_PORT;delete x.fields.RIGHT_PORT;}}for(const value of Object.values(x))scan(value);};scan(state);
+ if(found)for(const block of state.blocks?.blocks??[])if(block.type==='ev3_start')block.next={block:{type:'ev3_movement_setup',fields:{LEFT_PORT:left,RIGHT_PORT:right},...(block.next?{next:block.next}:{})}};
+ return state;
+}
 function powerPidSampleState(kind){
  return [{"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":40,"y":35,"next":{"block":{"type":"ev3_display_clear","next":{"block":{"type":"ev3_log_start","fields":{"FILE":"Battery"},"next":{"block":{"type":"controls_repeat_ext","inputs":{"TIMES":{"shadow":{"type":"math_number","fields":{"NUM":20}}},"DO":{"block":{"type":"ev3_log_value","fields":{"LABEL":"voltage_V"},"inputs":{"VALUE":{"block":{"type":"ev3_battery_voltage"}}},"next":{"block":{"type":"ev3_log_value","fields":{"LABEL":"current_A"},"inputs":{"VALUE":{"block":{"type":"ev3_battery_current"}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":0,"FONT":"2","DECIMALS":2},"inputs":{"VALUE":{"block":{"type":"ev3_battery_voltage"}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":32,"FONT":"2","DECIMALS":3},"inputs":{"VALUE":{"block":{"type":"ev3_battery_current"}}},"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":0.5}}}}}}}}}}}}}}},"next":{"block":{"type":"ev3_log_end","next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":2}}}}}}}}}}}}}}}]}},{"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":40,"y":35,"next":{"block":{"type":"ev3_display_clear","next":{"block":{"type":"ev3_pid_reset","fields":{"NAME":"PID1"},"next":{"block":{"type":"ev3_log_start","fields":{"FILE":"PID"},"next":{"block":{"type":"controls_repeat_ext","inputs":{"TIMES":{"shadow":{"type":"math_number","fields":{"NUM":10}}},"DO":{"block":{"type":"variables_set","fields":{"VAR":{"id":"pid-example-output","name":"PID出力"}},"inputs":{"VALUE":{"block":{"type":"ev3_pid","fields":{"NAME":"PID1"},"inputs":{"TARGET":{"shadow":{"type":"math_number","fields":{"NUM":10}}},"MEASURED":{"shadow":{"type":"math_number","fields":{"NUM":4}}},"KP":{"shadow":{"type":"math_number","fields":{"NUM":1}}},"KI":{"shadow":{"type":"math_number","fields":{"NUM":0.5}}},"KD":{"shadow":{"type":"math_number","fields":{"NUM":0.1}}}}}}},"next":{"block":{"type":"ev3_log_value","fields":{"LABEL":"output"},"inputs":{"VALUE":{"block":{"type":"variables_get","fields":{"VAR":{"id":"pid-example-output","name":"PID出力"}}}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":0,"FONT":"2","DECIMALS":3},"inputs":{"VALUE":{"block":{"type":"variables_get","fields":{"VAR":{"id":"pid-example-output","name":"PID出力"}}}}},"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":0.1}}}}}}}}}}}}},"next":{"block":{"type":"ev3_log_end","next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":2}}}}}}}}}}}}}}}}}]},"variables":[{"id":"pid-example-output","name":"PID出力"}]}][kind==='battery'?0:1];
 }
@@ -397,7 +407,8 @@ function gyroSampleState(){
  return {"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":40,"y":35,"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":1}}}},"next":{"block":{"type":"ev3_gyro_reset","fields":{"PORT":"1"},"next":{"block":{"type":"ev3_tone","inputs":{"FREQUENCY":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"MS":{"shadow":{"type":"math_number","fields":{"NUM":200}}}},"fields":{"VOLUME":25},"next":{"block":{"type":"ev3_log_start","fields":{"FILE":"Gyro"},"next":{"block":{"type":"ev3_display_clear","next":{"block":{"type":"controls_repeat_ext","inputs":{"TIMES":{"shadow":{"type":"math_number","fields":{"NUM":50}}},"DO":{"block":{"type":"ev3_log_value","fields":{"LABEL":"angle_deg"},"inputs":{"VALUE":{"block":{"type":"ev3_gyro_angle","fields":{"PORT":"1"}}}},"next":{"block":{"type":"ev3_log_value","fields":{"LABEL":"rate_deg_s"},"inputs":{"VALUE":{"block":{"type":"ev3_gyro_rate","fields":{"PORT":"1"}}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":0,"FONT":"2","DECIMALS":0},"inputs":{"VALUE":{"block":{"type":"ev3_gyro_angle","fields":{"PORT":"1"}}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":32,"FONT":"2","DECIMALS":0},"inputs":{"VALUE":{"block":{"type":"ev3_gyro_rate","fields":{"PORT":"1"}}}},"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":0.2}}}}}}}}}}}}}}},"next":{"block":{"type":"ev3_log_end","next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":2}}}}}}}}}}}}}}}}}}}}}]}};
 }
 
-function parallelSampleState(kind){
+function parallelSampleState(kind){return movementSampleState(parallelSampleStateRaw(kind));}
+function parallelSampleStateRaw(kind){
  const n=value=>({shadow:{type:'math_number',fields:{NUM:value}}});
  const seq=blocks=>{for(let i=0;i<blocks.length-1;i++)blocks[i].next={block:blocks[i+1]};return blocks[0];};
  const wait=value=>({type:'ev3_wait_seconds',inputs:{SECONDS:n(value)}});
@@ -420,7 +431,8 @@ function parallelSampleState(kind){
 }
 
 // モーターの新機能を単独で確認できる作品例。転送だけでは動かず、実行操作で動く。
-function motorSampleState(kind){
+function motorSampleState(kind){return movementSampleState(motorSampleStateRaw(kind));}
+function motorSampleStateRaw(kind){
  const n=value=>({shadow:{type:'math_number',fields:{NUM:value}}});
  const wait=seconds=>({type:'ev3_wait_seconds',inputs:{SECONDS:n(seconds)}});
  const setting=(ports,mode)=>({type:'ev3_motor_stop_mode',fields:{PORTS:ports,MODE:mode}});
@@ -569,7 +581,7 @@ function chain(block){
     switch(b.type){
       case 'ev3_led':out.push({type:'led',color:Number(b.getFieldValue('COLOR')),mode:b.getFieldValue('MODE')});break;
       case 'ev3_led_off':out.push({type:'led',color:0,mode:'on'});break;
-      case 'ev3_steering_run':case 'ev3_steering_angle':case 'ev3_steering_time':out.push({type:'steering',action:b.type.slice(13),leftPort:Number(b.getFieldValue('LEFT_PORT')),rightPort:Number(b.getFieldValue('RIGHT_PORT')),turn:value(b,'TURN'),speed:value(b,'SPEED'),...(b.getInput('DEGREES')?{degrees:value(b,'DEGREES')}:{}),...(b.getInput('SECONDS')?{seconds:value(b,'SECONDS')}:{})});break;
+      case 'ev3_steering_run':case 'ev3_steering_angle':case 'ev3_steering_time':out.push({type:'steering',action:b.type.slice(13),movement:true,turn:value(b,'TURN'),speed:value(b,'SPEED'),...(b.getInput('DEGREES')?{degrees:value(b,'DEGREES')}:{}),...(b.getInput('SECONDS')?{seconds:value(b,'SECONDS')}:{})});break;
       case 'ev3_text_set':out.push({type:'textSet',name:b.getFieldValue('NAME'),value:value(b,'VALUE')});break;
       case 'ev3_list_clear':case 'ev3_list_add':case 'ev3_list_set':case 'ev3_list_delete':out.push({type:({clear:'listClear',add:'listAdd',set:'listSet',delete:'listDelete'})[b.type.slice(9)],list:b.getFieldValue('LIST'),...(b.getInput('INDEX')?{index:value(b,'INDEX')}:{}),...(b.getInput('VALUE')?{value:value(b,'VALUE')}:{})});break;
       case 'ev3_log_start':out.push({type:'logStart',file:b.getFieldValue('FILE')});break;
@@ -599,13 +611,14 @@ function chain(block){
       case 'ev3_motor_speed_set':out.push({type:'motorSpeedSet',ports:Number(b.getFieldValue('PORTS')),speed:value(b,'SPEED')});break;
       case 'ev3_motor_power':out.push({type:'motorPower',ports:Number(b.getFieldValue('PORTS')),speed:value(b,'POWER')});break;
       case 'ev3_motor_stop_mode':out.push({type:'stopMode',ports:Number(b.getFieldValue('PORTS')),mode:b.getFieldValue('MODE')});break;
-      case 'ev3_tank_angle':case 'ev3_tank_time':out.push({type:'tankFinite',action:b.type==='ev3_tank_angle'?'angle':'time',leftPort:Number(b.getFieldValue('LEFT_PORT')),rightPort:Number(b.getFieldValue('RIGHT_PORT')),leftSpeed:value(b,'LEFT_SPEED'),rightSpeed:value(b,'RIGHT_SPEED'),...(b.getInput('DEGREES')?{degrees:value(b,'DEGREES')}:{seconds:value(b,'SECONDS')})});break;
+      case 'ev3_tank_angle':case 'ev3_tank_time':out.push({type:'tankFinite',action:b.type==='ev3_tank_angle'?'angle':'time',movement:true,leftSpeed:value(b,'LEFT_SPEED'),rightSpeed:value(b,'RIGHT_SPEED'),...(b.getInput('DEGREES')?{degrees:value(b,'DEGREES')}:{seconds:value(b,'SECONDS')})});break;
       case 'ev3_motor_l_single_rotation':case 'ev3_motor_l_pair_rotation':case 'ev3_motor_m_single_rotation':case 'ev3_motor_m_pair_rotation':out.push({type:'motorRotations',ports:Number(b.getFieldValue('PORTS')),speed:value(b,'SPEED'),rotations:value(b,'ROTATIONS'),mode:$('pairMode').value});break;
-      case 'ev3_tank':out.push({type:'tank',leftPort:Number(b.getFieldValue('LEFT_PORT')),rightPort:Number(b.getFieldValue('RIGHT_PORT')),leftSpeed:value(b,'LEFT_SPEED'),rightSpeed:value(b,'RIGHT_SPEED')});break;
-      case 'ev3_pivot_right':case 'ev3_pivot_left':out.push({type:'pivot',leftPort:Number(b.getFieldValue('LEFT_PORT')),rightPort:Number(b.getFieldValue('RIGHT_PORT')),speed:value(b,'SPEED'),angle:value(b,'ANGLE'),direction:b.type==='ev3_pivot_right'?'right':'left'});break;
-      case 'ev3_spin_right':case 'ev3_spin_left':out.push({type:'spin',leftPort:Number(b.getFieldValue('LEFT_PORT')),rightPort:Number(b.getFieldValue('RIGHT_PORT')),speed:value(b,'SPEED'),angle:value(b,'ANGLE'),direction:b.type==='ev3_spin_right'?'right':'left'});break;
+      case 'ev3_tank':out.push({type:'tank',movement:true,leftSpeed:value(b,'LEFT_SPEED'),rightSpeed:value(b,'RIGHT_SPEED')});break;
+      case 'ev3_pivot_right':case 'ev3_pivot_left':out.push({type:'pivot',movement:true,speed:value(b,'SPEED'),angle:value(b,'ANGLE'),direction:b.type==='ev3_pivot_right'?'right':'left'});break;
+      case 'ev3_spin_right':case 'ev3_spin_left':out.push({type:'spin',movement:true,speed:value(b,'SPEED'),angle:value(b,'ANGLE'),direction:b.type==='ev3_spin_right'?'right':'left'});break;
+      case 'ev3_movement_setup':out.push({type:'movementSetup',leftPort:Number(b.getFieldValue('LEFT_PORT')),rightPort:Number(b.getFieldValue('RIGHT_PORT'))});break;
       case 'ev3_wheel':out.push({type:'wheel',diameter:Number(b.getFieldValue('DIAMETER'))});break;
-      case 'ev3_drive_forward':case 'ev3_drive_backward':out.push({type:'drive',ports:Number(b.getFieldValue('PORTS')),speed:value(b,'SPEED'),cm:value(b,'CM'),direction:b.type==='ev3_drive_forward'?'forward':'backward',mode:$('pairMode').value});break;
+      case 'ev3_drive_forward':case 'ev3_drive_backward':out.push({type:'drive',movement:true,speed:value(b,'SPEED'),cm:value(b,'CM'),direction:b.type==='ev3_drive_forward'?'forward':'backward',mode:$('pairMode').value});break;
       case 'ev3_display_clear':out.push({type:'displayClear'});break;
       case 'ev3_display_text':out.push({type:'displayBitmap',x:Number(b.getFieldValue('X')),y:Number(b.getFieldValue('Y')),bitmap:rasterDisplayText(b.getFieldValue('TEXT'),Number(b.getFieldValue('SIZE')))});break;
       case 'ev3_display_image':out.push({type:'displayBitmap',x:Number(b.getFieldValue('X')),y:Number(b.getFieldValue('Y')),bitmap:presetBitmap(b.getFieldValue('IMAGE'),Number(b.getFieldValue('SIZE')))});break;
@@ -707,6 +720,7 @@ function project(){return {format:'ev3-block-lab',version:1,appVersion:VERSION,n
 function restore(data){
   if(data?.format!=='ev3-block-lab' || data.version!==1 || !data.workspace?.blocks)throw Error('EV3 Block Labのプロジェクト（バージョン1）を選んでください。');
   inspectBlocks(data.workspace.blocks);
+  const oldMovement=/\"type\":\s*\"ev3_(?:drive_|spin_|pivot_|steering_|tank)/.test(JSON.stringify(data.workspace))&&!JSON.stringify(data.workspace).includes('ev3_movement_setup');
   const backup=Blockly.serialization.workspaces.save(workspace);
   loading=true;
   try{Blockly.serialization.workspaces.load(data.workspace,workspace);}
@@ -716,6 +730,8 @@ function restore(data){
   $('programName').value=typeof data.programName==='string'?data.programName:'MyProgram';
   $('pairMode').value=['sync','feedback'].includes(data.pairMode)?data.pairMode:'independent';
   workspace.clearUndo();check();
+  if(oldMovement)feedback('以前の作品です。「動きに使うモーター」を追加し、左右の配線を再確認してください。B+Cは自動設定しません。',true);
+  return oldMovement;
 }
 // 復元中の一時状態は保存しない。容量不足などで失敗した場合は、ファイル保存を促す表示にする。
 function saveLocal(){
@@ -784,7 +800,7 @@ $('spinSample').onclick=()=>{
  const turn=direction=>({type:'ev3_spin_'+direction,fields:{LEFT_PORT:'2',RIGHT_PORT:'4'},inputs:{SPEED:number(20),ANGLE:number(90)}});
  const left=turn('left'),wait={type:'ev3_wait_seconds',inputs:{SECONDS:number(1)},next:{block:left}},right={...turn('right'),next:{block:wait}};
  const first={type:'ev3_start',next:{block:{type:'ev3_wheel',fields:{DIAMETER:56},next:{block:{type:'ev3_tread',fields:{TREAD:112},next:{block:right}}}}}};
- loading=true;try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[first]}},workspace);$('programName').value='SpinTurn';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('直径56mm・トレッド112mmの例です。実物の寸法と左右のポートに合わせて変更してください。');
+ loading=true;try{Blockly.serialization.workspaces.load(movementSampleState({blocks:{languageVersion:0,blocks:[first]}}),workspace);$('programName').value='SpinTurn';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('直径56mm・トレッド112mmの例です。実物の寸法と左右のポートに合わせて変更してください。');
 };
 $('sensorMotorSample').onclick=()=>{
  if(dirty && !confirm('現在の編集内容を距離で停止のサンプルに置き換えます。必要なら先に保存してください。'))return;
@@ -813,7 +829,7 @@ $('driveSample').onclick=()=>{
  if(dirty && !confirm('現在の編集内容を走行サンプルに置き換えます。必要なら先に保存してください。'))return;
  const move=(direction)=>'<block type="ev3_drive_'+direction+'"><field name="PORTS">6</field>'+n('SPEED',20)+n('CM',20)+'</block>';
  const xml='<xml xmlns="https://developers.google.com/blockly/xml"><block type="ev3_start" x="30" y="35"><next><block type="ev3_wheel"><field name="DIAMETER">56</field><next>'+move('forward').replace('</block>','<next><block type="ev3_wait_seconds">'+n('SECONDS',1)+'<next>'+move('backward')+'</next></block></next></block>')+'</next></block></next></block></xml>';
- loading=true;try{workspace.clear();Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(xml),workspace);$('programName').value='ForwardBackward';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('タイヤ直径56mm・B+C・前後20cmのサンプルです。実物の直径を確認してください。');
+ loading=true;try{workspace.clear();Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(xml),workspace);const state=movementSampleState(Blockly.serialization.workspaces.save(workspace));Blockly.serialization.workspaces.load(state,workspace);$('programName').value='ForwardBackward';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('タイヤ直径56mm・B+C・前後20cmのサンプルです。実物の直径を確認してください。');
 };
 $('soundSample').onclick=()=>replaceSample('sound');$('motorSample').onclick=()=>replaceSample('motor');
 $('undo').onclick=()=>workspace.undo(false);$('redo').onclick=()=>workspace.undo(true);
@@ -854,7 +870,7 @@ $('fileInput').onchange=async e=>{
   const file=e.target.files[0];e.target.value='';if(!file)return;
   try{if(file.size>2*1024*1024)throw Error('プロジェクトは2MB以下にしてください。');const data=JSON.parse(await file.text());
     if(dirty && !confirm('現在の編集内容をファイルの内容に置き換えますか？'))return;
-    restore(data);saveLocal();dirty=false;feedback('プロジェクトを読み込みました。');
+    const needsMovement=restore(data);saveLocal();dirty=false;if(!needsMovement)feedback('プロジェクトを読み込みました。');
   }catch(e){feedback(`読み込めませんでした。${e.message}`,true);}
 };
 let savedPath='';
@@ -1023,4 +1039,10 @@ for(const [id,kind,name]of [['batterySample','battery','BatteryTest'],['pidSampl
  loading=true;try{Blockly.serialization.workspaces.load(powerPidSampleState(kind),workspace);$('programName').value=name;workspace.clearUndo();}finally{loading=false;}
  check();saveLocal();dirty=false;$('sampleMenu').open=false;
  feedback(kind==='battery'?'バッテリー全体の電圧・電流を画面表示し、ログBatteryへ記録します。モーターは動かしません。':'目標10・測定4の固定値でPIDを10回計算し、ログPIDへ記録します。モーターは動かしません。');
+};
+
+for(const [id,kind,name]of [['movementBasicSample','basic','MovementBasic'],['movementSwitchSample','switch','MovementSwitch'],['movementMyBlockSample','myblock','MovementMyBlock']])$(id).onclick=()=>{
+ if(dirty&&!confirm('現在の編集内容を共通モーター設定のサンプルに置き換えます。必要なら先に保存してください。'))return;
+ loading=true;try{Blockly.serialization.workspaces.load(commonMovementSampleState(kind),workspace);$('programName').value=name;$('pairMode').value='feedback';workspace.clearUndo();}finally{loading=false;}
+ check();saveLocal();dirty=false;feedback(kind==='switch'?'左B・右Cで前進後、旧組を停止して左A・右Dへ切替え、後退します。4個の実機配線を確認してから実行してください。':'左B・右Cをスタート直後に設定します。実際の配線・直径を確認してください。');
 };

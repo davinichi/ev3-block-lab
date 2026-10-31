@@ -1,7 +1,7 @@
 // 編集ファイルとマイブロック集の検証・結合を担当する。EV3用RBFの生成や通信は行わない。
 // 独自ブロックを追加したときは、この許可一覧にも型名を登録して保存ファイルから復元できるようにする。
 const types=new Set(['add','sub','mul','div','lt','eq','gt','lte','gte','neq','and','or'].map(op=>'ev3_op_'+op));
-for(const type of ['ev3_battery_voltage','ev3_battery_current','ev3_pid','ev3_pid_reset'])types.add(type);
+for(const type of ['ev3_movement_setup','ev3_battery_voltage','ev3_battery_current','ev3_pid','ev3_pid_reset'])types.add(type);
 for(const type of ['ev3_when_condition','ev3_when_changed','ev3_when_message','ev3_message_send','ev3_message_wait'])types.add(type);
 // 本体ボタン・終了命令も、作品ファイルとマイブロック集の両方から復元できるよう許可する。
 for(const type of ['ev3_brick_button','ev3_brick_button_value','ev3_program_end','ev3_myblock_return'])types.add(type);

@@ -1,7 +1,7 @@
 {
   "format": "ev3-block-lab",
   "version": 1,
-  "appVersion": "0.19.0",
+  "appVersion": "0.23.0",
   "name": "TankFiniteTest",
   "programName": "TankFiniteTest",
   "ev3ProjectName": "EV3Lab",
@@ -16,81 +16,52 @@
           "y": 30,
           "next": {
             "block": {
-              "type": "ev3_motor_stop_mode",
+              "type": "ev3_movement_setup",
               "fields": {
-                "PORTS": "6",
-                "MODE": "hold"
+                "LEFT_PORT": "2",
+                "RIGHT_PORT": "4"
               },
               "next": {
                 "block": {
-                  "type": "ev3_tank_angle",
+                  "type": "ev3_motor_stop_mode",
                   "fields": {
-                    "LEFT_PORT": "2",
-                    "RIGHT_PORT": "4"
-                  },
-                  "inputs": {
-                    "LEFT_SPEED": {
-                      "shadow": {
-                        "type": "math_number",
-                        "fields": {
-                          "NUM": 30
-                        }
-                      }
-                    },
-                    "RIGHT_SPEED": {
-                      "shadow": {
-                        "type": "math_number",
-                        "fields": {
-                          "NUM": 15
-                        }
-                      }
-                    },
-                    "DEGREES": {
-                      "shadow": {
-                        "type": "math_number",
-                        "fields": {
-                          "NUM": 180
-                        }
-                      }
-                    }
+                    "PORTS": "6",
+                    "MODE": "hold"
                   },
                   "next": {
                     "block": {
-                      "type": "ev3_wait_seconds",
+                      "type": "ev3_tank_angle",
+                      "fields": {},
                       "inputs": {
-                        "SECONDS": {
+                        "LEFT_SPEED": {
                           "shadow": {
                             "type": "math_number",
                             "fields": {
-                              "NUM": 0.5
+                              "NUM": 30
+                            }
+                          }
+                        },
+                        "RIGHT_SPEED": {
+                          "shadow": {
+                            "type": "math_number",
+                            "fields": {
+                              "NUM": 15
+                            }
+                          }
+                        },
+                        "DEGREES": {
+                          "shadow": {
+                            "type": "math_number",
+                            "fields": {
+                              "NUM": 180
                             }
                           }
                         }
                       },
                       "next": {
                         "block": {
-                          "type": "ev3_tank_time",
-                          "fields": {
-                            "LEFT_PORT": "2",
-                            "RIGHT_PORT": "4"
-                          },
+                          "type": "ev3_wait_seconds",
                           "inputs": {
-                            "LEFT_SPEED": {
-                              "shadow": {
-                                "type": "math_number",
-                                "fields": {
-                                  "NUM": 30
-                                }
-                              }
-                            },
-                            "RIGHT_SPEED": {
-                              "shadow": {
-                                "type": "math_number",
-                                "fields": {
-                                  "NUM": -30
-                                }
-                              }
-                            },
                             "SECONDS": {
                               "shadow": {
                                 "type": "math_number",
@@ -102,8 +73,25 @@
                           },
                           "next": {
                             "block": {
-                              "type": "ev3_wait_seconds",
+                              "type": "ev3_tank_time",
+                              "fields": {},
                               "inputs": {
+                                "LEFT_SPEED": {
+                                  "shadow": {
+                                    "type": "math_number",
+                                    "fields": {
+                                      "NUM": 30
+                                    }
+                                  }
+                                },
+                                "RIGHT_SPEED": {
+                                  "shadow": {
+                                    "type": "math_number",
+                                    "fields": {
+                                      "NUM": -30
+                                    }
+                                  }
+                                },
                                 "SECONDS": {
                                   "shadow": {
                                     "type": "math_number",
@@ -115,7 +103,22 @@
                               },
                               "next": {
                                 "block": {
-                                  "type": "ev3_program_end"
+                                  "type": "ev3_wait_seconds",
+                                  "inputs": {
+                                    "SECONDS": {
+                                      "shadow": {
+                                        "type": "math_number",
+                                        "fields": {
+                                          "NUM": 0.5
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "next": {
+                                    "block": {
+                                      "type": "ev3_program_end"
+                                    }
+                                  }
                                 }
                               }
                             }

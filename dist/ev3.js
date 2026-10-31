@@ -1,5 +1,6 @@
+import {movementPlan,movementId} from './movement.js';
 import {pidName,validatePid,pidLayout,pidEmitter} from './pid.js';
-import {validateDisplay,emitDisplay} from './display.js';
+import {validateDisplay,emitDisplay,presetBitmap} from './display.js';
 import {motorFeatures,stopModes} from './motor-features.js';
 import {parallelPlan,sharedLock} from './parallel.js';
 import {extraLayout,dataEmitter,isText,checkText} from './data.js';
@@ -100,7 +101,13 @@ const scaled=(value,factor,divisor=1)=>typeof value==='number'?Math.round(value*
 // スピンはトレッド÷直径×旋回角、ピボットはその2倍。秒指定はミリ秒へ換算する。
 function prepareProgram(input){
   if(!input || !Array.isArray(input.main) || !Array.isArray(input.procedures))return input;
+  const pairs=movementPlan(input);
   const sequence=nodes=>nodes.flatMap(b=>{
+    if(b.movement){
+      const {movement,...command}=b;
+      const variants=[...pairs].map(([id,pair])=>({id,...pair,body:sequence([{...command,...pair,ports:pair.leftPort|pair.rightPort}])}));
+      return {type:'movement',variants,body:variants.flatMap(v=>v.body)};
+    }
     if(b.type==='pivot'){
       if(![1,2,4,8].includes(b.leftPort)||![1,2,4,8].includes(b.rightPort)||b.leftPort===b.rightPort)throw Error('ピボットターンの左右には異なるモーターポートを選んでください。');
       if(!['left','right'].includes(b.direction))throw Error('ピボットターンの方向が不正です。');
@@ -129,6 +136,7 @@ function prepareProgram(input){
 // 中間データを実行前に点検する。呼び出し順、変数、寸法、再帰、値の範囲を確認する。
 // 実行時に変化する値はここでは確定できないため、生成するVM命令側にも範囲検査を入れる。
 export function validate(program) {
+  program=prepareProgram(program);
   const floatingMode=true;
   if (!program || !Array.isArray(program.main) || (!program.main.length&&!program.threads?.length)) throw Error('「スタート」の下にブロックをつなげてください。');
   if (!Array.isArray(program.procedures) || program.procedures.length>32) throw Error('マイブロックは32個までです。');
@@ -148,6 +156,8 @@ export function validate(program) {
       const sourceInt=x=>{const n=evaluate(x,env);return floatingMode&&n!==UNKNOWN?Math.trunc(n):n;};
       const val=k=>floatingMode&&!['value','condition','seconds'].includes(k)?sourceInt(b[k]):evaluate(b[k],env);
       switch(b.type) {
+        case 'movementSetup':break;
+        case 'movement':walk(b.body,env,stack);break;
         case 'displayClear':case 'displayBitmap':case 'displayNumber':validateDisplay(b);if(b.type==='displayNumber')evaluate(b.value,env);break;
         case 'led':inRange(b.color,0,3,'ランプの色');if(!['on','flash','pulse'].includes(b.mode))throw Error('ランプの点灯方法を選んでください。');break;
         case 'steering':{if(![1,2,4,8].includes(b.leftPort)||![1,2,4,8].includes(b.rightPort)||b.leftPort===b.rightPort)throw Error('ステアリングの左右には異なるポートを選んでください。');inRange(val('speed'),-100,100,'速さ');inRange(val('turn'),-100,100,'ステアリング');if(!['run','angle','time'].includes(b.action))throw Error('ステアリングの動作を選んでください。');if(b.action!=='run'&&val('speed')===0)throw Error('有限走行の速さは0以外にしてください。');if(b.action==='angle')inRange(val('degrees'),1,36000,'外側モーターの角度');if(b.action==='time'){const t=evaluate(b.seconds,env);if(t!==UNKNOWN&&(!Number.isFinite(t)||t<=0||t>60))throw Error('走行時間は0より大きく60秒以下にしてください。');}break;}
@@ -236,8 +246,8 @@ export function compile(program,folder='EV3Lab') {
   program=prepareProgram(program);
   validate(program);
   const parallel=parallelPlan(program);
-  const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false,usesTimer=false,usesStopModes=false,usesGyro=false;
-  const collect=x=>{if(x&&typeof x==='object'){if(x.sensor?.kind?.startsWith('gyro')||x.type==='gyroReset'){usesGyro=true;usesSensors=true;}if(x.type==='stopMode'||x.stopMode!==undefined)usesStopModes=true;if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.battery||x.pid||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
+  const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false,usesTimer=false,usesStopModes=false,usesGyro=false,usesMovement=false;
+  const collect=x=>{if(x&&typeof x==='object'){if(['movement','movementSetup'].includes(x.type))usesMovement=true;if(x.sensor?.kind?.startsWith('gyro')||x.type==='gyroReset'){usesGyro=true;usesSensors=true;}if(x.type==='stopMode'||x.stopMode!==undefined)usesStopModes=true;if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.battery||x.pid||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
   collect(program);if(variableNames.size>32)throw Error('変数は32個までです。');
   // 通常変数・寸法・加減速設定・共有タイマーを重ならない位置へ配置する。各数値の領域は4バイト。
   const globalOffsets=new Map([...variableNames].map((name,i)=>[name,i*4]));
@@ -246,7 +256,8 @@ export function compile(program,folder='EV3Lab') {
   const stopModeOffset=timerOffset+(usesTimer?4:0);
   // 角度のゼロ点はポート別・プログラム全体で共有。物理的な再校正やモード切替はしない。
   const gyroOffset=stopModeOffset+(usesStopModes?16:0);
-  const baseGlobalBytes=gyroOffset+(usesGyro?16:0);
+  const movementOffset=gyroOffset+(usesGyro?16:0);
+  const baseGlobalBytes=movementOffset+(usesMovement?4:0);
   const pids=pidLayout(program,baseGlobalBytes),dataBase=baseGlobalBytes+pids.bytes;
   const extras=extraLayout(program,dataBase,directory);
   // Bind a diagnostic record to this compiler revision and exact project.
@@ -273,7 +284,7 @@ export function compile(program,folder='EV3Lab') {
     const alloc=()=>{const at=bytes;bytes+=4;return at;};
     const timer=alloc();
     const emit=(op,...args)=>code.push(op,...args.flat());
-    const faults=[];
+    const faults=[],movementFaults=[];
     const lock=parallel&&!p.boot?sharedLock({emit,alloc,local,globalVar,constant,jump:(...args)=>jump(...args),patch:(...args)=>patch(...args),position:()=>code.length,guard:(...args)=>guard(...args)},p.root,roots.length,lockBase):null;
     let lockDepth=0;
     const locked=fn=>{if(!lock||lockDepth)return fn();lock.acquire();lockDepth++;const result=fn();lockDepth--;lock.release();return result;};
@@ -583,6 +594,34 @@ export function compile(program,folder='EV3Lab') {
     const sequence=nodes=>{
       for(const original of nodes) {
         let b=original;
+        if(b.type==='movement'){
+          // 配線の読み取りだけを排他化。有限走行の完了待ちで計測処理を妨げない。
+          const selected=local(alloc());locked(()=>emit(OP.MOVE32,globalVar(movementOffset),selected));
+          const ends=[];let localPeak=bytes;
+          for(const variant of b.variants){
+            const different=local(alloc());emit(OP.SUB32,selected,constant(variant.id),different);
+            const low=jump(OP.JR_LT32,[different,constant(0)]),high=jump(OP.JR_GT32,[different,constant(0)]);
+            const startBytes=bytes;sequence(variant.body);const peakBytes=bytes;
+            ends.push(jump(OP.JR,[]));patch(low,code.length);patch(high,code.length);
+            // 分岐は同時に動かないため、次の分岐と作業領域を共有する。
+            localPeak=Math.max(localPeak,peakBytes);bytes=startBytes;
+          }
+          movementFaults.push(jump(OP.JR,[]));for(const end of ends)patch(end,code.length);
+          bytes=Math.max(bytes,localPeak);continue;
+        }
+        if(b.type==='movementSetup'){
+          locked(()=>{
+            const current=globalVar(movementOffset),id=movementId(b.leftPort,b.rightPort),difference=local(alloc());
+            emit(OP.SUB32,current,constant(id),difference);
+            const low=jump(OP.JR_LT32,[difference,constant(0)]),high=jump(OP.JR_GT32,[difference,constant(0)]),same=jump(OP.JR,[]);
+            patch(low,code.length);patch(high,code.length);
+            // 旧組を停止してから切り替える。同じ左右設定の再実行は停止しない。
+            const empty=jump(OP.JR_LT32,[current,constant(1)]),left=local(alloc()),right=local(alloc()),mask=local(alloc());
+            emit(OP.DIV32,current,constant(16),left);emit(OP.MUL32,left,constant(16),right);emit(OP.SUB32,current,right,right);emit(OP.ADD32,left,right,mask);
+            emit(OP.STOP,constant(0),mask,constant(1));patch(empty,code.length);
+            emit(OP.MOVE32,constant(id),current);patch(same,code.length);
+          });continue;
+        }
         const shared=['displayClear','displayBitmap','displayNumber','set','change','textSet','listAdd','listSet','listClear','listDelete','logStart','logValue','logEnd','broadcast','wheel','tread','ramp','timerReset','stopMode','pidReset'].includes(b.type)&&lock&&!lockDepth;
         if(shared){lock.acquire();lockDepth++;}
         if(usesSensors||usesForever||usesFloat||usesRamps){
@@ -687,6 +726,7 @@ export function compile(program,folder='EV3Lab') {
     if(index===0&&usesTimer)emit(OP.MOVE32,constant(0),globalVar(timerOffset));
     if(index===0&&usesStopModes)for(let i=0;i<4;i++)emit(OP.MOVE32,constant(0),globalVar(stopModeOffset+4*i));
     if(index===0&&usesGyro)for(let i=0;i<4;i++)emit(OP.MOVE32,constant(0),globalVar(gyroOffset+4*i));
+    if(index===0&&usesMovement)emit(OP.MOVE32,constant(0),globalVar(movementOffset));
     if(index===0){pidOps.init();dataOps.init();}
     const pause=ms=>{emit(OP.WAIT,constant(ms),local(timer));emit(OP.READY,local(timer));};
     if(p.boot){
@@ -719,6 +759,15 @@ export function compile(program,folder='EV3Lab') {
     }
     // Firmware validation scans each object sequentially up to its first END.
     // Keep fault handlers inside that object, and skip them on normal completion.
+    if(movementFaults.length){
+      const normalEnd=jump(OP.JR,[]);for(const at of movementFaults)patch(at,code.length);
+      // 明示的な未設定エラー。エラー番号23と×を本体へ表示し、すべて停止する。
+      emit(OP.STOP,constant(0),constant(15),constant(1));
+      emitDisplay({type:'displayClear'},{emit,constant,floatExpr,guard,floatGuard});
+      emitDisplay({type:'displayBitmap',x:0,y:0,bitmap:presetBitmap('cross',48)},{emit,constant,floatExpr,guard,floatGuard});
+      emitDisplay({type:'displayNumber',x:56,y:12,font:2,decimals:0,value:23},{emit,constant,floatExpr,guard,floatGuard});
+      emit(OP.SOUND,constant(1),constant(25),constant(300),constant(400));emit(OP.SOUND_READY);emit(OP.PROGRAM_STOP,constant(-1));patch(normalEnd,code.length);
+    }
     if(faults.length){const normalEnd=jump(OP.JR,[]);for(const at of faults)patch(at,code.length);emit(OP.STOP,constant(0),constant(15),constant(1));emit(OP.SOUND,constant(1),constant(25),constant(300),constant(400));emit(OP.SOUND_READY);emit(OP.PROGRAM_STOP,constant(-1));patch(normalEnd,code.length);}
     emit(OP.END);
     return {code,localBytes:bytes,trigger:p.subcall?1:0,name:p.name,kind:p.subcall?'procedure':p.boot?'boot':p.kind??'start'};
