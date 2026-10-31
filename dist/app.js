@@ -4,7 +4,7 @@ import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.
 const $=id=>document.getElementById(id);
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.23.0';
+const VERSION='0.23.1';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -98,7 +98,7 @@ Blockly.defineBlocksWithJsonArray([
  {type:'ev3_gyro_reset',message0:'ジャイロセンサ %1 の角度を0にする',args0:[sensorPort()],previousStatement:null,nextStatement:null,colour:'#34ccf1',tooltip:'現在の向きをこのプログラム内の0度にします。ゼロ点は同じポートを使う全処理で共有します。センサ本体の再校正ではなく、接続中のポート表示の生値は変わりません。静止した状態で実行してください。'},
  {type:'ev3_battery_voltage',message0:'EV3本体のバッテリー電圧（V）',output:'Number',colour:'#34ccf1',tooltip:'本体が測定したバッテリー全体の電圧をV単位の小数で返します。残量の％ではありません。'},
  {type:'ev3_battery_current',message0:'EV3本体のバッテリー電流（A）',output:'Number',colour:'#34ccf1',tooltip:'本体が測定したバッテリー全体の消費電流をA単位の小数で返します。モーター1個ごとの電流ではありません。'},
- {type:'ev3_pid',message0:'PID %1 目標値 %2 測定値 %3',args0:[{type:'field_input',name:'NAME',text:'PID1'},{type:'input_value',name:'TARGET',check:'Number'},{type:'input_value',name:'MEASURED',check:'Number'}],message1:'P %1 I %2 D %3 の出力',args1:[{type:'input_value',name:'KP',check:'Number'},{type:'input_value',name:'KI',check:'Number'},{type:'input_value',name:'KD',check:'Number'}],output:'Number',inputsInline:true,colour:'#00b85d',tooltip:'目標値−測定値の偏差と実際の経過秒数でPIDを計算。同じ名前は状態を共有します。初回はP項のみ。同じ1ms内は前回出力。出力制限はないので必要な範囲に収めて使います。'},
+ {type:'ev3_pid',message0:'PID %1 目標値 %2 測定値 %3',args0:[{type:'field_input',name:'NAME',text:'PID1'},{type:'input_value',name:'TARGET',check:'Number'},{type:'input_value',name:'MEASURED',check:'Number'}],message1:'kp %1 ki %2 kd %3 の出力',args1:[{type:'input_value',name:'KP',check:'Number'},{type:'input_value',name:'KI',check:'Number'},{type:'input_value',name:'KD',check:'Number'}],output:'Number',inputsInline:true,colour:'#00b85d',tooltip:'目標値−測定値の偏差と実際の経過秒数でPIDを計算。同じ名前は状態を共有します。初回はP項のみ。同じ1ms内は前回出力。出力制限はないので必要な範囲に収めて使います。'},
  {type:'ev3_pid_reset',message0:'PID %1 をリセットする',args0:[{type:'field_input',name:'NAME',text:'PID1'}],previousStatement:null,nextStatement:null,colour:'#d19636',tooltip:'同じ名前のPIDの積分・前回偏差・時刻を消します。次の計算はP項のみ。モーターを動かしたり停止したりする命令ではありません。'},
  {type:'ev3_color_is',message0:'カラーセンサ %1 の色が %2',args0:[sensorPort(),{type:'field_dropdown',name:'COLOR',options:colorNames}],output:'Boolean',inputsInline:true,colour:'#34ccf1',tooltip:'EV3カラーセンサ。選んだ色なら成り立ちます。'},
  {type:'ev3_color_value',message0:'カラーセンサ %1 の色（番号）',args0:[sensorPort()],output:'Number',colour:'#34ccf1',tooltip:'0:色なし、1:黒、2:青、3:緑、4:黄、5:赤、6:白、7:茶。'},
@@ -262,6 +262,10 @@ group('動き').splice(2,0,...['angle','time'].map(action=>({kind:'block',type:'
 group('動き').splice(2,0,...['run','angle','time'].map(action=>({kind:'block',type:'ev3_steering_'+action,inputs:{TURN:shadow(25),SPEED:shadow(20),...(action==='angle'?{DEGREES:shadow(360)}:action==='time'?{SECONDS:shadow(2)}:{})}})));
 const movementOrder=['ev3_movement_setup','ev3_wheel','ev3_tread','ev3_steering_run','ev3_steering_angle','ev3_steering_time','ev3_tank_angle','ev3_tank_time','ev3_tank','ev3_spin_right','ev3_spin_left','ev3_pivot_right','ev3_pivot_left','ev3_drive_forward','ev3_drive_backward'];
 group('動き').push({kind:'block',type:'ev3_movement_setup'});group('動き').sort((a,b)=>movementOrder.indexOf(a.type)-movementOrder.indexOf(b.type));
+// 旋回は寸法設定が必要なまとまりとして、余白と説明で区切る。
+const spinIndex=group('動き').findIndex(x=>x.type==='ev3_spin_right');
+group('動き')[spinIndex-1].gap=40;
+group('動き').splice(spinIndex,0,{kind:'label',text:'旋回前にタイヤ直径・トレッドを設定',gap:16});
 group('演算').push(...['mod','random','min','max'].map(op=>({kind:'block',type:'ev3_data_'+op,inputs:{A:shadow(1),B:shadow(10)}})),{kind:'block',type:'ev3_data_round',inputs:{A:shadow(1.5)}},{kind:'block',type:'ev3_data_clamp',inputs:{A:shadow(120),LOW:shadow(-100),HIGH:shadow(100)}});
 const textShadow=t=>({shadow:{type:'ev3_text',fields:{TEXT:t}}});
 toolbox.contents.splice(toolbox.contents.findIndex(c=>c.name==='変数'),0,

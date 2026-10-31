@@ -57,3 +57,6 @@ aside#connectionPanel{z-index:1000}
 
 /* 最新マニュアルは編集領域を狭めずヘッダーから直接保存できる。 */
 .manual-download{display:inline-flex;align-items:center;white-space:nowrap;gap:4px;padding:7px 10px;border:1px solid #b9d9d4;border-radius:6px;color:#08766e;background:#edf7f4;text-decoration:none;font-size:12px;font-weight:600}.manual-download:hover{background:#dff0eb}.manual-download:focus-visible{outline:3px solid #d3a238;outline-offset:2px}.manual-links{padding:16px;background:#edf7f4;border:1px solid #c6ddd8;border-radius:8px;margin:14px 0}.manual-links p{margin:6px 0 10px}.manual-links a{color:#08766e;font-weight:600}@media(max-width:600px){.manual-download{font-size:11px;padding:6px}}
+
+/* 下部の確認結果は授業中にも読める大きさで表示。長文は折り返す。 */
+.editor-caption{align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;flex-shrink:0}.editor-caption .build-status{font-size:16px;font-weight:600;line-height:1.5;white-space:normal;overflow-wrap:anywhere;min-width:0;flex:1 1 260px;color:#176b61}.editor-caption .build-status.error{color:#ad3228}.editor-caption>span{font-size:11px;line-height:1.5}
