@@ -1,3 +1,4 @@
+import {parallelPlan,sharedLock} from './parallel.js';
 import {extraLayout,dataEmitter,isText,checkText} from './data.js';
 // EV3 bytecode and system-command implementation. No firmware image is modified.
 // EV3標準ファームウェア用のバイトコード生成と通信を担当する。ファームウェア自体は書き換えない。
@@ -25,7 +26,7 @@ export function constant(n) {
 // 変数の値そのものではなく、VMのローカル／グローバルメモリのアドレスを符号化する。
 export const local = n => n < 32 ? [0x40 | n] : n < 128 ? [0xc1, n] : n < 32768 ? [0xc2, ...u16(n)] : [0xc3,...u32(n)];
 export const globalVar = n => n < 32 ? [0x60 | n] : n < 128 ? [0xe1,n] : [0xe2,...u16(n)];
-export const OP = {END:0x0a, RETURN:0x08, CALL:0x09, PROGRAM_STOP:0x02, JR:0x40, JR_LT32:0x66, JR_GT32:0x6a, MOVE32:0x3a, ADD32:0x12, SUB32:0x16, MUL32:0x1a, DIV32:0x1e,
+export const OP = {END:0x0a, RETURN:0x08, CALL:0x09, PROGRAM_STOP:0x02, OBJECT_START:0x05, OBJECT_WAIT:0x07, JR:0x40, JR_LT32:0x66, JR_GT32:0x6a, MOVE32:0x3a, ADD32:0x12, SUB32:0x16, MUL32:0x1a, DIV32:0x1e,
   INPUT_DEVICE:0x99, MOVEF32:0x3e, TIMER_READ:0x87, MOTOR_COUNT:0xb3, MOTOR_SPEED:0xa5, MOTOR_START:0xa6, MOTOR_TEST:0xa9,
   WAIT:0x85, READY:0x86, SOUND:0x94, SOUND_READY:0x96, MOTOR_RESET:0xa2, MOTOR_CLEAR_COUNT:0xb2, STOP:0xa3, MOTOR:0xae, MOTOR_TIME:0xaf, MOTOR_SYNC:0xb0, MOTOR_READY:0xaa};
 // センサ・ボタンなど実行前に確定しない値を示す。0と区別して、未実行の測定値を決め打ちしない。
@@ -46,6 +47,7 @@ function unaryValue(fn,n){
 }
 // EV3のDATAFは32ビット浮動小数点。検証側もMath.froundを使い、本体と同じ丸めを再現する。
 function floatingConstant(n){const bytes=new Uint8Array(4);new DataView(bytes.buffer).setFloat32(0,finiteNumber(Math.fround(n)),true);return [0x83,...bytes];}
+const PARALLEL=Symbol('parallel');
 const GLOBALS=Symbol('globals'),GEOMETRY=Symbol('geometry'),RETURNS=Symbol('return states');
 const arithmetic={add:(a,b)=>a+b,sub:(a,b)=>a-b,mul:(a,b)=>a*b,div:(a,b)=>{if(b===0)throw Error('0では割れません。');return Math.trunc(a/b);},eq:(a,b)=>+(a===b),neq:(a,b)=>+(a!==b),lt:(a,b)=>+(a<b),lte:(a,b)=>+(a<=b),gt:(a,b)=>+(a>b),gte:(a,b)=>+(a>=b),and:(a,b)=>+(!!a&&!!b),or:(a,b)=>+(!!a||!!b)};
 // ボタン番号はEV3固有の並び。いずれか=7は上下左右と中央をまとめ、戻るボタンは停止操作用に残す。
@@ -81,7 +83,7 @@ function evaluate(x, env) {
     if(value===UNKNOWN)return UNKNOWN;
     return Math.round(value*360000/Math.round(diameter*31416/1000));
   }
-  if(x?.var!==undefined)return env[GLOBALS]?.get(x.var)??0;
+  if(x?.var!==undefined)return env[PARALLEL]?UNKNOWN:env[GLOBALS]?.get(x.var)??0;
   if(x?.not!==undefined){const n=evaluate(x.not,env);return n===UNKNOWN?UNKNOWN:+!n;}
   if(x?.op){if(!Object.hasOwn(arithmetic,x.op))throw Error('未対応の計算です。');const a=evaluate(x.left,env),b=evaluate(x.right,env);if(x.op==='div'&&b===0)throw Error('0では割れません。');if(a===UNKNOWN||b===UNKNOWN)return UNKNOWN;const result=env[FLOATS]?Math.fround(x.op==='div'?a/b:arithmetic[x.op](a,b)):arithmetic[x.op](a,b);if(env[FLOATS])finiteNumber(result);else inRange(result,-2147483648,2147483647,'計算結果');return result;}
   if(x?.scaled){const n=evaluate(x.scaled.value,env);return n===UNKNOWN?UNKNOWN:env[FLOATS]?finiteNumber(Math.fround(n*x.scaled.factor/x.scaled.divisor)):Math.round(n*x.scaled.factor/x.scaled.divisor);}
@@ -116,13 +118,13 @@ function prepareProgram(input){
     if(b.type==='if')return {...b,then:sequence(b.then),else:sequence(b.else)};
     return b;
   });
-  return {...input,main:sequence(input.main),procedures:input.procedures.map(p=>({...p,body:sequence(p.body)}))};
+  return {...input,threads:(input.threads??[]).map(t=>({...t,body:sequence(t.body)})),main:sequence(input.main),procedures:input.procedures.map(p=>({...p,body:sequence(p.body)}))};
 }
 // 中間データを実行前に点検する。呼び出し順、変数、寸法、再帰、値の範囲を確認する。
 // 実行時に変化する値はここでは確定できないため、生成するVM命令側にも範囲検査を入れる。
 export function validate(program) {
   const floatingMode=true;
-  if (!program || !Array.isArray(program.main) || !program.main.length) throw Error('「スタート」の下にブロックをつなげてください。');
+  if (!program || !Array.isArray(program.main) || (!program.main.length&&!program.threads?.length)) throw Error('「スタート」の下にブロックをつなげてください。');
   if (!Array.isArray(program.procedures) || program.procedures.length>32) throw Error('マイブロックは32個までです。');
   const map=new Map();
   for (const p of program.procedures) {
@@ -130,6 +132,7 @@ export function validate(program) {
     if (p.params.length>8 || new Set(p.params).size!==p.params.length) throw Error('引数は重複のない名前で8個までです。');
     map.set(p.name,p);
   }
+  const parallel=parallelPlan(program);
   let visits=0;
   const globals=new Map(),geometry={diameter10:0,tread10:0};
   // 検証中の状態を命令順に進める。programEndは全体終了、myblockReturnは呼び出し元へ戻る信号。
@@ -181,6 +184,7 @@ export function validate(program) {
         case 'motorTimed': inRange(b.ports,1,15,'モーターポート');if(b.ports.toString(2).split('1').length-1>2)throw Error('モーターポートは2個まで指定できます。');inRange(val('speed'),-100,100,'モーターの速さ');if(val('speed')===0)throw Error('モーターの速さは0以外にしてください。');{const seconds=val('seconds');if(seconds!==UNKNOWN&&(!Number.isFinite(seconds)||seconds<=0||seconds>60))throw Error('モーターの時間は0より大きく60秒以下にしてください。');} break;
         case 'timerReset':break;
         case 'encoderReset':inRange(b.port,1,4,'リセットするモーターポート');break;
+        case 'broadcast':if(typeof b.message!=='string'||!b.message.trim()||b.message.length>40||b.message.includes('\0'))throw Error('メッセージ名は1〜40文字にしてください。');break;
         case 'programEnd':return 'programEnd';
         case 'myblockReturn':if(!stack.length)throw Error('マイブロックの終了は定義の中だけで使えます。');env[RETURNS].push({globals:new Map(globals),geometry:{...geometry}});return 'myblockReturn';
         case 'stop': if(b.ports!==undefined)inRange(b.ports,1,15,'停止するモーターポート');break;
@@ -190,7 +194,7 @@ export function validate(program) {
           if(stack.includes(p.name))throw Error('試作版ではマイブロックの再帰呼び出しは使えません。');
           if(b.args.length!==p.params.length)throw Error(`「${p.name}」の引数の数が一致しません。`);
           const args=b.args.map(x=>evaluate(x,env)); args.forEach(n=>floatingMode?finiteNumber(n,'引数'):inRange(n,-2147483648,2147483647,'引数'));
-          const next=Object.fromEntries(p.params.map((n,i)=>[n,args[i]]));next[GLOBALS]=globals;next[GEOMETRY]=geometry;next[FLOATS]=floatingMode;next[RETURNS]=[];const exit=walk(p.body,next,[...stack,p.name]);if(exit==='programEnd')return exit;
+          const next=Object.fromEntries(p.params.map((n,i)=>[n,args[i]]));next[GLOBALS]=globals;next[GEOMETRY]=geometry;next[FLOATS]=floatingMode;next[PARALLEL]=!!parallel;next[RETURNS]=[];const exit=walk(p.body,next,[...stack,p.name]);if(exit==='programEnd')return exit;
           // Merge every early return with the fall-through state. A branch
           // that returned did not execute the remainder of this definition.
           const states=next[RETURNS];if(exit!=='myblockReturn')states.push({globals:new Map(globals),geometry:{...geometry}});
@@ -201,7 +205,12 @@ export function validate(program) {
       }
     }
   }
-  walk(program.main,{[GLOBALS]:globals,[GEOMETRY]:geometry,[FLOATS]:floatingMode},[]);
+  for(const root of parallel?.roots??[{body:program.main}]){
+    globals.clear();Object.assign(geometry,{diameter10:0,tread10:0});
+    const env={[GLOBALS]:globals,[GEOMETRY]:geometry,[FLOATS]:floatingMode,[PARALLEL]:!!parallel};
+    if(root.condition!==undefined)evaluate(root.condition,env);
+    walk(root.body,env,[]);
+  }
   return {map,visits};
 }
 // 検証済みの中間データをRBFへ組み立てる。返り値には本体用dataと診断用の補助情報を含む。
@@ -210,6 +219,7 @@ export function compile(program,folder='EV3Lab') {
   const directory=projectDirectory(folder),usesFloat=true;
   program=prepareProgram(program);
   validate(program);
+  const parallel=parallelPlan(program);
   const variableNames=new Set();let usesGeometry=false,usesSensors=false,usesForever=false,usesRamps=false,usesTimer=false;
   const collect=x=>{if(x&&typeof x==='object'){if(x.timer===true||x.type==='timerReset'){usesTimer=true;usesSensors=true;}if(x.type==='forever')usesForever=true;if(x.type==='ramp')usesRamps=true;if(x.sensor||x.button||x.type==='encoderReset')usesSensors=true;if(x.geometry||x.type==='wheel'||x.type==='tread')usesGeometry=true;if(typeof x.var==='string')variableNames.add(x.var);for(const v of Object.values(x))collect(v);}};
   collect(program);if(variableNames.size>32)throw Error('変数は32個までです。');
@@ -225,15 +235,28 @@ export function compile(program,folder='EV3Lab') {
   const diagnosticPath=`${directory}/FB_${(diagnosticTag>>>0).toString(16).padStart(8,'0')}.bin`;
   let recordsTiming=false;
   const procs=program.procedures;
-  const ids=new Map(procs.map((p,i)=>[p.name,i+2]));
-  const names=['メイン',...procs.map(p=>p.name)];
-  const objects=[{params:[],body:program.main},...procs].map((p,index)=>{
-    const code=index ? [p.params.length,...p.params.map(()=>usesFloat?0x83:0x82)] : [];
+  const roots=parallel?.roots??[];
+  const messageBase=baseGlobalBytes+extras.bytes;
+  const ackBase=messageBase+(parallel?.messages.size??0)*4;
+  const lockBase=ackBase+roots.length*4;
+  const globalBytes=parallel?lockBase+roots.length*8:baseGlobalBytes+extras.bytes;
+  const messageAt=name=>globalVar(messageBase+parallel.messages.get(name)*4);
+  const ackAt=i=>globalVar(ackBase+i*4);
+  const needed=roots.map(r=>{const names=new Set();parallel.visit(r.body,b=>{if(b.type==='call')names.add(b.name);});return names;});
+  const specs=parallel?[{boot:true,params:[],body:[],name:'並行処理の初期化'},
+    ...roots.map((r,i)=>({...r,root:i,params:[],name:r.name??(r.kind==='message'?'受信 '+r.message:r.kind==='start'?'スタート'+(i+1):'イベント'+(i+1))})),
+    ...roots.flatMap((_,root)=>procs.filter(p=>needed[root].has(p.name)).map(p=>({...p,subcall:true,root})))]:[{params:[],body:program.main,name:'メイン'},...procs.map(p=>({...p,subcall:true}))];
+  const objects=specs.map((p,index)=>{
+    const ids=new Map(specs.flatMap((s,i)=>s.subcall&&s.root===p.root?[[s.name,i+1]]:[]));
+    const code=p.subcall ? [p.params.length,...p.params.map(()=>usesFloat?0x83:0x82)] : [];
     let bytes=p.params.length*4;
     const alloc=()=>{const at=bytes;bytes+=4;return at;};
     const timer=alloc();
     const emit=(op,...args)=>code.push(op,...args.flat());
     const faults=[];
+    const lock=parallel&&!p.boot?sharedLock({emit,alloc,local,globalVar,constant,jump:(...args)=>jump(...args),patch:(...args)=>patch(...args),position:()=>code.length,guard:(...args)=>guard(...args)},p.root,roots.length,lockBase):null;
+    let lockDepth=0;
+    const locked=fn=>{if(!lock||lockDepth)return fn();lock.acquire();lockDepth++;const result=fn();lockDepth--;lock.release();return result;};
     // 整数を要求するハードウェア命令やセンサ値を扱う層。出力マスクと入力ポート番号の取り違えに注意。
     const integerExpr=x=>{
       if(typeof x==='number')return constant(x);
@@ -319,7 +342,7 @@ export function compile(program,folder='EV3Lab') {
       if(typeof x==='number')return floatingConstant(x);
       if(x?.timer===true){const elapsed=local(alloc()),seconds=local(alloc());emit(OP.TIMER_READ,elapsed);emit(OP.SUB32,elapsed,globalVar(timerOffset),elapsed);emit(0x1f,asFloat(elapsed),floatingConstant(1000),seconds);return seconds;}
       if(x?.numeric){const {op,a,b,low,high}=x.numeric,A=floatExpr(a),r=local(alloc());floatGuard(A);if(op==='round'){const t=local(alloc());emit(0x13,A,floatingConstant(.5),t);emit(0x8d,constant(3),t,r);return r;}const B=b===undefined?null:floatExpr(b);if(B)floatGuard(B);if(op==='mod'){floatNonzero(B);emit(0x8d,constant(2),A,B,r);const zero=jump(OP.JR_LT32,[floatCompare(0x53,r,floatingConstant(0)),constant(1)]),positive=local(alloc());emit(0x1b,r,B,positive);const same=jump(0x6b,[positive,floatingConstant(0)]);emit(0x13,r,B,r);patch(zero,code.length);patch(same,code.length);return r;}if(op==='random'){const from=expr(a),to=expr(b);guard(from,-32767,32767);guard(to,-32767,32767);faults.push(jump(OP.JR_GT32,[from,to]));const n=local(alloc());emit(OP.MOVE32,constant(0),n);emit(0x8e,from,to,n);const signed=local(alloc());emit(0x36,n,signed);return asFloat(signed);}if(op==='clamp'){const lo=floatExpr(low),hi=floatExpr(high);floatGuard(lo);floatGuard(hi);faults.push(jump(0x6b,[lo,hi]));emit(0x3f,A,r);const ok=jump(0x6b,[r,lo]);emit(0x3f,lo,r);patch(ok,code.length);const ok2=jump(0x67,[r,hi]);emit(0x3f,hi,r);patch(ok2,code.length);return r;}emit(0x3f,A,r);const keep=jump(op==='min'?0x67:0x6b,[A,B]);emit(0x3f,B,r);patch(keep,code.length);return r;}
-      if(x?.textData||x?.listData)return dataOps.numeric(x);
+      if(x?.textData||x?.listData)return locked(()=>dataOps.numeric(x));
       if(x?.var!==undefined)return globalVar(globalOffsets.get(x.var));
       if(x?.param!==undefined){const i=p.params.indexOf(x.param);if(i<0)throw Error('引数の定義を確認してください。');return local(i*4);}
       if(x?.math){
@@ -532,6 +555,8 @@ export function compile(program,folder='EV3Lab') {
     const sequence=nodes=>{
       for(const original of nodes) {
         let b=original;
+        const shared=['set','change','textSet','listAdd','listSet','listClear','listDelete','logStart','logValue','logEnd','broadcast','wheel','tread','ramp','timerReset'].includes(b.type)&&lock&&!lockDepth;
+        if(shared){lock.acquire();lockDepth++;}
         if(usesSensors||usesForever||usesFloat||usesRamps){
           const checked=(source,min,max)=>{const at=alloc();emit(OP.MOVE32,expr(source),local(at));guard(local(at),min,max);return {register:at};};
           if(b.driveSource){const cm=checked(b.driveSource.cm,1,1000),speed=checked(b.driveSource.speed,1,100);b={...b,speed:scaled(speed,b.driveSource.direction==='backward'?-1:1),degrees:{geometry:{kind:'distance',value:cm}}};}
@@ -554,7 +579,7 @@ export function compile(program,folder='EV3Lab') {
           case 'change':{const target=globalVar(globalOffsets.get(b.var));emit(usesFloat?0x13:OP.ADD32,target,usesFloat?floatExpr(b.value):expr(b.value),target);if(usesFloat)floatGuard(target);break;}
           case 'if':{const skip=jump(OP.JR_LT32,[expr(b.condition),constant(1)]);sequence(b.then);const end=jump(OP.JR,[]);patch(skip,code.length);sequence(b.else);patch(end,code.length);break;}
           case 'forever':{const start=code.length;sequence(b.body);emit(OP.WAIT,constant(20),local(timer));emit(OP.READY,local(timer));const again=jump(OP.JR,[]);patch(again,start);break;}
-          case 'while':{const start=code.length,condition=expr(b.condition),out=jump(b.until?OP.JR_GT32:OP.JR_LT32,[condition,constant(b.until?0:1)]);sequence(b.body);if(usesSensors){emit(OP.WAIT,constant(20),local(timer));emit(OP.READY,local(timer));}const again=jump(OP.JR,[]);patch(again,start);patch(out,code.length);break;}
+          case 'while':{const start=code.length,condition=expr(b.condition),out=jump(b.until?OP.JR_GT32:OP.JR_LT32,[condition,constant(b.until?0:1)]);sequence(b.body);if(usesSensors||parallel){emit(OP.WAIT,constant(20),local(timer));emit(OP.READY,local(timer));}const again=jump(OP.JR,[]);patch(again,start);patch(out,code.length);break;}
           case 'tank':{
             const active=local(alloc()),left=local(alloc()),right=local(alloc());
             // Sample and validate both inputs before changing either motor.
@@ -596,8 +621,20 @@ export function compile(program,folder='EV3Lab') {
           case 'timerReset':emit(OP.TIMER_READ,globalVar(timerOffset));break;
           case 'encoderReset':integerExpr({sensor:{kind:'encoder',port:b.port}});emit(OP.MOTOR_CLEAR_COUNT,constant(0),constant(1<<(b.port-1)));break;
           case 'programEnd':emit(OP.STOP,constant(0),constant(15),constant(1));emit(OP.PROGRAM_STOP,constant(-1));return;
-          case 'myblockReturn':if(!index)throw Error('マイブロックの終了は定義の中だけで使えます。');emit(OP.RETURN);return;
+          case 'myblockReturn':if(!p.subcall)throw Error('マイブロックの終了は定義の中だけで使えます。');emit(OP.RETURN);return;
           case 'stop': emit(OP.STOP,constant(0),constant(b.ports??15),constant(1)); break;
+          case 'broadcast':{
+            if(!parallel)break;
+            const counter=messageAt(b.message),sent=local(alloc());guard(counter,0,2147483645);
+            emit(OP.ADD32,counter,constant(1),counter);emit(OP.MOVE32,counter,sent);
+            // 送信だけを共有領域の排他対象にする。待機中は受信側が記録・変数更新できる。
+            if(shared){lockDepth--;lock.release();}
+            if(b.wait)for(let i=0;i<roots.length;i++)if(roots[i].kind==='message'&&roots[i].message===b.message){
+              const check=code.length,pending=jump(OP.JR_LT32,[ackAt(i),sent]),done=jump(OP.JR,[]);
+              patch(pending,code.length);emit(OP.WAIT,constant(5),local(timer));emit(OP.READY,local(timer));const again=jump(OP.JR,[]);patch(again,check);patch(done,code.length);
+            }
+            break;
+          }
           case 'call': {const id=ids.get(b.name); if(!id)throw Error(`「${b.name}」の定義がありません。`); emit(OP.CALL,constant(id),constant(b.args.length),...b.args.map(usesFloat?floatExpr:expr)); break;}
           case 'repeat': {
             const counter=alloc(); emit(OP.MOVE32,expr(b.count),local(counter));
@@ -607,6 +644,7 @@ export function compile(program,folder='EV3Lab') {
           }
           default: throw Error(`未対応のブロック: ${b.type}`);
         }
+        if(shared&&b.type!=='broadcast'){lockDepth--;lock.release();}
       }
     };
     // 実行開始時だけ共有領域を初期化する。マイブロックから戻るたびに通常変数を消してはいけない。
@@ -614,13 +652,40 @@ export function compile(program,folder='EV3Lab') {
     if(index===0&&usesRamps)for(const at of [rampOffset,rampOffset+4,rampOffset+8])emit(OP.MOVE32,constant(0),globalVar(at));
     if(index===0&&usesTimer)emit(OP.MOVE32,constant(0),globalVar(timerOffset));
     if(index===0)dataOps.init();
-    sequence(p.body);
-    if(index)emit(OP.RETURN);else emit(OP.STOP,constant(0),constant(15),constant(1));
+    const pause=ms=>{emit(OP.WAIT,constant(ms),local(timer));emit(OP.READY,local(timer));};
+    if(p.boot){
+      for(let at=messageBase;at<globalBytes;at+=4)emit(OP.MOVE32,constant(0),globalVar(at));
+      for(let i=0;i<roots.length;i++)emit(OP.OBJECT_START,constant(i+2));
+      for(let i=0;i<roots.length;i++)if(roots[i].kind==='start')emit(OP.OBJECT_WAIT,constant(i+2));
+      if(roots.some(r=>r.kind!=='start')){const top=code.length;pause(20);const again=jump(OP.JR,[]);patch(again,top);}
+      else emit(OP.STOP,constant(0),constant(15),constant(1));
+    }else if(parallel&&!p.subcall&&p.kind!=='start'){
+      const previous=local(alloc());
+      if(p.kind==='message')emit(OP.MOVE32,constant(0),previous);
+      else if(p.kind==='changed')emit(0x3f,floatExpr(p.condition),previous);
+      else emit(OP.MOVE32,constant(0),previous);
+      const top=code.length;
+      let idle,observed;
+      if(p.kind==='message'){
+        observed=local(alloc());emit(OP.MOVE32,messageAt(p.message),observed);
+        const equal=local(alloc());emit(OP.SUB32,observed,previous,equal);faults.push(jump(OP.JR_LT32,[equal,constant(0)]));idle=jump(OP.JR_LT32,[equal,constant(1)]);
+        sequence(p.body);emit(OP.MOVE32,observed,previous);emit(OP.MOVE32,observed,ackAt(p.root));
+      }else if(p.kind==='condition'){
+        const now=expr(p.condition),was=local(alloc());emit(OP.MOVE32,previous,was);emit(OP.MOVE32,now,previous);
+        const no=jump(OP.JR_LT32,[now,constant(1)]);idle=jump(OP.JR_GT32,[was,constant(0)]);sequence(p.body);patch(no,code.length);
+      }else{
+        const now=floatExpr(p.condition),changed=local(alloc());emit(OP.MOVE32,constant(0),changed);emit(0x53,now,previous,changed);emit(0x3f,now,previous);idle=jump(OP.JR_LT32,[changed,constant(1)]);sequence(p.body);
+      }
+      patch(idle,code.length);pause(20);const again=jump(OP.JR,[]);patch(again,top);
+    }else{
+      sequence(p.body);
+      if(p.subcall)emit(OP.RETURN);else if(!parallel)emit(OP.STOP,constant(0),constant(15),constant(1));
+    }
     // Firmware validation scans each object sequentially up to its first END.
     // Keep fault handlers inside that object, and skip them on normal completion.
     if(faults.length){const normalEnd=jump(OP.JR,[]);for(const at of faults)patch(at,code.length);emit(OP.STOP,constant(0),constant(15),constant(1));emit(OP.SOUND,constant(1),constant(25),constant(300),constant(400));emit(OP.SOUND_READY);emit(OP.PROGRAM_STOP,constant(-1));patch(normalEnd,code.length);}
     emit(OP.END);
-    return {code,localBytes:bytes,trigger:index ? 1:0,name:names[index]};
+    return {code,localBytes:bytes,trigger:p.subcall?1:0,name:p.name,kind:p.subcall?'procedure':p.boot?'boot':p.kind??'start'};
   });
   // RBFは16バイトのファイルヘッダ、各12バイトのオブジェクトヘッダ、命令列の順。
   // オブジェクト末尾とジャンプ位置は、実機VMの検証を通すため正確に一致させる。
@@ -628,8 +693,8 @@ export function compile(program,folder='EV3Lab') {
   const headers=[];
   for(const o of objects) {o.offset=offset; headers.push(...u32(offset),...u16(0),...u16(o.trigger),...u32(o.localBytes)); offset+=o.code.length;}
   if(offset>65536)throw Error('プログラムが大きすぎます（上限64KB）。');
-  const data=new Uint8Array([76,69,71,79,...u32(offset),...u16(104),...u16(objects.length),...u32(baseGlobalBytes+extras.bytes),...headers,...objects.flatMap(o=>o.code)]);
-  return {data,objects,program,logFiles:extras.files,usesSensors,usesFloat,usesRamps,usesTimer,diagnosticTag,diagnosticPath:recordsTiming&&!usesRamps?diagnosticPath:null};
+  const data=new Uint8Array([76,69,71,79,...u32(offset),...u16(104),...u16(objects.length),...u32(globalBytes),...headers,...objects.flatMap(o=>o.code)]);
+  return {data,objects,program,usesParallel:!!parallel,threadCount:parallel?roots.length:1,logFiles:extras.files,usesSensors,usesFloat,usesRamps,usesTimer,diagnosticTag,diagnosticPath:recordsTiming&&!usesRamps?diagnosticPath:null};
 }
 
 // 本体に保存した68バイトの補正記録を復号する。識別タグを照合し、別のプログラムの古い記録を混同しない。

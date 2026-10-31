@@ -1,0 +1,176 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "appVersion": "0.18.0",
+  "name": "ParallelMeasure",
+  "programName": "ParallelMeasure",
+  "ev3ProjectName": "EV3Lab",
+  "pairMode": "independent",
+  "workspace": {
+    "variables": [
+      {
+        "id": "parallel-finished",
+        "name": "計測完了"
+      }
+    ],
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "x": 30,
+          "y": 30,
+          "next": {
+            "block": {
+              "type": "ev3_motor_l_pair_time",
+              "fields": {
+                "PORTS": "6"
+              },
+              "inputs": {
+                "SPEED": {
+                  "shadow": {
+                    "type": "math_number",
+                    "fields": {
+                      "NUM": 20
+                    }
+                  }
+                },
+                "SECONDS": {
+                  "shadow": {
+                    "type": "math_number",
+                    "fields": {
+                      "NUM": 2
+                    }
+                  }
+                }
+              },
+              "next": {
+                "block": {
+                  "type": "ev3_wait_until",
+                  "inputs": {
+                    "BOOL": {
+                      "block": {
+                        "type": "ev3_op_eq",
+                        "inputs": {
+                          "A": {
+                            "block": {
+                              "type": "variables_get",
+                              "fields": {
+                                "VAR": {
+                                  "id": "parallel-finished"
+                                }
+                              }
+                            }
+                          },
+                          "B": {
+                            "shadow": {
+                              "type": "math_number",
+                              "fields": {
+                                "NUM": 1
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "next": {
+                    "block": {
+                      "type": "ev3_program_end"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "ev3_start",
+          "x": 500,
+          "y": 30,
+          "next": {
+            "block": {
+              "type": "ev3_log_start",
+              "fields": {
+                "FILE": "Parallel"
+              },
+              "next": {
+                "block": {
+                  "type": "controls_repeat_ext",
+                  "inputs": {
+                    "TIMES": {
+                      "shadow": {
+                        "type": "math_number",
+                        "fields": {
+                          "NUM": 20
+                        }
+                      }
+                    },
+                    "DO": {
+                      "block": {
+                        "type": "ev3_log_value",
+                        "fields": {
+                          "LABEL": "距離_cm"
+                        },
+                        "inputs": {
+                          "VALUE": {
+                            "block": {
+                              "type": "ev3_distance",
+                              "fields": {
+                                "PORT": "2"
+                              }
+                            }
+                          }
+                        },
+                        "next": {
+                          "block": {
+                            "type": "ev3_wait_seconds",
+                            "inputs": {
+                              "SECONDS": {
+                                "shadow": {
+                                  "type": "math_number",
+                                  "fields": {
+                                    "NUM": 0.1
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "next": {
+                    "block": {
+                      "type": "ev3_log_end",
+                      "next": {
+                        "block": {
+                          "type": "variables_set",
+                          "fields": {
+                            "VAR": {
+                              "id": "parallel-finished"
+                            }
+                          },
+                          "inputs": {
+                            "VALUE": {
+                              "shadow": {
+                                "type": "math_number",
+                                "fields": {
+                                  "NUM": 1
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -20,7 +20,7 @@ class XmlNode{
 }
 function editor(){
  const elements=new Map();
- const context=vm.createContext({console,setTimeout,clearTimeout,XMLSerializer:class{serializeToString(n){return '<'+n.nodeName+' '+[...n.attrs].map(([k,v])=>k+'='+JSON.stringify(v)).join(' ')+'>'+n.childNodes.map(c=>this.serializeToString(c)).join('')+'</'+n.nodeName+'>'; }},document:{createElementNS:(_ns,name)=>new XmlNode(name),createTextNode:text=>new XmlNode('#text',3,text),querySelector:()=>({}),getElementById:id=>{if(!elements.has(id))elements.set(id,{value:id==='pairMode'?'independent':'',textContent:''});return elements.get(id);}}});
+ const context=vm.createContext({console,setTimeout,clearTimeout,structuredClone,XMLSerializer:class{serializeToString(n){return '<'+n.nodeName+' '+[...n.attrs].map(([k,v])=>k+'='+JSON.stringify(v)).join(' ')+'>'+n.childNodes.map(c=>this.serializeToString(c)).join('')+'</'+n.nodeName+'>'; }},document:{createElementNS:(_ns,name)=>new XmlNode(name),createTextNode:text=>new XmlNode('#text',3,text),querySelector:()=>({}),getElementById:id=>{if(!elements.has(id))elements.set(id,{value:id==='pairMode'?'independent':'',textContent:''});return elements.get(id);}}});
  for(const file of ['blockly_compressed.js','blocks_compressed.js','ja.js'])vm.runInContext(readFileSync(new URL('../dist/vendor/'+file,import.meta.url),'utf8'),context);
  const prefix=app.slice(app.indexOf('\n')+1,app.indexOf('const theme='));vm.runInContext(prefix,context);
  vm.runInContext('const workspace=new Blockly.Workspace();',context);
@@ -562,4 +562,40 @@ test('new classroom data and steering samples reload, preserve library types and
 });
 test('every newly advertised data block can be saved and restored through the actual allowlist',()=>{
  const context=editor(),saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();const groups=toolbox.contents.filter(c=>['データ','記録','ランプ'].includes(c.name));for(const item of groups.flatMap(c=>c.contents).filter(x=>x.kind==='block'))Blockly.serialization.blocks.append(item,workspace);const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);const result=Blockly.serialization.workspaces.save(workspace);Blockly.Events.enable();JSON.stringify(result);`,context));inspectBlocks(saved.blocks);assert.ok(saved.blocks.blocks.length>=20);
+});
+
+test('parallel startup and event hats survive project reload with sensor conditions and message names',()=>{
+ const context=editor();
+ const result=JSON.parse(vm.runInContext(`
+ Blockly.Events.disable();
+ const state={blocks:{languageVersion:0,blocks:[
+ {type:'ev3_start',next:{block:{type:'ev3_message_wait',fields:{MESSAGE:'走行開始'}}}},
+ {type:'ev3_start',next:{block:{type:'ev3_wait_seconds',inputs:{SECONDS:{shadow:{type:'math_number',fields:{NUM:1}}}}}}},
+ {type:'ev3_when_message',fields:{MESSAGE:'走行開始'},next:{block:{type:'ev3_stop'}}},
+ {type:'ev3_when_condition',inputs:{BOOL:{block:{type:'ev3_touch',fields:{PORT:'1',STATE:'1'}}}},next:{block:{type:'ev3_program_end'}}},
+ {type:'ev3_when_changed',inputs:{VALUE:{block:{type:'ev3_color_value',fields:{PORT:'3'}}}},next:{block:{type:'ev3_led'}}}
+ ]}};
+ Blockly.serialization.workspaces.load(state,workspace);const saved=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(saved,workspace);
+ const p=program();const blocks=Blockly.serialization.workspaces.save(workspace);Blockly.Events.enable();JSON.stringify({p,blocks});`,context));
+ inspectBlocks(result.blocks.blocks);const build=compile(result.p);assert.equal(build.threadCount,5);assert.equal(build.usesParallel,true);
+ assert.equal(result.p.main[0].type,'broadcast');assert.equal(result.p.main[0].wait,true);
+ assert.deepEqual(result.p.threads.map(t=>t.kind),['start','message','condition','changed']);
+ assert.equal(result.p.threads[1].message,'走行開始');
+});
+
+test('messages in a reusable My Block preserve export/import semantics and same named arguments',()=>{
+ const context=editor();const library=JSON.parse(vm.runInContext(`Blockly.Events.disable();const def=saveMyBlock(workspace,'通知する',[]),send=workspace.newBlock('ev3_message_send');send.setFieldValue('できた','MESSAGE');def.getInput('STACK').connection.connect(send.previousConnection);const state=Blockly.serialization.workspaces.save(workspace);Blockly.Events.enable();JSON.stringify(state);`,context));
+ const merged=mergeBlockLibrary({blocks:{languageVersion:0,blocks:[{type:'ev3_start'}]}},createBlockLibrary(library,'0.18.0'));inspectBlocks(merged.blocks);
+ assert.equal(merged.blocks.blocks.find(b=>b.type==='procedures_defnoreturn').inputs.STACK.block.fields.MESSAGE,'できた');
+});
+
+test('all three parallel classroom samples reload and compile without losing events, variables or log names',()=>{
+ for(const [kind,name]of [['parallel','ParallelMeasure'],['event','TouchEvent'],['message','MessageRelay']]){
+  const context=editor(),sample=JSON.parse(readFileSync(new URL('../examples/'+name+'.ev3lab',import.meta.url),'utf8'));
+  inspectBlocks(sample.workspace.blocks);context.lesson=JSON.stringify(sample.workspace);context.kind=kind;
+  const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const saved=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(saved,workspace);const p=program();Blockly.Events.enable();JSON.stringify(p);`,context));
+  const b=compile(p);assert.equal(b.threadCount,2);assert.ok(b.usesParallel);assert.equal(b.program.procedures.length,0);
+  assert.deepEqual(b.logFiles,kind==='parallel'?['Parallel']:kind==='message'?['Message']:[]);
+  const generated=JSON.parse(vm.runInContext('JSON.stringify(parallelSampleState(kind))',context));assert.deepEqual(generated,sample.workspace);
+ }
 });

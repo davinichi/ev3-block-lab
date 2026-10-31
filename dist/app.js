@@ -4,7 +4,7 @@ import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.
 const $=id=>document.getElementById(id);
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.17.1';
+const VERSION='0.18.0';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -24,7 +24,7 @@ const deviceName=type=>deviceNames[type]??([0,125,126,127].includes(type)?'未�
 const singlePorts=[['A','1'],['B','2'],['C','4'],['D','8']];
 const pairPorts=[['B + C','6'],['A + B','3'],['A + C','5'],['A + D','9'],['B + D','10'],['C + D','12']];
 Blockly.defineBlocksWithJsonArray([
- {type:'ev3_start',message0:'▶ スタート',nextStatement:null,colour:'#d3a238',tooltip:'EV3本体から起動すると、ここから実行します。'},
+ {type:'ev3_start',message0:'▶ スタート',nextStatement:null,colour:'#d3a238',tooltip:'EV3本体から起動すると、ここから実行します。複数置くと別々に並行して動きます。全部のスタートが終わると停止します。イベントがある場合はプログラム終了まで監視を続けます。'},
  {type:'ev3_motor',message0:'Lモーター %1 速さ %2 ％で %3 度回す',args0:[{type:'field_dropdown',name:'PORTS',options:[singlePorts[1],singlePorts[0],singlePorts[2],singlePorts[3],...pairPorts]},{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'DEGREES',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'速度は-100〜100（0以外）。2ポートを選んだ場合の制御方式は「先生用の設定・計測」で選択します。標準は各モーターの指定角度を優先し、同期方式は検証用です。'},
  {type:'ev3_tone',message0:'音 %1 Hz を %2 ミリ秒 鳴らす 音量 %3',args0:[{type:'input_value',name:'FREQUENCY',check:'Number'},{type:'input_value',name:'MS',check:'Number'},{type:'field_number',name:'VOLUME',value:25,min:0,max:100,precision:1}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#a570b3'},
  {type:'ev3_wait',message0:'%1 ミリ秒 待つ（旧形式）',args0:[{type:'input_value',name:'MS',check:'Number'}],previousStatement:null,nextStatement:null,colour:'#d19636'},
@@ -196,6 +196,15 @@ Blockly.defineBlocksWithJsonArray([
  {type:'ev3_list_stat',message0:'リスト %1 の %2',args0:[namedField('LIST','データ'),{type:'field_dropdown',name:'OP',options:[['合計','sum'],['平均','average'],['最小値','min'],['最大値','max']]}],output:'Number',colour:'#ff8c1a',tooltip:'平均・最小・最大は1項目以上必要です。空の合計は0です。'}
 ]);
 
+// イベントは開始ブロックと同じく、上につなぐブロックを持たない。
+// 条件・値の欄へ既存のセンサや比較ブロックを入れ、監視内容を組み立てる。
+Blockly.defineBlocksWithJsonArray([
+ {type:'ev3_when_condition',message0:'%1 が成り立ったとき',args0:[{type:'input_value',name:'BOOL',check:'Boolean'}],nextStatement:null,colour:'#d3a238',tooltip:'約20ミリ秒ごとに条件を確認し、成り立たない状態から成り立つ状態になったときに実行します。開始時に成り立っていても1回実行します。実行中の再起動はしません。'},
+ {type:'ev3_when_changed',message0:'%1 の値が変わったとき',args0:[{type:'input_value',name:'VALUE',check:'Number'}],nextStatement:null,colour:'#d3a238',tooltip:'センサ・変数などの数値を約20ミリ秒ごとに確認します。開始時の値を基準に、変化すると実行します。実行中は同じ処理を重ねて起動しません。'},
+ {type:'ev3_when_message',message0:'%1 を受け取ったとき',args0:[{type:'field_input',name:'MESSAGE',text:'メッセージ1'}],nextStatement:null,colour:'#d3a238',tooltip:'同じ名前のメッセージを送ると起動します。実行中の追加受信はまとめて保持し、完了後に最新分をもう1回実行します。'},
+ ...[['send','を送る'],['wait','を送って待つ']].map(([kind,label])=>({type:'ev3_message_'+kind,message0:'%1 '+label,args0:[{type:'field_input',name:'MESSAGE',text:'メッセージ1'}],previousStatement:null,nextStatement:null,colour:'#d3a238',tooltip:kind==='wait'?'同じ名前の受信処理が全部終わるまで待ちます。受信処理がない場合はそのまま進みます。自分や互いの完了を待つ構成は使えません。':'同じ名前の受信処理を起動し、すぐ次へ進みます。名前は大文字・小文字も含めて一致させてください。'}))
+]);
+
 const num=(n)=>({kind:'block',type:'math_number',fields:{NUM:n}});
 const shadow=(n)=>({shadow:{type:'math_number',fields:{NUM:n}}});
 // 左側カテゴリの公開一覧。新規ブロック追加時は、定義・chain/expression・library.jsの許可一覧も確認する。
@@ -214,6 +223,7 @@ const toolbox={kind:'categoryToolbox',contents:[
 
 // 本体ボタンは互換読み込みのため定義を残し、新規の一覧だけから一時的に外す。
 const group=name=>toolbox.contents.find(c=>c.name===name).contents;
+toolbox.contents.splice(1,0,{kind:'category',name:'イベント',colour:'#d3a238',contents:[{kind:'label',text:'センサ・比較を条件の欄に入れます'},{kind:'block',type:'ev3_when_condition'},{kind:'block',type:'ev3_when_changed'},{kind:'label',text:'名前が同じメッセージで連携します'},{kind:'block',type:'ev3_when_message'},{kind:'block',type:'ev3_message_send'},{kind:'block',type:'ev3_message_wait'}]});
 group('動き').splice(2,0,...['run','angle','time'].map(action=>({kind:'block',type:'ev3_steering_'+action,inputs:{TURN:shadow(25),SPEED:shadow(20),...(action==='angle'?{DEGREES:shadow(360)}:action==='time'?{SECONDS:shadow(2)}:{})}})));
 group('演算').push(...['mod','random','min','max'].map(op=>({kind:'block',type:'ev3_data_'+op,inputs:{A:shadow(1),B:shadow(10)}})),{kind:'block',type:'ev3_data_round',inputs:{A:shadow(1.5)}},{kind:'block',type:'ev3_data_clamp',inputs:{A:shadow(120),LOW:shadow(-100),HIGH:shadow(100)}});
 const textShadow=t=>({shadow:{type:'ev3_text',fields:{TEXT:t}}});
@@ -341,6 +351,29 @@ function saveMyBlock(ws,name,rows,definitionId=null){
 }
 
 // Blocklyの色・表示・操作を初期化する。独自ブロックの型名は保存データの互換性にも関わる。
+// 授業で独立して試せる、走行＋計測・センサイベント・メッセージの3例。
+function parallelSampleState(kind){
+ const n=value=>({shadow:{type:'math_number',fields:{NUM:value}}});
+ const seq=blocks=>{for(let i=0;i<blocks.length-1;i++)blocks[i].next={block:blocks[i+1]};return blocks[0];};
+ const wait=value=>({type:'ev3_wait_seconds',inputs:{SECONDS:n(value)}});
+ const end={type:'ev3_program_end'};
+ const distance=()=>({block:{type:'ev3_distance',fields:{PORT:'2'}}});
+ const log={type:'ev3_log_value',fields:{LABEL:'距離_cm'},inputs:{VALUE:distance()}};
+ const repeat=count=>({type:'controls_repeat_ext',inputs:{TIMES:n(count),DO:{block:seq([structuredClone(log),wait(.1)])}}});
+ const root=(type,x,y,body,extra={})=>({type,x,y,...extra,next:{block:seq(body)}});
+ let blocks,variables=[];
+ if(kind==='parallel'){
+  const ref={id:'parallel-finished'};variables=[{...ref,name:'計測完了'}];
+  blocks=[root('ev3_start',30,30,[{type:'ev3_motor_l_pair_time',fields:{PORTS:'6'},inputs:{SPEED:n(20),SECONDS:n(2)}},{type:'ev3_wait_until',inputs:{BOOL:{block:{type:'ev3_op_eq',inputs:{A:{block:{type:'variables_get',fields:{VAR:ref}}},B:n(1)}}}}},end]),
+   root('ev3_start',500,30,[{type:'ev3_log_start',fields:{FILE:'Parallel'}},repeat(20),{type:'ev3_log_end'},{type:'variables_set',fields:{VAR:ref},inputs:{VALUE:n(1)}}])];
+ }else if(kind==='event'){
+  blocks=[root('ev3_start',30,30,[{type:'ev3_motor_l_pair_run',fields:{PORTS:'6'},inputs:{SPEED:n(20)}}]),root('ev3_when_condition',30,220,[end],{inputs:{BOOL:{block:{type:'ev3_touch',fields:{PORT:'1',STATE:'1'}}}}})];
+ }else{
+  blocks=[root('ev3_start',30,30,[{type:'ev3_led',fields:{COLOR:'1',MODE:'on'}},{type:'ev3_message_wait',fields:{MESSAGE:'測定'}},{type:'ev3_led',fields:{COLOR:'2',MODE:'on'}},wait(.5),end]),root('ev3_when_message',450,30,[{type:'ev3_log_start',fields:{FILE:'Message'}},repeat(10),{type:'ev3_log_end'}],{fields:{MESSAGE:'測定'}})];
+ }
+ return {variables,blocks:{languageVersion:0,blocks}};
+}
+
 const theme=Blockly.Theme.defineTheme('ev3lab',{base:Blockly.Themes.Classic,fontStyle:{family:'"Yu Gothic UI", Meiryo, sans-serif',size:12},blockStyles:{procedure_blocks:{colourPrimary:'#aa597e'},math_blocks:{colourPrimary:'#668b6d'},variable_blocks:{colourPrimary:'#c58245'},loop_blocks:{colourPrimary:'#d19636'}},componentStyles:{workspaceBackgroundColour:'#fbfcfd',toolboxBackgroundColour:'#f4f7f8',flyoutBackgroundColour:'#eef3f5',flyoutOpacity:1,scrollbarColour:'#b9c9ce',insertionMarkerColour:'#126c67',insertionMarkerOpacity:.3}});
 const workspace=Blockly.inject('blocklyDiv',{toolbox,theme,renderer:'zelos',media:'vendor/media/',trashcan:true,scrollbars:true,grid:{spacing:24,length:2,colour:'#e5ebee',snap:false},zoom:{controls:true,wheel:true,startScale:.85,minScale:.35,maxScale:1.5,scaleSpeed:1.1},move:{scrollbars:true,drag:true,wheel:true},sounds:false});
 workspace.registerToolboxCategoryCallback('ARGUMENTS',argumentFlyout);
@@ -453,6 +486,7 @@ function chain(block){
       case 'ev3_list_clear':case 'ev3_list_add':case 'ev3_list_set':case 'ev3_list_delete':out.push({type:({clear:'listClear',add:'listAdd',set:'listSet',delete:'listDelete'})[b.type.slice(9)],list:b.getFieldValue('LIST'),...(b.getInput('INDEX')?{index:value(b,'INDEX')}:{}),...(b.getInput('VALUE')?{value:value(b,'VALUE')}:{})});break;
       case 'ev3_log_start':out.push({type:'logStart',file:b.getFieldValue('FILE')});break;
       case 'ev3_log_value':out.push({type:'logValue',label:b.getFieldValue('LABEL'),value:value(b,'VALUE')});break;
+      case 'ev3_message_send':case 'ev3_message_wait':out.push({type:'broadcast',message:b.getFieldValue('MESSAGE').trim(),wait:b.type==='ev3_message_wait'});break;
       case 'ev3_log_end':out.push({type:'logEnd'});break;
       case 'variables_set':case 'math_change':{
  const variable=b.getField('VAR').getVariable(),root=b.getRootBlock();
@@ -498,12 +532,15 @@ function chain(block){
   }
   return out;
 }
-// スタートから到達する命令と、そこから呼ばれるマイブロックだけを集める。未接続の試作ブロックは転送対象に含めない。
+// スタート・イベントから到達する命令と、そこから呼ばれるマイブロックだけを集める。未接続の試作ブロックは転送対象に含めない。
 function program(){
   const roots=workspace.getTopBlocks(true).filter(b=>b.isEnabled());
   const starts=roots.filter(b=>b.type==='ev3_start');
-  if(starts.length!==1)throw Error('「スタート」ブロックは1個だけ置いてください。');
-  const main=chain(starts[0].getNextBlock()),used=new Map();
+  const events=roots.filter(b=>['ev3_when_condition','ev3_when_changed','ev3_when_message'].includes(b.type));
+  if(!starts.length&&!events.length)throw Error('「スタート」またはイベントのブロックを置いてください。');
+  if(starts.length+events.length>16)throw Error('スタート・イベント・メッセージ受信は合計16個までです。');
+  const main=starts.length?chain(starts[0].getNextBlock()):[],used=new Map();
+  const threads=[...starts.slice(1).map((b,i)=>({kind:'start',name:'スタート'+(i+2),body:chain(b.getNextBlock())})),...events.map(b=>({kind:b.type==='ev3_when_message'?'message':b.type==='ev3_when_changed'?'changed':'condition',...(b.type==='ev3_when_message'?{message:b.getFieldValue('MESSAGE').trim()}:{condition:value(b,b.type==='ev3_when_changed'?'VALUE':'BOOL')}),body:chain(b.getNextBlock())}))];
   function gather(nodes){
     for(const node of nodes){
       if(node.type==='call' && !used.has(node.name)){
@@ -515,8 +552,8 @@ function program(){
       for(const key of ['body','then','else'])if(node[key])gather(node[key]);
     }
   }
-  gather(main);
-  return {main,procedures:[...used.values()]};
+  gather(main);for(const t of threads)gather(t.body);
+  return {main,procedures:[...used.values()],...(threads.length?{threads}:{} )};
 }
 // 読み込み・改名後の引数IDや表示を正規化する。Blocklyのイベントをまとめ、元に戻す操作を崩さない。
 function ensureArgumentInputs(){
@@ -549,7 +586,7 @@ function check(){
   try{
     ensureArgumentInputs();
     lastBuild=compile(program(),$('ev3ProjectName').value);$('buildStatus').textContent='✓ 転送用プログラムを生成できます';$('buildStatus').className='build-status';
-    $('buildDetails').textContent=`${lastBuild.data.length} バイト / マイブロック ${lastBuild.objects.length-1} 個 / EV3標準形式${lastBuild.usesRamps?' / 加減速（試作）':''}${lastBuild.usesFloat?' / 小数計算対応':''}${lastBuild.usesSensors?' / センサは本体実行時に読み取り':''}`;
+    $('buildDetails').textContent=`${lastBuild.data.length} バイト / マイブロック ${lastBuild.program.procedures.length} 個 / EV3標準形式${lastBuild.usesParallel?' / 並行 '+lastBuild.threadCount+' 処理':''}${lastBuild.usesRamps?' / 加減速（試作）':''}${lastBuild.usesFloat?' / 小数計算対応':''}${lastBuild.usesSensors?' / センサは本体実行時に読み取り':''}`;
   }catch(e){lastBuild=null;$('buildStatus').textContent=e.message;$('buildStatus').className='build-status error';$('buildDetails').textContent='ブロックを修正すると、自動で確認します。';}
   updateButtons();return lastBuild;
 }
@@ -848,3 +885,10 @@ async function loadFeatureSample(name){
 }
 $('sampleData').onclick=()=>loadFeatureSample('DataLogTest');
 $('sampleSteering').onclick=()=>loadFeatureSample('SteeringTest');
+
+for(const [id,kind,name]of [['parallelSample','parallel','ParallelMeasure'],['eventSample','event','TouchEvent'],['messageSample','message','MessageRelay']])$(id).onclick=()=>{
+ if(dirty&&!confirm('編集中の内容をサンプルに置き換えます。必要なら先に保存してください。'))return;
+ loading=true;try{Blockly.serialization.workspaces.load(parallelSampleState(kind),workspace);$('programName').value=name;workspace.clearUndo();}finally{loading=false;}
+ check();saveLocal();dirty=false;$('sampleMenu').open=false;
+ feedback(kind==='parallel'?'B+Cの走行と、超音波センサ2のCSV記録を並行します。ログ名はParallelです。':kind==='event'?'B+Cを回し続け、タッチセンサ1で全体を停止します。本体の戻るボタンでも停止できます。':'「測定」を送って待ち、超音波センサ2をCSVに記録します。ログ名はMessageです。');
+};
