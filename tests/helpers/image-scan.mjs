@@ -10,7 +10,7 @@ export function scanImage(data){
   const start=view.getUint32(16+12*object,true),end=object+1<objects?view.getUint32(28+12*object,true):size;
   assert.equal(cursor,start,'Object headers must agree with the sequential firmware scan');
   const localSize=view.getUint32(24+12*object,true),boundaries=new Set(),jumps=[];
-  if(view.getUint16(20+12*object,true)===0&&view.getUint16(22+12*object,true)===1){const n=data[cursor++];for(let i=0;i<n;i++)assert.ok([0x82,0x83].includes(data[cursor++]));}
+  if(view.getUint16(20+12*object,true)===0&&view.getUint16(22+12*object,true)===1){const n=data[cursor++];for(let i=0;i<n;i++)assert.ok([0x82,0x83,0x43].includes(data[cursor++]));}
   const parameter=()=>{
    assert.ok(cursor<end);const tag=data[cursor++];let value,variable=false;
    if(tag===0x84){while(cursor<end&&data[cursor]!==0)cursor++;assert.ok(cursor<end);cursor++;return null;}

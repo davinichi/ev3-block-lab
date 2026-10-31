@@ -7,7 +7,15 @@ export function parallelPlan(program) {
  const roots=[...(program.main.length?[{kind:'start',name:'スタート1',body:program.main}]:[]),...others];
  if(!roots.length||roots.length>16)throw Error('スタート・イベント・メッセージ受信は合計16個までです。');
  const procs=new Map(program.procedures.map(p=>[p.name,p]));
- const visit=(nodes,fn,seen=new Set())=>{for(const b of nodes){fn(b);for(const key of ['body','then','else'])if(b[key])visit(b[key],fn,seen);if(b.type==='call'&&!seen.has(b.name)){seen.add(b.name);visit(procs.get(b.name)?.body??[],fn,seen);}}};
+ // 式に差し込んだマイブロックも依存関係に含める（イベント条件・戻り値も対象）。
+ const visit=(node,fn,seen=new Set())=>{
+  if(!node||typeof node!=='object')return;
+  if(Array.isArray(node)){for(const n of node)visit(n,fn,seen);return;}
+  fn(node);
+  for(const value of Object.values(node))visit(value,fn,seen);
+  const call=node.callValue??(node.type==='call'?node:null);
+  if(call){if(node.callValue)fn({type:'call',...call});if(!seen.has(call.name)){seen.add(call.name);const p=procs.get(call.name);visit(p?.body,fn,seen);visit(p?.result,fn,seen);}}
+ };
  const messages=new Map(),waits=roots.map(()=>new Set()),modes=new Map();
  const message=name=>{if(typeof name!=='string'||!name.trim()||name.length>40||name.includes('\0'))throw Error('メッセージ名は1〜40文字にしてください。');if(!messages.has(name))messages.set(name,messages.size);};
  roots.forEach((r,i)=>{
@@ -20,7 +28,7 @@ export function parallelPlan(program) {
     if(previous.some(p=>p.root!==i&&p.mode!==mode))throw Error(`センサ${s.port}を並行処理で異なるモードにはできません。同じモードにそろえてください。`);
     previous.push({root:i,mode});modes.set(s.port,previous);
    }for(const v of Object.values(x))inspect(v);};
-  inspect(r.condition);visit(r.body,b=>{inspect(b);if(b.type==='broadcast'){message(b.message);if(b.wait)waits[i].add(b.message);}});
+  inspect(r.condition);visit([r.condition,r.body],b=>{inspect(b);if(b.type==='broadcast'){message(b.message);if(b.wait)waits[i].add(b.message);}});
  });
  if(messages.size>32)throw Error('メッセージは32種類までです。');
  // 自分を待つ・相互に待つ構成は永久待機になるため、転送前に知らせる。

@@ -1,7 +1,8 @@
 // 編集ファイルとマイブロック集の検証・結合を担当する。EV3用RBFの生成や通信は行わない。
 // 独自ブロックを追加したときは、この許可一覧にも型名を登録して保存ファイルから復元できるようにする。
+const isDefinition=b=>['procedures_defnoreturn','procedures_defreturn'].includes(b?.type);
 const types=new Set(['add','sub','mul','div','lt','eq','gt','lte','gte','neq','and','or'].map(op=>'ev3_op_'+op));
-for(const type of ['ev3_movement_setup','ev3_battery_voltage','ev3_battery_current','ev3_pid','ev3_pid_reset'])types.add(type);
+for(const type of ['procedures_defreturn','procedures_callreturn','ev3_return_value','ev3_movement_setup','ev3_battery_voltage','ev3_battery_current','ev3_pid','ev3_pid_reset'])types.add(type);
 for(const type of ['ev3_when_condition','ev3_when_changed','ev3_when_message','ev3_message_send','ev3_message_wait'])types.add(type);
 // 本体ボタン・終了命令も、作品ファイルとマイブロック集の両方から復元できるよう許可する。
 for(const type of ['ev3_brick_button','ev3_brick_button_value','ev3_program_end','ev3_myblock_return'])types.add(type);
@@ -30,7 +31,7 @@ function references(nodes){
     if(!value||typeof value!=='object')return;
     if(value.fields?.VAR?.id)ids.add(value.fields.VAR.id);
     if(value.extraState?.parameterId)ids.add(value.extraState.parameterId);
-    if(value.type==='procedures_defnoreturn')for(const p of value.extraState?.params??[])if(p.id)ids.add(p.id);
+    if(isDefinition(value))for(const p of value.extraState?.params??[])if(p.id)ids.add(p.id);
     for(const child of Object.values(value))visit(child);
   }
   visit(nodes);return ids;
@@ -38,7 +39,7 @@ function references(nodes){
 const definitionName=block=>String(block.fields?.NAME??'').trim();
 // 定義だけを取り出して.ev3blocks用データにする。現在の作品を変更しないように複製を返す。
 export function createBlockLibrary(state,appVersion){
-  const definitions=(state.blocks?.blocks??[]).filter(b=>b.type==='procedures_defnoreturn');
+  const definitions=(state.blocks?.blocks??[]).filter(b=>isDefinition(b));
   if(!definitions.length)throw Error('書き出すマイブロックがありません。');
   inspectBlocks(definitions);
   const refs=references(definitions);
@@ -48,10 +49,10 @@ export function createBlockLibrary(state,appVersion){
 export function mergeBlockLibrary(current,library,makeId=()=>crypto.randomUUID()){
   if(library?.format!=='ev3-block-lab-library'||library.version!==1||!Array.isArray(library.definitions)||!library.definitions.length||library.definitions.length>32||!Array.isArray(library.variables))throw Error('マイブロックを書き出したファイルを選んでください。');
   inspectBlocks(library.definitions);
-  const names=new Set((current.blocks?.blocks??[]).filter(b=>b.type==='procedures_defnoreturn').map(b=>definitionName(b).toLocaleLowerCase()));
+  const names=new Set((current.blocks?.blocks??[]).filter(b=>isDefinition(b)).map(b=>definitionName(b).toLocaleLowerCase()));
   for(const definition of library.definitions){
     const name=definitionName(definition),key=name.toLocaleLowerCase();
-    if(definition.type!=='procedures_defnoreturn'||!name)throw Error('マイブロックの定義が不正です。');
+    if(!isDefinition(definition)||!name)throw Error('マイブロックの定義が不正です。');
     if(names.has(key))throw Error(`同じ名前のマイブロック「${name}」があります。名前を変更してから読み込んでください。`);
     names.add(key);
   }
@@ -72,7 +73,7 @@ export function mergeBlockLibrary(current,library,makeId=()=>crypto.randomUUID()
     if(types.has(value.type))delete value.id;
     if(value.fields?.VAR?.id)value.fields.VAR.id=mapping.get(value.fields.VAR.id);
     if(value.extraState?.parameterId)value.extraState.parameterId=mapping.get(value.extraState.parameterId);
-    if(value.type==='procedures_defnoreturn')for(const p of value.extraState?.params??[])if(p.id)p.id=mapping.get(p.id);
+    if(isDefinition(value))for(const p of value.extraState?.params??[])if(p.id)p.id=mapping.get(p.id);
     for(const child of Object.values(value))remap(child);
   }
   remap(imported);

@@ -24,6 +24,36 @@ test('new stop palette offers three direct methods and retains each through libr
  }
 });
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
+
+test('numeric My Blocks keep return shape, arguments and result through save and library reuse',()=>{
+ const c=editor();
+ const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();
+ const def=saveMyBlock(workspace,'倍にする',[{name:'数'}],null,true);
+ const plus=workspace.newBlock('ev3_op_mul'),arg=workspace.newBlock('ev3_argument'),two=workspace.newBlock('math_number');
+ arg.loadExtraState({name:'数',parameterId:def.getVarModels()[0].getId()});two.setFieldValue(2,'NUM');
+ plus.getInput('A').connection.connect(arg.outputConnection);plus.getInput('B').connection.connect(two.outputConnection);
+ def.getInput('RETURN').connection.connect(plus.outputConnection);
+ const call=workspace.newBlock('procedures_callreturn');call.loadExtraState({name:'倍にする',params:['数']});
+ if(call.outputConnection.getCheck()[0]!=='Number'||!call.getInputsInline())throw Error('numeric inline shape');
+ const n=workspace.newBlock('math_number');n.setFieldValue(4.5,'NUM');call.getInput('ARG0').connection.connect(n.outputConnection);
+ const start=workspace.newBlock('ev3_start'),set=workspace.newBlock('variables_set');start.nextConnection.connect(set.previousConnection);set.getInput('VALUE').connection.connect(call.outputConnection);
+ const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);
+ const p=program();Blockly.Events.enable();JSON.stringify({state:Blockly.serialization.workspaces.save(workspace),p});`,c));
+ assert.equal(saved.p.procedures[0].returns,true);assert.equal(saved.p.procedures[0].result.op,'mul');compile(saved.p);
+ inspectBlocks(saved.state.blocks);const lib=createBlockLibrary(saved.state,'0.24.0');assert.equal(lib.definitions[0].type,'procedures_defreturn');
+ const imported=mergeBlockLibrary({blocks:{languageVersion:0,blocks:[]}},lib);c.imported=JSON.stringify(imported);
+ const result=JSON.parse(vm.runInContext(`Blockly.Events.disable();workspace.clear();Blockly.serialization.workspaces.load(JSON.parse(imported),workspace);const d=workspace.getAllBlocks(false).find(b=>b.type==='procedures_defreturn');const v=expression(d.getInputTargetBlock('RETURN'));Blockly.Events.enable();JSON.stringify(v);`,c));
+ assert.deepEqual(result,{op:'mul',left:{param:'数'},right:2});
+ assert.throws(()=>mergeBlockLibrary(saved.state,lib),/同じ名前/);
+});
+
+test('numeric early returns are caps; definition shape conversion preserves the body and protects callers',()=>{
+ const c=editor();
+ vm.runInContext(`Blockly.Events.disable();let d=saveMyBlock(workspace,'計算',[]);const w=workspace.newBlock('ev3_wait_seconds');d.getInput('STACK').connection.connect(w.previousConnection);
+ d=saveMyBlock(workspace,'計算',[],d.id,true);if(d.type!=='procedures_defreturn'||d.getInputTargetBlock('STACK').type!=='ev3_wait_seconds'||!d.getInputTargetBlock('RETURN').isShadow())throw Error('conversion lost inputs');
+ const cap=workspace.newBlock('ev3_return_value');if(cap.nextConnection||!cap.previousConnection)throw Error('must be cap');
+ const caller=workspace.newBlock('procedures_callreturn');caller.loadExtraState({name:'計算',params:[]});let blocked=false;try{saveMyBlock(workspace,'計算',[],d.id,false);}catch(e){blocked=true;}if(!blocked)throw Error('must protect connected callers');Blockly.Events.enable();`,c);
+});
 test('display blocks keep Japanese text, preset choice and numeric inputs through project and My Block reuse',()=>{
  const context=editor();const rendered=[];
  context.rasterDisplayText=(text,size)=>{rendered.push({text,size});return {width:2,height:1,rows:['10']};};

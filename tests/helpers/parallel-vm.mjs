@@ -11,7 +11,7 @@ export function runParallel(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorD
   const execute=function*(id,args=[]){
     let pc=headers[id-1].pc;const memory=new Uint8Array(headers[id-1].size),own=dv(memory);
     const m=Object.fromEntries([8,16,32].flatMap(bits=>[['getInt'+bits,(at,...args)=>at<0?shared['getInt'+bits](-at-1,...args):own['getInt'+bits](at,...args)],['setInt'+bits,(at,...args)=>at<0?shared['setInt'+bits](-at-1,...args):own['setInt'+bits](at,...args)]]));
-    if(headers[id-1].sub){const count=bytes[pc++];assert.equal(count,args.length);for(let i=0;i<count;i++){assert.ok([0x82,0x83].includes(bytes[pc++]));m.setInt32(i*4,args[i],true);}}
+    if(headers[id-1].sub){const count=bytes[pc++];assert.equal(count,args.length);for(let i=0;i<count;i++){assert.ok([0x82,0x83,0x43].includes(bytes[pc++]));m.setInt32(i*4,args[i],true);}}
     function param(size=4,output=false){
       const tag=bytes[pc++];let val,isVar=false;
       if(tag===0x84){const start=pc;while(bytes[pc]!==0){assert.ok(pc<bytes.length);pc++;}const text=new TextDecoder().decode(bytes.slice(start,pc));pc++;return text;}
@@ -33,10 +33,10 @@ export function runParallel(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorD
       const op=bytes[pc++];
       switch(op){
         case 0x84:{const cmd=param(1);let args=[];if([17,18].includes(cmd))args=[param(1)];else if([3,9].includes(cmd))args=[param(1),param(2),param(2),param(2),param(2)];else if(cmd===8)args=[param(1),param(2),param(2),fparam(),param(1),param(1)];else assert.ok([0,1].includes(cmd));events.push({type:'draw',cmd,args,task:id});break;}
-        case 0x0a:case 0x08:return;
+        case 0x0a:case 0x08:return args.map((_,i)=>m.getInt32(i*4,true));
         case 5:{const target=param(2);tasks.set(target,{gen:execute(target),until:0});break;}
         case 7:{const target=param(2);while(tasks.has(target))yield {until:time+1};break;}
-        case 9:{const target=param(2),count=param(1),args=[];for(let i=0;i<count;i++)args.push(param());while(busy.has(target))yield {until:time+1};busy.add(target);yield* execute(target,args);busy.delete(target);break;}
+        case 9:{const target=param(2),count=param(1),args=[],outputs=[];const header=headers[target-1].pc;assert.equal(bytes[header],count);for(let i=0;i<count;i++){if(bytes[header+1+i]&64){outputs.push([i,param(4,true)]);args.push(0);}else args.push(param());}while(busy.has(target))yield {until:time+1};busy.add(target);const returned=yield* execute(target,args);if(returned)for(const [i,at]of outputs)m.setInt32(at,returned[i],true);busy.delete(target);break;}
         case 0x81:{const kind=param(1),out=param(4,true);assert.ok([1,2].includes(kind));setFloat(out,batteryRead(kind,time));break;}
         case 0x83:{assert.equal(param(1),9);const button=param(1),at=param(1,true);assert.ok(button>=1&&button<=5);m.setInt8(at,+buttonRead(button,time));break;}
         case 0x94:{assert.equal(param(1),1);const volume=param(1),frequency=param(2),ms=param(2);events.push({type:'tone',volume,frequency,ms});break;}

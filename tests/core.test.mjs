@@ -118,7 +118,7 @@ function interpret(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorDriver=nul
   const execute=(id,args=[])=>{
     let pc=headers[id-1].pc;const memory=new Uint8Array(headers[id-1].size),own=dv(memory);
     const m=Object.fromEntries([8,16,32].flatMap(bits=>[['getInt'+bits,(at,...args)=>at<0?shared['getInt'+bits](-at-1,...args):own['getInt'+bits](at,...args)],['setInt'+bits,(at,...args)=>at<0?shared['setInt'+bits](-at-1,...args):own['setInt'+bits](at,...args)]]));
-    if(id>1){const count=bytes[pc++];assert.equal(count,args.length);for(let i=0;i<count;i++){assert.ok([0x82,0x83].includes(bytes[pc++]));m.setInt32(i*4,args[i],true);}}
+    if(id>1){const count=bytes[pc++];assert.equal(count,args.length);for(let i=0;i<count;i++){assert.ok([0x82,0x83,0x43].includes(bytes[pc++]));m.setInt32(i*4,args[i],true);}}
     function param(size=4,output=false){
       const tag=bytes[pc++];let val,isVar=false;
       if(tag===0x84){const start=pc;while(bytes[pc]!==0){assert.ok(pc<bytes.length);pc++;}const text=new TextDecoder().decode(bytes.slice(start,pc));pc++;return text;}
@@ -139,8 +139,8 @@ function interpret(bytes,{initialCounts=[0,0,0,0],movementLog=[],motorDriver=nul
     while(--budget>0){
       const op=bytes[pc++];
       switch(op){
-        case 0x0a:case 0x08:return;
-        case 9:{const target=param(2),count=param(1),args=[];for(let i=0;i<count;i++)args.push(param());execute(target,args);break;}
+        case 0x0a:case 0x08:return args.map((_,i)=>m.getInt32(i*4,true));
+        case 9:{const target=param(2),count=param(1),args=[],outputs=[];const header=view.getUint32(16+12*(target-1),true);assert.equal(bytes[header],count);for(let i=0;i<count;i++){if(bytes[header+1+i]&64){outputs.push([i,param(4,true)]);args.push(0);}else args.push(param());}const returned=execute(target,args);if(returned)for(const [i,at]of outputs)m.setInt32(at,returned[i],true);break;}
         case 0x81:{const kind=param(1),out=param(4,true);assert.ok([1,2].includes(kind));setFloat(out,batteryRead(kind,motorDriver?.time??0));break;}
         case 0x83:{assert.equal(param(1),9);const button=param(1),at=param(1,true);assert.ok(button>=1&&button<=5);m.setInt8(at,+buttonRead(button,motorDriver?.time??0));break;}
         case 0x94:{assert.equal(param(1),1);const volume=param(1),frequency=param(2),ms=param(2);events.push({type:'tone',volume,frequency,ms});break;}
