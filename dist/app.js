@@ -7,7 +7,7 @@ const sampleActions=new Map();
 function sampleAction(id){if(!sampleActions.has(id))sampleActions.set(id,{});return sampleActions.get(id);}
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.25.3';
+const VERSION='0.25.4';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
@@ -540,6 +540,10 @@ function configureEditorInteractions(workspace){
  };
  // パレットから取り出しても開いたままにし、背景をクリックしたときだけ閉じる。
  workspace.getFlyout().setAutoClose(false);
+ // 開いたまま使うパレットでも、閉じた後の幅を編集領域から差し引かない。
+ // Blockly標準の寸法計算はautoClose=falseだと非表示のパレット幅も含む。
+ const metrics=workspace.getMetricsManager(),flyoutMetrics=metrics.getFlyoutMetrics.bind(metrics);
+ metrics.getFlyoutMetrics=(...args)=>{const size=flyoutMetrics(...args);return workspace.getFlyout().isVisible()?size:{...size,width:0,height:0};};
  workspace.addChangeListener(event=>{
   if(event.type===Blockly.Events.CLICK&&event.targetType==='workspace')workspace.getToolbox().clearSelection();
  });
@@ -1049,10 +1053,12 @@ $('variableForm').onsubmit=event=>{
  catch(error){$('variableError').textContent=error.message;}
 };
 
-// Classroom layout: connection tools overlay the canvas only when requested.
-// 接続設定は編集領域の上に開く。閉じたときにキャンバスを広く使えるようにする。
+// Classroom layout: connection tools share the row with the canvas.
+// 接続パネルの開閉で編集領域の幅が変わる。次の描画でもBlocklyの寸法を更新する。
+let connectionLayoutFrame=0;
 function showConnectionPanel(open){
  $('connectionPanel').hidden=!open;$('toggleConnectionPanel').setAttribute('aria-expanded',String(open));
+ cancelAnimationFrame(connectionLayoutFrame);connectionLayoutFrame=requestAnimationFrame(()=>{connectionLayoutFrame=0;Blockly.svgResize(workspace);});
  if(open)$('closeConnectionPanel').focus();else $('toggleConnectionPanel').focus();
 }
 $('toggleConnectionPanel').onclick=()=>showConnectionPanel($('connectionPanel').hidden);

@@ -25,6 +25,13 @@ test('new stop palette offers three direct methods and retains each through libr
 });
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
 
+test('persistent palettes do not reserve hidden width after closing or fitting the workspace',()=>{
+ const c=editor();
+ vm.runInContext(`let visible=false,autoClose=true;const metrics={getFlyoutMetrics(small){return {width:small?350:700,height:480,position:2};}},flyout={setAutoClose(value){autoClose=value;},isVisible(){return visible;}};
+ configureEditorInteractions({getFlyout:()=>flyout,getMetricsManager:()=>metrics,addChangeListener(){}});
+ for(let i=0;i<3;i++){visible=false;const hidden=metrics.getFlyoutMetrics();if(hidden.width!==0||hidden.height!==0||hidden.position!==2)throw Error('hidden palette steals viewport');visible=true;if(metrics.getFlyoutMetrics(true).width!==350||autoClose)throw Error('open palette must stay open and preserve metrics');}`,c);
+});
+
 test('movement stop stays in its group and survives project and My Block library reuse',()=>{
  const c=editor();
  const saved=JSON.parse(vm.runInContext(`Blockly.Events.disable();const def=saveMyBlock(workspace,'走行を止める',[]),stop=workspace.newBlock('ev3_movement_stop');def.getInput('STACK').connection.connect(stop.previousConnection);if(!stop.nextConnection||stop.getField('PORTS'))throw Error('must continue with shared ports');const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);const contents=toolbox.contents.find(g=>g.name==='動き').contents;if(!contents.some(b=>b.type==='ev3_movement_stop'))throw Error('missing movement stop');Blockly.Events.enable();JSON.stringify(Blockly.serialization.workspaces.save(workspace));`,c));
