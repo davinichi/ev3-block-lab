@@ -1,6 +1,6 @@
 # EV3 Block Lab
 
-小学校の授業で、Chromebook・WindowsのブラウザからLEGO MINDSTORMS EV3をプログラミングするための試作アプリです。現在のバージョンは **v0.25.4** です（2026年11月1日時点）。
+小学校の授業で、Chromebook・WindowsのブラウザからLEGO MINDSTORMS EV3をプログラミングするための試作アプリです。現在のバージョンは **v0.25.5** です（2026年11月1日時点）。
 
 ブロックからEV3標準形式の実行ファイル（.rbf）を生成し、本体へ転送・読み戻し照合します。本体に保存したプログラムは、PCから切り離して本体で選択・実行できます。
 
@@ -16,19 +16,21 @@ v0.19.0では、左右別速度の角度・時間指定、ブレーキ／惰性�
 
 ## 最新版マニュアル
 
-[ブロック命令マニュアル v0.25.4（全20章・PDF 42ページ）](docs/manual-v0.25.4/README.md)
+[ブロック命令マニュアル v0.25.5（全20章・PDF 42ページ）](docs/manual-v0.25.5/README.md)
 
-[配布・印刷用PDF v0.25.4](docs/manual-v0.25.4/EV3-Block-Lab-ブロック命令マニュアル-v0.25.4.pdf) ／ [HTML版 v0.25.4](docs/manual-v0.25.4/EV3-Block-Lab-ブロック命令マニュアル-v0.25.4.html) ／ [マニュアル一覧・旧版の履歴](docs/README.md)
+[配布・印刷用PDF v0.25.5](docs/manual-v0.25.5/EV3-Block-Lab-ブロック命令マニュアル-v0.25.5.pdf) ／ [HTML版 v0.25.5](docs/manual-v0.25.5/EV3-Block-Lab-ブロック命令マニュアル-v0.25.5.html) ／ [マニュアル一覧・旧版の履歴](docs/README.md)
 
 2026年11月1日更新。画面のブロックグループ順に、基本操作・センサー・CSV・並行処理・イベント・マイブロックなどを統合しています。第2章に横並びの接続パネルと画面幅変更時の操作、第16章に数値・複数の戻り値を持つマイブロック、第20章にEV3 Classroomとの比較表を掲載しています。
 
 上記はGitHubリポジトリに登録した資料へのリンクです。HTML版はファイルをダウンロードしてブラウザで開けます。GitHub Pagesでの正式公開は別工程です。
 
+[English manual (23 pages)](docs/manual-v0.25.5-en/README.md) / [English PDF](docs/manual-v0.25.5-en/EV3-Block-Lab-Manual-v0.25.5-en.pdf) / [English HTML](docs/manual-v0.25.5-en/EV3-Block-Lab-Manual-v0.25.5-en.html)
+
 ### 旧版の追加ガイド・サンプル
 
 [ジャイロセンサの説明・実機テスト v0.21.0（旧版）](docs/manual-v0.21.0/gyro-guide.md) ／ [テスト用サンプル GyroTest.ev3lab](examples/GyroTest.ev3lab)
 
-ジャイロセンサの現行仕様はv0.25.4マニュアルの第7章を参照してください。過去のマニュアル・追加ガイドは[マニュアル一覧の履歴](docs/README.md#過去のマニュアル履歴)に保持しています。
+ジャイロセンサの現行仕様はv0.25.5マニュアルの第7章を参照してください。過去のマニュアル・追加ガイドは[マニュアル一覧の履歴](docs/README.md#過去のマニュアル履歴)に保持しています。
 
 ## GitHub Pagesで公開する
 
@@ -160,4 +162,16 @@ v0.25.2：動きの速度を−100〜100％へ統一。負の速度は表示方�
 v0.25.3：「動き」に「停止」を追加。共通設定の左右モーターだけをブレーキ停止し、次の命令へ進みます。左右設定が必要で、タイヤ直径・トレッドは不要です。保存・マイブロック集へ対応。実機確認待ち。
 
 
-v0.25.4：接続パネルを編集領域と横並びに変更。閉じたときの幅の復元と、小さい画面でのツールバーの折り返しに対応。非表示の分類パレットの幅をBlocklyの表示範囲から除外し、全体表示のずれも修正しました。開閉・幅変更25状態、ブロック操作、282件の自動テストを確認。[最新版PDF・HTMLマニュアル](docs/manual-v0.25.4/README.md)の第2章に新しい操作を掲載。実機通信の追加確認は未実施です。
+v0.25.4：接続パネルを編集領域と横並びに変更。閉じたときの幅の復元と、小さい画面でのツールバーの折り返しに対応。非表示の分類パレットの幅をBlocklyの表示範囲から除外し、全体表示のずれも修正しました。開閉・幅変更25状態、ブロック操作、282件の自動テストを確認。[v0.25.4マニュアル（旧版）](docs/manual-v0.25.4/README.md)の第2章に新しい操作を掲載。実機通信の追加確認は未実施です。
+
+
+
+## v0.25.5: 日本語 / English
+
+右上から表示言語を切り替えます。ブロック・ボタン・案内を切り替え、入力した名前・文字・接続は維持します。表示再構築によりUndo履歴はクリアされます。言語はブラウザに保存し、作品ファイルには依存させません。通信中は切り替えできません。
+
+Choose Japanese or English at the top right. Blocks, controls and help change language; user names, text and the connection remain unchanged. Switching rebuilds the display and clears undo history. Language is saved in this browser, independently of project files. Wait for communication to finish before switching. Native browser/OS prompts and external device errors may use their own language.
+
+[English manual (PDF)](docs/manual-v0.25.5-en/EV3-Block-Lab-Manual-v0.25.5-en.pdf) / [HTML](docs/manual-v0.25.5-en/EV3-Block-Lab-Manual-v0.25.5-en.html)
+
+英語版は全20章・23ページ、日本語版は全20章・42ページです。自動テストとブラウザ確認は実機テストの代わりではありません。

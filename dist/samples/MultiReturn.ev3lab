@@ -32,7 +32,7 @@
                   "fields": {
                     "X": 0,
                     "Y": 0,
-                    "FONT": "1",
+                    "FONT": "0",
                     "DECIMALS": 1
                   },
                   "inputs": {
@@ -78,7 +78,7 @@
                       "fields": {
                         "X": 0,
                         "Y": 32,
-                        "FONT": "1",
+                        "FONT": "0",
                         "DECIMALS": 1
                       },
                       "inputs": {

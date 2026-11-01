@@ -2,26 +2,27 @@ import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.
 // 画面とBlocklyを結び付ける入口。ブロック定義 → 中間データ → ev3.jsでRBF生成 → 接続・転送の順に処理する。
 // 外部ライブラリのdist/vendorは編集せず、独自ブロックと画面側の振る舞いをここに記述する。
 const $=id=>document.getElementById(id);
+const uiText=text=>globalThis.EBLi18n?.t(text)??text;
 // サンプルの実装を選択UIから分離する。すべて同じ確認画面を経由して開く。
 const sampleActions=new Map();
 function sampleAction(id){if(!sampleActions.has(id))sampleActions.set(id,{});return sampleActions.get(id);}
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.25.4';
+const VERSION='0.25.5';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
-Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE='マイブロック';
-Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE='定義';
-Blockly.Msg.CONTROLS_IF_MSG_THEN='';
-Blockly.Msg.CONTROLS_IF_MSG_ELSE='';
-Blockly.Msg.CONTROLS_IF_MSG_ELSEIF='でなければ、もし';
-Blockly.Msg.CONTROLS_REPEAT_INPUT_DO='';
-Blockly.Msg.PROCEDURES_CALLNORETURN_TOOLTIP='マイブロックを呼び出します。';
+Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE=uiText('マイブロック');
+Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE=uiText('定義');
+Blockly.Msg.CONTROLS_IF_MSG_THEN=uiText('');
+Blockly.Msg.CONTROLS_IF_MSG_ELSE=uiText('');
+Blockly.Msg.CONTROLS_IF_MSG_ELSEIF=uiText('でなければ、もし');
+Blockly.Msg.CONTROLS_REPEAT_INPUT_DO=uiText('');
+Blockly.Msg.PROCEDURES_CALLNORETURN_TOOLTIP=uiText('マイブロックを呼び出します。');
 function isMyBlockDefinition(b){return ['procedures_defnoreturn','procedures_defreturn'].includes(b?.type);}
 for(const type of ['procedures_callnoreturn','procedures_callreturn']){
  const originalCallInit=Blockly.Blocks[type].init;
  Blockly.Blocks[type].init=function(){originalCallInit.call(this);this.setInputsInline(true);if(type==='procedures_callreturn')this.setOutput(true,'Number');};
 }
-Blockly.Msg.PROCEDURES_DEFRETURN_TITLE='定義';Blockly.Msg.PROCEDURES_DEFRETURN_RETURN='返す値';
+Blockly.Msg.PROCEDURES_DEFRETURN_TITLE=uiText('定義');Blockly.Msg.PROCEDURES_DEFRETURN_RETURN=uiText('返す値');
 const deviceNames={7:'Lモーター',8:'Mモーター',16:'EV3 タッチセンサ',29:'EV3 カラーセンサ',30:'EV3 超音波センサ',32:'EV3 ジャイロセンサ',33:'EV3 赤外線センサ'};
 const deviceName=type=>deviceNames[type]??([0,125,126,127].includes(type)?'未接続／認識中':'未対応機器（種類 '+type+'）');
 // 出力ポートの選択値はA=1、B=2、C=4、D=8のビットマスク。2個の指定は値を足したもの。
@@ -311,7 +312,7 @@ function variableFlyout(ws){
    items.push(...variables.map(m=>({kind:'block',type:'variables_get',fields:{VAR:{id:m.getId()}}})));
  }
  if(!variables.length)items.push({kind:'label',text:'「変数をつくる」で名前を付けます'});
- return items;
+ return globalThis.EBLi18n?.toolbox(items)??items;
 }
 function createOrdinaryVariable(ws,name){
  name=String(name).trim();
@@ -326,7 +327,7 @@ function argumentFlyout(ws){
  items.push(...[...names.values()].map(m=>({kind:'block',type:'ev3_argument',extraState:{parameterId:m.getId(),name:m.getName()}})));
  if(!names.size)items.push({kind:'label',text:'「マイブロックを作る」で引数を追加します'});
  else items.push({kind:'label',text:'同じ名前を定義したマイブロックで使えます'});
- return items;
+ return globalThis.EBLi18n?.toolbox(items)??items;
 }
 Blockly.Blocks.ev3_argument={
  init:function(){this.parameterId='';this.appendDummyInput().appendField(new Blockly.FieldLabelSerializable('名前'),'ARG_NAME');this.setOutput(true,'Number');this.setColour('#aa597e');this.setTooltip('同じ引数名を定義したマイブロックの中で使えます。値は呼び出しごとに別々です。');},
@@ -354,7 +355,7 @@ function setDefinitionOutputs(block,names){
  for(let i=block.inputList.length-1;i>=0;i--){const name=block.inputList[i].name;if(/^RETURN[1-9]\d*$/.test(name)&&Number(name.slice(6))>=names.length)block.removeInput(name);}
  names.forEach((name,i)=>{const key=i?'RETURN'+i:'RETURN';let input=block.getInput(key);if(!input)input=block.appendValueInput(key);input.setCheck('Number');
   if(i===0){if(!block.getField('RETURN_LABEL0'))input.appendField(name,'RETURN_LABEL0');else block.setFieldValue(name,'RETURN_LABEL0');}
-  else if(!block.getField('RETURN_LABEL'+i))input.appendField('返す値 '+name,'RETURN_LABEL'+i);else block.setFieldValue('返す値 '+name,'RETURN_LABEL'+i);
+  else if(!block.getField('RETURN_LABEL'+i))input.appendField(uiText('返す値 ')+name,'RETURN_LABEL'+i);else block.setFieldValue(uiText('返す値 ')+name,'RETURN_LABEL'+i);
  });
 }
 // 丸い呼び出しは選んだ戻り値を1個返す。呼び出すたびに定義を実行し、結果を使い回さない。
@@ -374,7 +375,7 @@ function setDefinitionOutputs(block,names){
 for(const type of ['procedures_defnoreturn','procedures_defreturn']){
  const base=Blockly.Blocks[type],init=base.init,save=base.saveExtraState,load=base.loadExtraState;
  base.init=function(){init.call(this);this.setMutator(null);if(type==='procedures_defreturn')setDefinitionOutputs(this,['値']);
-  const menu=this.customContextMenu;this.customContextMenu=function(options){menu?.call(this,options);options.unshift({text:'名前・引数・戻り値を編集',enabled:true,callback:()=>openMyBlockDialog(this.id)});};
+  const menu=this.customContextMenu;this.customContextMenu=function(options){menu?.call(this,options);options.unshift({text:uiText('名前・引数・戻り値を編集'),enabled:true,callback:()=>openMyBlockDialog(this.id)});};
  };
  if(type==='procedures_defreturn'){
   const mutation=base.mutationToDom; base.mutationToDom=function(...args){const node=mutation.apply(this,args);node.setAttribute('outputs',JSON.stringify(outputNames(this)));return node;};
@@ -531,7 +532,7 @@ function stackCopyData(block){
  return data;
 }
 function configureEditorInteractions(workspace){
- Blockly.Msg.DUPLICATE_BLOCK='複製';
+ Blockly.Msg.DUPLICATE_BLOCK=uiText('複製');
  const duplicate=Blockly.ContextMenuRegistry.registry.getItem('blockDuplicate');
  if(duplicate)duplicate.callback=({block})=>{
   if(!block)return;
@@ -549,7 +550,7 @@ function configureEditorInteractions(workspace){
  });
 }
 const theme=Blockly.Theme.defineTheme('ev3lab',{base:Blockly.Themes.Classic,fontStyle:{family:'"Yu Gothic UI", Meiryo, sans-serif',size:12},blockStyles:{procedure_blocks:{colourPrimary:'#aa597e'},math_blocks:{colourPrimary:'#668b6d'},variable_blocks:{colourPrimary:'#c58245'},loop_blocks:{colourPrimary:'#d19636'}},componentStyles:{workspaceBackgroundColour:'#fbfcfd',toolboxBackgroundColour:'#f4f7f8',flyoutBackgroundColour:'#eef3f5',flyoutOpacity:1,scrollbarColour:'#b9c9ce',insertionMarkerColour:'#126c67',insertionMarkerOpacity:.3}});
-const workspace=Blockly.inject('blocklyDiv',{toolbox,theme,renderer:'zelos',media:'vendor/media/',trashcan:true,scrollbars:true,grid:{spacing:24,length:2,colour:'#e5ebee',snap:false},zoom:{controls:true,wheel:true,startScale:.85,minScale:.35,maxScale:1.5,scaleSpeed:1.1},move:{scrollbars:true,drag:true,wheel:true},sounds:false});
+const workspace=Blockly.inject('blocklyDiv',{toolbox:globalThis.EBLi18n?.toolbox(toolbox)??toolbox,theme,renderer:'zelos',media:'vendor/media/',trashcan:true,scrollbars:true,grid:{spacing:24,length:2,colour:'#e5ebee',snap:false},zoom:{controls:true,wheel:true,startScale:.85,minScale:.35,maxScale:1.5,scaleSpeed:1.1},move:{scrollbars:true,drag:true,wheel:true},sounds:false});
 configureEditorInteractions(workspace);
 workspace.registerToolboxCategoryCallback('ARGUMENTS',argumentFlyout);
 workspace.registerToolboxCategoryCallback('VARIABLE',variableFlyout);
@@ -564,7 +565,7 @@ workspace.registerToolboxCategoryCallback('PROCEDURE',ws=>{
  }
  for(const def of ws.getAllBlocks(false).filter(b=>outputNames(b).length>1))items.push({kind:'block',type:'ev3_return_values',extraState:{outputs:outputNames(def)},inputs:Object.fromEntries(outputNames(def).map((_,i)=>['VALUE'+i,shadow(0)]))});
  items.push({kind:'block',type:'ev3_return_value',inputs:{VALUE:{shadow:{type:'math_number',fields:{NUM:0}}}}});
- return items;
+ return globalThis.EBLi18n?.toolbox(items)??items;
 });
 let lastBuild=null,busy=false,loading=false,dirty=false,saveTimer,baselineCounts=null,lastTimingSignature=null,monitorTimer=null;
 const logs=[];
@@ -1162,5 +1163,19 @@ $('sampleConfirmCancel').onclick=()=>{pendingSample=null;$('sampleConfirmDialog'
 $('sampleConfirmDialog').oncancel=()=>{pendingSample=null;};
 $('sampleConfirmOpen').onclick=()=>{const id=pendingSample;pendingSample=null;$('sampleConfirmDialog').close();if(id)openSelectedSample(id);};
 
-function multiReturnSampleState(){return {"variables":[{"id":"multi-値1","name":"値1"},{"id":"multi-値2","name":"値2"}],"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":40,"y":35,"next":{"block":{"type":"ev3_display_clear","next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":0,"FONT":"1","DECIMALS":1},"inputs":{"VALUE":{"block":{"type":"procedures_callreturn","extraState":{"name":"和と差","params":["値1","値2"],"outputs":["和","差"],"output":0},"inputs":{"ARG0":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"ARG1":{"shadow":{"type":"math_number","fields":{"NUM":220}}}}}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":32,"FONT":"1","DECIMALS":1},"inputs":{"VALUE":{"block":{"type":"procedures_callreturn","extraState":{"name":"和と差","params":["値1","値2"],"outputs":["和","差"],"output":1},"inputs":{"ARG0":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"ARG1":{"shadow":{"type":"math_number","fields":{"NUM":220}}}}}}},"next":{"block":{"type":"ev3_tone","fields":{"VOLUME":25},"inputs":{"FREQUENCY":{"shadow":{"type":"math_number","fields":{"NUM":660}}},"MS":{"shadow":{"type":"math_number","fields":{"NUM":400}}}},"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":2}}}}}}}}}}}}}}},{"type":"procedures_defreturn","x":650,"y":35,"fields":{"NAME":"和と差"},"extraState":{"params":[{"id":"multi-値1","name":"値1"},{"id":"multi-値2","name":"値2"}],"outputs":["和","差"]},"inputs":{"RETURN":{"block":{"type":"ev3_op_add","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"multi-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"multi-値2"},"fields":{"ARG_NAME":"値2"}}}}}},"RETURN1":{"block":{"type":"ev3_op_sub","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"multi-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"multi-値2"},"fields":{"ARG_NAME":"値2"}}}}}}}}]}};}
+function multiReturnSampleState(){return {"variables":[{"id":"multi-値1","name":"値1"},{"id":"multi-値2","name":"値2"}],"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":40,"y":35,"next":{"block":{"type":"ev3_display_clear","next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":0,"FONT":"0","DECIMALS":1},"inputs":{"VALUE":{"block":{"type":"procedures_callreturn","extraState":{"name":"和と差","params":["値1","値2"],"outputs":["和","差"],"output":0},"inputs":{"ARG0":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"ARG1":{"shadow":{"type":"math_number","fields":{"NUM":220}}}}}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":32,"FONT":"0","DECIMALS":1},"inputs":{"VALUE":{"block":{"type":"procedures_callreturn","extraState":{"name":"和と差","params":["値1","値2"],"outputs":["和","差"],"output":1},"inputs":{"ARG0":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"ARG1":{"shadow":{"type":"math_number","fields":{"NUM":220}}}}}}},"next":{"block":{"type":"ev3_tone","fields":{"VOLUME":25},"inputs":{"FREQUENCY":{"shadow":{"type":"math_number","fields":{"NUM":660}}},"MS":{"shadow":{"type":"math_number","fields":{"NUM":400}}}},"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":2}}}}}}}}}}}}}}},{"type":"procedures_defreturn","x":650,"y":35,"fields":{"NAME":"和と差"},"extraState":{"params":[{"id":"multi-値1","name":"値1"},{"id":"multi-値2","name":"値2"}],"outputs":["和","差"]},"inputs":{"RETURN":{"block":{"type":"ev3_op_add","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"multi-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"multi-値2"},"fields":{"ARG_NAME":"値2"}}}}}},"RETURN1":{"block":{"type":"ev3_op_sub","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"multi-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"multi-値2"},"fields":{"ARG_NAME":"値2"}}}}}}}}]}};}
 sampleAction('multiReturnSample').onclick=()=>{loading=true;try{Blockly.serialization.workspaces.load(multiReturnSampleState(),workspace);$('programName').value='MultiReturn';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('丸い呼び出しで「和」「差」を選びます。それぞれ呼び出すたびに定義を実行します。本体画面の上に660、下に220を表示し、660Hzの音を鳴らします。モーターは動かしません。');};
+
+// 言語は表示だけの設定。状態を複製して同じIDで再描画し、接続は作り直さない。
+globalThis.EBLi18n?.attach({
+ switchLanguage(next){
+  if(busy)throw Error('転送・通信が終わってから言語を切り替えてください。');
+  const previous=globalThis.EBLi18n.language,state=Blockly.serialization.workspaces.save(workspace),wasLoading=loading;
+  loading=true;
+  try{workspace.getToolbox()?.clearSelection();globalThis.EBLi18n.apply(next);Blockly.serialization.workspaces.load(state,workspace);workspace.updateToolbox(globalThis.EBLi18n.toolbox(toolbox));ensureArgumentInputs();workspace.clearUndo();}
+  catch(error){globalThis.EBLi18n.apply(previous);Blockly.serialization.workspaces.load(state,workspace);throw error;}
+  finally{loading=wasLoading;}
+  check();saveLocal();requestAnimationFrame(()=>Blockly.svgResize(workspace));
+ },
+ showError:message=>feedback(message,true)
+});
