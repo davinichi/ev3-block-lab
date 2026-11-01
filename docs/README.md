@@ -1,12 +1,12 @@
 # EV3 Block Lab マニュアル
 
-## 最新版：v0.25.4
+## 最新版：v0.25.5
 
-2026年11月1日更新。現在のアプリ v0.25.4 に対応した **全20章・PDF 42ページ** の統合マニュアルです。
+2026年11月1日更新。現在のアプリ v0.25.5 に対応した **全20章・PDF 42ページ** の統合マニュアルです。
 
-- [最新版 v0.25.4 の目次と全文](manual-v0.25.4/README.md)
-- [最新版PDF v0.25.4（42ページ）](manual-v0.25.4/EV3-Block-Lab-ブロック命令マニュアル-v0.25.4.pdf)
-- [最新版HTML v0.25.4](manual-v0.25.4/EV3-Block-Lab-ブロック命令マニュアル-v0.25.4.html)
+- [最新版 v0.25.5 の目次と全文](manual-v0.25.5/README.md)
+- [最新版PDF v0.25.5（42ページ）](manual-v0.25.5/EV3-Block-Lab-ブロック命令マニュアル-v0.25.5.pdf)
+- [最新版HTML v0.25.5](manual-v0.25.5/EV3-Block-Lab-ブロック命令マニュアル-v0.25.5.html)
 
 画面のブロックグループ順に整理しています。第2章に横並びの接続パネルと画面幅変更時の操作、第6章に動きの共通モーター設定、第7章にセンサー、第9章にPID制御、第16章に数値・複数の戻り値を持つマイブロック、第20章にEV3 Classroomとの比較表と開発の目的を掲載しています。
 
@@ -16,12 +16,20 @@
 
 GitHub Pagesでの正式公開は別工程です。この一覧への登録やmainブランチの更新は、GitHub Pagesでの正式公開完了を意味しません。公開手順は[リポジトリのREADME](../README.md#github-pagesで公開する)を参照してください。
 
+### English edition
+
+[English source (20 chapters)](manual-v0.25.5-en/README.md) / [English PDF (23 pages)](manual-v0.25.5-en/EV3-Block-Lab-Manual-v0.25.5-en.pdf) / [English HTML](manual-v0.25.5-en/EV3-Block-Lab-Manual-v0.25.5-en.html)
+
+画面右上の日本語・English選択に合わせてPDF・HTMLのリンクも切り替わります。日本語版は42ページです。
+The language selector also switches manual links. User-entered names remain unchanged; switching clears undo history.
+
 ## 過去のマニュアル（履歴）
 
-以下は過去バージョンの資料です。現在のアプリには上記のv0.25.4を使用してください。旧版の内容・章番号・ページ数は当時のものとして保持しています。
+以下は過去バージョンの資料です。現在のアプリには上記のv0.25.5を使用してください。旧版の内容・章番号・ページ数は当時のものとして保持しています。
 
 | バージョン | リポジトリ内の資料 |
 | --- | --- |
+| v0.25.4（旧版） | [目次・全文](manual-v0.25.4/README.md) ／ [PDF](manual-v0.25.4/EV3-Block-Lab-ブロック命令マニュアル-v0.25.4.pdf) ／ [HTML](manual-v0.25.4/EV3-Block-Lab-ブロック命令マニュアル-v0.25.4.html) |
 | v0.25.3（旧版） | [目次・全文](manual-v0.25.3/README.md) ／ [PDF](manual-v0.25.3/EV3-Block-Lab-ブロック命令マニュアル-v0.25.3.pdf) ／ [HTML](manual-v0.25.3/EV3-Block-Lab-ブロック命令マニュアル-v0.25.3.html) |
 | v0.25.2（旧版） | [目次・全文](manual-v0.25.2/README.md) ／ [PDF](manual-v0.25.2/EV3-Block-Lab-ブロック命令マニュアル-v0.25.2.pdf) ／ [HTML](manual-v0.25.2/EV3-Block-Lab-ブロック命令マニュアル-v0.25.2.html) |
 | v0.25.1（旧版） | [目次・全文](manual-v0.25.1/README.md) ／ [PDF](manual-v0.25.1/EV3-Block-Lab-ブロック命令マニュアル-v0.25.1.pdf) ／ [HTML](manual-v0.25.1/EV3-Block-Lab-ブロック命令マニュアル-v0.25.1.html) |

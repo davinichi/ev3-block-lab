@@ -84,3 +84,8 @@ body{grid-template-rows:48px auto minmax(0,1fr) auto 18px}
 /* 狭い接続パネル内の確認ボタンや入力欄も折り返す。 */
 #connectionPanel .section-label{flex-wrap:wrap}
 #connectionPanel select,#connectionPanel input:not([type="checkbox"]){min-width:0;max-width:100%}
+
+/* 言語の切り替えは小さい画面でも操作できる幅を確保する。 */
+.language-switch{display:flex;flex-shrink:0}.language-switch select{font:inherit;font-size:12px;min-height:30px;border:1px solid var(--line);border-radius:6px;background:white;color:#314953;padding:4px 6px;max-width:100px}
+html[lang="en"] .blocklyToolboxCategoryLabel{font-size:11px}
+@media(max-width:760px){.header-right{gap:5px}.language-switch select{font-size:11px;padding:4px}.brand{font-size:14px}}
