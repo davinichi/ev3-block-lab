@@ -1,6 +1,6 @@
 # EV3 Block Lab
 
-小学校の授業で、Chromebook・WindowsのブラウザからLEGO MINDSTORMS EV3をプログラミングするための試作アプリです。現在のバージョンは **v0.25.5** です（2026年11月1日時点）。
+小学校の授業で、Chromebook・WindowsのブラウザからLEGO MINDSTORMS EV3をプログラミングするための試作アプリです。現在のバージョンは **v0.25.6** です（2026年11月1日時点）。
 
 ブロックからEV3標準形式の実行ファイル（.rbf）を生成し、本体へ転送・読み戻し照合します。本体に保存したプログラムは、PCから切り離して本体で選択・実行できます。
 
@@ -16,21 +16,21 @@ v0.19.0では、左右別速度の角度・時間指定、ブレーキ／惰性�
 
 ## 最新版マニュアル
 
-[ブロック命令マニュアル v0.25.5（全20章・PDF 42ページ）](docs/manual-v0.25.5/README.md)
+[ブロック命令マニュアル v0.25.6（全20章・PDF 43ページ）](docs/manual-v0.25.6/README.md)
 
-[配布・印刷用PDF v0.25.5](docs/manual-v0.25.5/EV3-Block-Lab-ブロック命令マニュアル-v0.25.5.pdf) ／ [HTML版 v0.25.5](docs/manual-v0.25.5/EV3-Block-Lab-ブロック命令マニュアル-v0.25.5.html) ／ [マニュアル一覧・旧版の履歴](docs/README.md)
+[配布・印刷用PDF v0.25.6](docs/manual-v0.25.6/EV3-Block-Lab-ブロック命令マニュアル-v0.25.6.pdf) ／ [HTML版 v0.25.6](docs/manual-v0.25.6/EV3-Block-Lab-ブロック命令マニュアル-v0.25.6.html) ／ [マニュアル一覧・旧版の履歴](docs/README.md)
 
 2026年11月1日更新。画面のブロックグループ順に、基本操作・センサー・CSV・並行処理・イベント・マイブロックなどを統合しています。第2章に横並びの接続パネルと画面幅変更時の操作、第16章に数値・複数の戻り値を持つマイブロック、第20章にEV3 Classroomとの比較表を掲載しています。
 
 上記はGitHubリポジトリに登録した資料へのリンクです。HTML版はファイルをダウンロードしてブラウザで開けます。GitHub Pagesでの正式公開は別工程です。
 
-[English manual (23 pages)](docs/manual-v0.25.5-en/README.md) / [English PDF](docs/manual-v0.25.5-en/EV3-Block-Lab-Manual-v0.25.5-en.pdf) / [English HTML](docs/manual-v0.25.5-en/EV3-Block-Lab-Manual-v0.25.5-en.html)
+[English manual (24 pages)](docs/manual-v0.25.6-en/README.md) / [English PDF](docs/manual-v0.25.6-en/EV3-Block-Lab-Manual-v0.25.6-en.pdf) / [English HTML](docs/manual-v0.25.6-en/EV3-Block-Lab-Manual-v0.25.6-en.html)
 
 ### 旧版の追加ガイド・サンプル
 
 [ジャイロセンサの説明・実機テスト v0.21.0（旧版）](docs/manual-v0.21.0/gyro-guide.md) ／ [テスト用サンプル GyroTest.ev3lab](examples/GyroTest.ev3lab)
 
-ジャイロセンサの現行仕様はv0.25.5マニュアルの第7章を参照してください。過去のマニュアル・追加ガイドは[マニュアル一覧の履歴](docs/README.md#過去のマニュアル履歴)に保持しています。
+ジャイロセンサの現行仕様はv0.25.6マニュアルの第7章を参照してください。過去のマニュアル・追加ガイドは[マニュアル一覧の履歴](docs/README.md#過去のマニュアル履歴)に保持しています。
 
 ## GitHub Pagesで公開する
 
@@ -177,3 +177,12 @@ Choose Japanese or English at the top right. Blocks, controls and help change la
 [English manual (PDF)](docs/manual-v0.25.5-en/EV3-Block-Lab-Manual-v0.25.5-en.pdf) / [HTML](docs/manual-v0.25.5-en/EV3-Block-Lab-Manual-v0.25.5-en.html)
 
 英語版は全20章・23ページ、日本語版は全20章・42ページです。自動テストとブラウザ確認は実機テストの代わりではありません。
+
+
+## v0.25.6：動きグループの加速・減速
+
+「動き」の寸法設定の下に、モーターと共通の加減速ブロックを追加しました。前進・後退・スピン・ピボットに加え、ステアリングと左右別速度の角度・時間指定にも台形・S字を適用します。左右の指定角度・正逆方向・速度比を反映し、各ポートの停止方法を維持します。連続走行・即時停止・パワー命令は従来どおり対象外です。
+
+「動きの加減速」サンプルを追加。設定は実行順で共有し、設定用マイブロックでも使えます。短時間では最高速度と加減速区間を圧縮し、整数％・整数度による丸めがあります。実際の軌跡・停止精度は実機確認待ちです。
+
+Finite steering and separate-speed angle/time moves now use the shared trapezoid/S-curve setting. The same setting block is available in Motors and Movement. Continuous motion and immediate stops remain unchanged. The Movement ramp profiles sample compares both shapes. Japanese/English PDF and HTML manuals are updated to v0.25.6 (43 / 24 pages). Hardware validation remains pending.

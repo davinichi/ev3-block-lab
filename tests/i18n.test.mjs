@@ -104,7 +104,7 @@ test('language changes leave generated executable bytes identical for a called n
 test('both manual editions and locale scripts are linked and shipped as local assets',()=>{
  const html=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
  assert.match(html,/id="uiLanguage"/);assert.match(html,/data-language="en"/);assert.match(html,/i18n-bootstrap\.js/);
- for(const stem of ['EV3-Block-Lab-Manual-v0.25.5-en','EV3-Block-Lab-ブロック命令マニュアル-v0.25.5']){
+ for(const stem of ['EV3-Block-Lab-Manual-v0.25.6-en','EV3-Block-Lab-ブロック命令マニュアル-v0.25.6']){
   assert.match(readFileSync(new URL('../dist/manual/'+stem+'.html',import.meta.url),'utf8'),/chapter-20/);
   assert.equal(readFileSync(new URL('../dist/manual/'+stem+'.pdf',import.meta.url)).subarray(0,4).toString(),'%PDF');
  }

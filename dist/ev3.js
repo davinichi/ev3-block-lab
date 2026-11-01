@@ -534,7 +534,9 @@ export function compile(program,folder='EV3Lab') {
       const reg=()=>local(alloc()),c=constant;
       const mode=globalVar(rampOffset),up=reg(),down=reg(),base=reg(),sign=reg(),cap=reg(),began=reg(),elapsed=reg(),limit=reg();
       const ports=[0,1,2,3].filter(i=>b.ports&(1<<i)),timed=b.type==='motorTimed';
-      const signs=b.portDirections?Object.fromEntries(ports.map(port=>[port,reg()])):null;
+      const weighted=!!b.portSpeeds;
+      const signs=b.portDirections||weighted?Object.fromEntries(ports.map(port=>[port,reg()])):null;
+      const weights=weighted?ports.map(reg):null,ratioBase=weighted?reg():null,targets=weighted&&!timed?ports.map(reg):null;
       const direction=port=>signs?signs[port]:sign;
       const finishes=[];
       const clamp=(value,min,max)=>{const above=jump(OP.JR_GT32,[value,c(min-1)]);emit(OP.MOVE32,c(min),value);patch(above,code.length);const below=jump(OP.JR_LT32,[value,c(max+1)]);emit(OP.MOVE32,c(max),value);patch(below,code.length);};
@@ -550,8 +552,21 @@ export function compile(program,folder='EV3Lab') {
       emit(OP.MOVE32,globalVar(rampOffset+4),up);emit(OP.MOVE32,globalVar(rampOffset+8),down);
       emit(OP.MOVE32,expr(b.speed),base);guard(base,-100,100);nonzero(base);emit(OP.MOVE32,c(1),sign);
       const positive=jump(OP.JR_GT32,[base,c(0)]);emit(OP.MOVE32,c(-1),sign);emit(OP.SUB32,c(0),base,base);patch(positive,code.length);
-      if(signs)ports.forEach(port=>emit(OP.MUL32,sign,c(b.portDirections[port]),signs[port]));
+      if(weighted){
+        // 左右の指定速度の比率と符号を保存する。短時間走行でピークを下げても比率は変えない。
+        emit(OP.MOVE32,base,ratioBase);
+        ports.forEach((port,i)=>{emit(OP.MOVE32,expr(b.portSpeeds[port]),weights[i]);guard(weights[i],-100,100);emit(OP.MOVE32,c(1),signs[port]);const positive=jump(OP.JR_GT32,[weights[i],c(-1)]);emit(OP.MOVE32,c(-1),signs[port]);emit(OP.SUB32,c(0),weights[i],weights[i]);patch(positive,code.length);});
+      }else if(signs)ports.forEach(port=>emit(OP.MUL32,sign,c(b.portDirections[port]),signs[port]));
       const target=reg();emit(OP.MOVE32,expr(timed?(b.secondsAreMs?b.seconds:scaled(b.seconds,1000)):b.degrees),target);guard(target,1,timed?60000:36000);
+      if(targets)ports.forEach((port,i)=>{emit(OP.MUL32,target,weights[i],targets[i]);emit(OP.DIV32,ratioBase,c(2),cap);emit(OP.ADD32,targets[i],cap,targets[i]);emit(OP.DIV32,targets[i],ratioBase,targets[i]);});
+      const portTarget=i=>targets?targets[i]:target;
+      const signedSpeed=(i,value)=>{
+        if(weighted){emit(OP.MUL32,value,weights[i],value);emit(OP.DIV32,value,ratioBase,value);
+          // 角度命令を速度0で始めるとFWにより即時完了するため、動く側は最低1%。
+          const zero=jump(OP.JR_LT32,[weights[i],c(1)]);clamp(value,1,100);patch(zero,code.length);
+        }
+        emit(OP.MUL32,value,direction(ports[i]),value);
+      };
       // Reject disconnected/wrong devices before starting either shaft.
       ports.forEach(port=>integerExpr({sensor:{kind:'encoder',port:port+1}}));
       if(timed){
@@ -569,8 +584,15 @@ export function compile(program,folder='EV3Lab') {
       if(!timed){emit(OP.MOTOR_RESET,c(0),c(b.ports));ports.forEach((port,i)=>emit(OP.MOTOR_COUNT,c(0),c(port),start[i]));for(const value of [previous,previousTime,braking,phase])emit(OP.MOVE32,c(0),value);}
       emit(OP.MOVE32,base,cap);const noRamp=jump(OP.JR_LT32,[up,c(1)]);emit(OP.MOVE32,c(1),cap);patch(noRamp,code.length);
       emit(OP.TIMER_READ,began);
-      if(timed){emit(OP.MUL32,cap,sign,speed[0]);emit(OP.MOTOR_SPEED,c(0),c(b.ports),speed[0]);emit(OP.MOTOR_START,c(0),c(b.ports));}
-      else ports.forEach((port,i)=>{emit(OP.MUL32,cap,direction(port),speed[i]);emit(OP.MOTOR,c(0),c(1<<port),speed[i],c(0),target,c(0),motors.nativeBrake(1<<port));});
+      if(timed){
+        if(weighted){const active=reg();emit(OP.MOVE32,c(0),active);ports.forEach((port,i)=>{emit(OP.MOVE32,cap,speed[i]);signedSpeed(i,speed[i]);const moving=jump(OP.JR_GT32,[weights[i],c(0)]);emit(OP.STOP,c(0),c(1<<port),c(1));const done=jump(OP.JR,[]);patch(moving,code.length);emit(OP.MOTOR_SPEED,c(0),c(1<<port),speed[i]);emit(OP.ADD32,active,c(1<<port),active);patch(done,code.length);});emit(OP.MOTOR_START,c(0),active);}
+        else{emit(OP.MUL32,cap,sign,speed[0]);emit(OP.MOTOR_SPEED,c(0),c(b.ports),speed[0]);emit(OP.MOTOR_START,c(0),c(b.ports));}
+      }else ports.forEach((port,i)=>{
+        emit(OP.MOVE32,cap,speed[i]);signedSpeed(i,speed[i]);
+        let inactive,done;if(weighted){inactive=jump(OP.JR_LT32,[targets[i],c(1)]);}
+        emit(OP.MOTOR,c(0),c(1<<port),speed[i],c(0),portTarget(i),c(0),motors.nativeBrake(1<<port));
+        if(weighted){done=jump(OP.JR,[]);patch(inactive,code.length);emit(OP.STOP,c(0),c(1<<port),c(1));patch(done,code.length);}
+      });
       const loop=code.length;
       emit(OP.TIMER_READ,elapsed);emit(OP.SUB32,elapsed,began,elapsed);
       if(timed){finishes.push(jump(OP.JR_GT32,[elapsed,target]));const equal=reg();emit(OP.SUB32,target,elapsed,equal);finishes.push(jump(OP.JR_LT32,[equal,c(1)]));}
@@ -578,8 +600,11 @@ export function compile(program,folder='EV3Lab') {
         emit(OP.MOVE32,c(0),sum);
         ports.forEach((port,i)=>{emit(OP.MOTOR_TEST,c(0),c(1<<port),busy[i]);emit(OP.ADD32,sum,busy[i],sum);emit(OP.MOTOR_COUNT,c(0),c(port),current[i]);emit(OP.SUB32,current[i],start[i],progress[i]);emit(OP.MUL32,progress[i],direction(port),progress[i]);});
         finishes.push(jump(OP.JR_LT32,[sum,c(1)]));faults.push(jump(OP.JR_GT32,[elapsed,limit]));
-        emit(OP.MOVE32,progress[0],common);
-        if(ports.length===2){const smaller=jump(OP.JR_LT32,[common,progress[1]]);emit(OP.MOVE32,progress[1],common);patch(smaller,code.length);}
+        if(weighted){
+          // 外側（速い側）の角度へ換算して進み具合を比較する。停止側は最小値に含めない。
+          emit(OP.MOVE32,target,common);
+          ports.forEach((port,i)=>{const inactive=jump(OP.JR_LT32,[targets[i],c(1)]);emit(OP.MUL32,progress[i],ratioBase,progress[i]);emit(OP.DIV32,progress[i],weights[i],progress[i]);const smaller=jump(OP.JR_LT32,[common,progress[i]]);emit(OP.MOVE32,progress[i],common);patch(smaller,code.length);patch(inactive,code.length);});
+        }else{emit(OP.MOVE32,progress[0],common);if(ports.length===2){const smaller=jump(OP.JR_LT32,[common,progress[1]]);emit(OP.MOVE32,progress[1],common);patch(smaller,code.length);}}
         emit(OP.SUB32,target,common,remaining);
         // Estimate stopping distance from measured progress, without assuming
         // a particular L/M motor's degrees-per-second conversion or gearing.
@@ -597,7 +622,8 @@ export function compile(program,folder='EV3Lab') {
         const instantDown=jump(OP.JR_LT32,[down,c(1)]),notYet=jump(OP.JR_GT32,[remaining,down]);
         const downCurve=curve(remaining,down),downCap=reg();emit(OP.MUL32,base,downCurve,downCap);emit(OP.DIV32,downCap,c(1000),downCap);
         const alreadyLower=jump(OP.JR_LT32,[cap,downCap]);emit(OP.MOVE32,downCap,cap);patch(alreadyLower,code.length);patch(instantDown,code.length);patch(notYet,code.length);clamp(cap,1,100);
-        emit(OP.MUL32,cap,sign,speed[0]);emit(OP.MOTOR_SPEED,c(0),c(b.ports),speed[0]);
+        if(weighted)ports.forEach((port,i)=>{const zero=jump(OP.JR_LT32,[weights[i],c(1)]);emit(OP.MOVE32,cap,speed[i]);signedSpeed(i,speed[i]);emit(OP.MOTOR_SPEED,c(0),c(1<<port),speed[i]);patch(zero,code.length);});
+        else{emit(OP.MUL32,cap,sign,speed[0]);emit(OP.MOTOR_SPEED,c(0),c(b.ports),speed[0]);}
       }else{
         const instantDown=jump(OP.JR_LT32,[down,c(1)]);
         const alreadyDecelerating=jump(OP.JR_GT32,[phase,c(0)]),notYet=jump(OP.JR_GT32,[remaining,braking]);
@@ -609,14 +635,22 @@ export function compile(program,folder='EV3Lab') {
         patch(notYet,code.length);patch(instantDown,code.length);
         ports.forEach((port,i)=>{
           emit(OP.MOVE32,cap,speed[i]);
-          if(ports.length===2){const diff=reg();emit(OP.SUB32,progress[i],progress[1-i],diff);const notAhead=jump(OP.JR_LT32,[diff,c(1)]);emit(OP.MUL32,diff,c(2),diff);emit(OP.SUB32,speed[i],diff,speed[i]);clamp(speed[i],0,100);patch(notAhead,code.length);}
-          emit(OP.MUL32,speed[i],direction(port),speed[i]);
+          if(ports.length===2){const diff=reg();emit(OP.SUB32,progress[i],weighted?common:progress[1-i],diff);const notAhead=jump(OP.JR_LT32,[diff,c(1)]);emit(OP.MUL32,diff,c(2),diff);emit(OP.SUB32,speed[i],diff,speed[i]);clamp(speed[i],0,100);patch(notAhead,code.length);}
+          // 進み過ぎた側を一時的に0にする補正は保持し、それ以外は比率に換算する。
+          const paused=jump(OP.JR_LT32,[speed[i],c(1)]);signedSpeed(i,speed[i]);patch(paused,code.length);
           const finished=jump(OP.JR_LT32,[busy[i],c(1)]);emit(OP.MOTOR_SPEED,c(0),c(1<<port),speed[i]);patch(finished,code.length);
         });
       }
       emit(OP.WAIT,c(20),local(timer));emit(OP.READY,local(timer));const again=jump(OP.JR,[]);patch(again,loop);
       for(const at of finishes)patch(at,code.length);
       motors.stop(b.ports);
+    };
+
+    // ステアリング／左右別速度を同じ加減速エンジンへ渡す。入力式は呼び出し側で1回だけ評価する。
+    const rampedPair=(b,leftSpeed,rightSpeed)=>{
+      const absolute=value=>{const out=local(alloc());emit(OP.MOVE32,value,out);const positive=jump(OP.JR_GT32,[out,constant(-1)]);emit(OP.SUB32,constant(0),out,out);patch(positive,code.length);return out;};
+      const a=absolute(expr(leftSpeed)),d=absolute(expr(rightSpeed)),peakAt=alloc(),peak=local(peakAt);emit(OP.MOVE32,a,peak);const larger=jump(OP.JR_GT32,[a,d]);emit(OP.MOVE32,d,peak);patch(larger,code.length);nonzero(peak);
+      rampedMotion({type:b.action==='time'?'motorTimed':'motor',ports:b.leftPort|b.rightPort,speed:{register:peakAt},portSpeeds:{[Math.log2(b.leftPort)]:leftSpeed,[Math.log2(b.rightPort)]:rightSpeed},...(b.action==='time'?{seconds:b.seconds,secondsAreMs:b.secondsAreMs}:{degrees:b.degrees})});
     };
 
     // 制御構造をEV3の比較・ジャンプ・呼び出し命令へ展開する。終了命令の後の同じ並びは生成しない。
@@ -669,9 +703,39 @@ export function compile(program,folder='EV3Lab') {
         switch(b.type) {
           case 'displayClear':case 'displayBitmap':case 'displayNumber':emitDisplay(b,{emit,constant,floatExpr,guard,floatGuard});break;
           case 'led':emit(0x82,constant(27),constant(b.color===0?0:b.color+({on:0,flash:3,pulse:6}[b.mode])));break;
-          case 'steering':{const ports=b.leftPort|b.rightPort,speed=expr(b.speed),turn=expr(b.turn),nativeTurn=local(alloc());guard(speed,-100,100);guard(turn,-100,100);emit(OP.MUL32,turn,constant(b.leftPort<b.rightPort?2:-2),nativeTurn);if(b.action==='run'){emit(OP.MOTOR_SYNC,constant(0),constant(ports),speed,nativeTurn,constant(0),constant(0));}else{nonzero(speed);const brake=motors.nativeBrake(ports,true);emit(OP.MOTOR_RESET,constant(0),constant(ports));const amount=b.action==='angle'?expr(b.degrees):expr(scaled(b.seconds,1000));guard(amount,1,b.action==='angle'?36000:60000);emit(b.action==='time'?0xb1:OP.MOTOR_SYNC,constant(0),constant(ports),speed,nativeTurn,amount,brake);emit(OP.MOTOR_READY,constant(0),constant(ports));motors.finish(ports);}break;}
+          case 'steering':{
+            const ports=b.leftPort|b.rightPort,speed=expr(b.speed),turn=expr(b.turn),nativeTurn=local(alloc());guard(speed,-100,100);guard(turn,-100,100);
+            emit(OP.MUL32,turn,constant(b.leftPort<b.rightPort?2:-2),nativeTurn);
+            if(b.action==='run'){emit(OP.MOTOR_SYNC,constant(0),constant(ports),speed,nativeTurn,constant(0),constant(0));}
+            else{
+              nonzero(speed);let legacy,done,amount;
+              if(usesRamps){
+                // 分岐前に量も評価する。式中のマイブロックを片方の分岐だけへ生成しない。
+                const amountAt=alloc();amount=local(amountAt);emit(OP.MOVE32,b.action==='angle'?expr(b.degrees):expr(scaled(b.seconds,1000)),amount);guard(amount,1,b.action==='angle'?36000:60000);
+                const paired={...b,...(b.action==='angle'?{degrees:{register:amountAt}}:{seconds:{register:amountAt},secondsAreMs:true})};
+                legacy=jump(OP.JR_LT32,[globalVar(rampOffset),constant(1)]);
+                const leftAt=alloc(),rightAt=alloc(),factor=local(alloc()),left=local(leftAt),right=local(rightAt);
+                emit(OP.MOVE32,speed,left);emit(OP.MOVE32,speed,right);
+                const negative=jump(OP.JR_LT32,[turn,constant(0)]);
+                emit(OP.MUL32,turn,constant(2),factor);emit(OP.SUB32,constant(100),factor,factor);emit(OP.MUL32,speed,factor,right);emit(OP.DIV32,right,constant(100),right);const ready=jump(OP.JR,[]);
+                patch(negative,code.length);emit(OP.MUL32,turn,constant(2),factor);emit(OP.ADD32,constant(100),factor,factor);emit(OP.MUL32,speed,factor,left);emit(OP.DIV32,left,constant(100),left);patch(ready,code.length);
+                rampedPair(paired,{register:leftAt},{register:rightAt});done=jump(OP.JR,[]);patch(legacy,code.length);
+              }
+              const brake=motors.nativeBrake(ports,true);emit(OP.MOTOR_RESET,constant(0),constant(ports));if(!amount)amount=b.action==='angle'?expr(b.degrees):expr(scaled(b.seconds,1000));guard(amount,1,b.action==='angle'?36000:60000);
+              emit(b.action==='time'?0xb1:OP.MOTOR_SYNC,constant(0),constant(ports),speed,nativeTurn,amount,brake);emit(OP.MOTOR_READY,constant(0),constant(ports));motors.finish(ports);if(done!==undefined)patch(done,code.length);
+            }break;
+          }
           case 'stopMode':motors.configure(b);break;
-          case 'tankFinite':motors.tank(b);break;
+          case 'tankFinite':{
+            let done;
+            if(usesRamps){
+              const leftAt=alloc(),rightAt=alloc(),amountAt=alloc();emit(OP.MOVE32,expr(b.leftSpeed),local(leftAt));guard(local(leftAt),-100,100);emit(OP.MOVE32,expr(b.rightSpeed),local(rightAt));guard(local(rightAt),-100,100);
+              emit(OP.MOVE32,b.action==='angle'?expr(b.degrees):expr(scaled(b.seconds,1000)),local(amountAt));guard(local(amountAt),1,b.action==='angle'?36000:60000);
+              b={...b,leftSpeed:{register:leftAt},rightSpeed:{register:rightAt},...(b.action==='angle'?{degrees:{register:amountAt}}:{seconds:{register:amountAt},secondsAreMs:true})};
+              const legacy=jump(OP.JR_LT32,[globalVar(rampOffset),constant(1)]);rampedPair(b,b.leftSpeed,b.rightSpeed);done=jump(OP.JR,[]);patch(legacy,code.length);
+            }
+            motors.tank(b);if(done!==undefined)patch(done,code.length);break;
+          }
           case 'motorPower':case 'motorSpeedSet':{const speed=expr(b.speed);guard(speed,-100,100);emit(b.type==='motorPower'?OP.MOTOR_POWER:OP.MOTOR_SPEED,constant(0),constant(b.ports),speed);if(b.type==='motorPower')emit(OP.MOTOR_START,constant(0),constant(b.ports));break;}
           case 'textSet':case 'listAdd':case 'listSet':case 'listClear':case 'listDelete':case 'logStart':case 'logValue':case 'logEnd':dataOps.statement(b);break;
           case 'ramp':{emit(OP.MOVE32,constant({off:0,trapezoid:1,scurve:2}[b.mode]),globalVar(rampOffset));for(const [i,name]of ['upSeconds','downSeconds'].entries()){const time=expr(scaled(b[name],1000));guard(time,0,10000);emit(OP.MOVE32,time,globalVar(rampOffset+4+i*4));}break;}

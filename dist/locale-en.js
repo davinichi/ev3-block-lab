@@ -48,7 +48,7 @@ Object.assign(catalog.tips,{
 ev3_movement_stop:'Brake only the two currently configured movement motors, then continue to the next command. Other motors keep running. Movement motor setup is required; wheel dimensions are not.',
 ev3_movement_setup:'Set the shared left/right motor ports when this block runs. Ports must differ. Changing the pair first stops the old pair. Repeating the same setting does not stop the motors. Each program run starts unconfigured.',
 ev3_start:'Execution starts here. Multiple start stacks run concurrently. Sensor and message events keep the program alive until it is ended.',
-ev3_ramp:'Apply trapezoidal or smoothstep S-curve acceleration/deceleration to subsequent finite motor/drive/turn moves. Times are 0–10 seconds. Continuous, steering and tank commands are not ramped.',
+ev3_ramp:'Apply trapezoidal or smoothstep S-curve acceleration/deceleration to subsequent finite motor/drive/turn moves. Times are 0–10 seconds. Finite steering and tank moves also use this setting; continuous commands and immediate stops do not.',
 ev3_tone:'Play a tone at 250–10000 Hz for 1–30000 milliseconds; volume 0–100. Waits for the tone to finish.',ev3_wait_seconds:'Wait 0–60 seconds. Fractional seconds, such as 0.5, are allowed.',
 ev3_battery_voltage:'Battery pack voltage measured by the brick, in volts. This is not a battery percentage.',ev3_battery_current:'Total current measured by the brick, in amperes. This is not an individual motor’s current.',
 ev3_pid:'PID output from target minus measured value, using elapsed seconds. States with the same name are shared. First call uses P only; repeated calls in the same millisecond reuse the result. Clamp the output to your required range.',ev3_pid_reset:'Clear the integral, previous error and timing for this named PID state.',
@@ -330,6 +330,14 @@ ev3_touch:'Read the touch sensor’s current state, not a remembered press event
 ev3_led:'Change the brick light and continue immediately. Add a wait to observe it. Normal firmware behavior resumes after program termination.'
 });
 for(const op of ['add','sub','mul','div','lt','eq','gt','lte','gte','neq','and','or'])catalog.tips['ev3_op_'+op]=op==='div'?'Divide, preserving decimals. Division by zero is invalid.':'Use matching numeric or condition reporters on both sides.';
+T['加速・減速（モーター・動き共通）']='Acceleration / deceleration (motors and movement)';
+T['動きの加減速']='Movement ramp profiles';
+T['左右B+Cでステアリング25・速さ30％・3秒を台形→S字で比較し、最後に左右30％／15％で速い側360度を回します。加速・減速は各1秒。配線を確認し、最初は車輪を浮かせてください。']='With left B / right C, compare trapezoid and S-curve steering (25, speed 30%, 3 s), then run at left 30% / right 15% for 360 degrees of the faster motor. Acceleration and deceleration are 1 s each. Check wiring and lift wheels for the first test.';
+catalog.tips.ev3_ramp='Shared setting for Motors and Movement. Applies to finite degrees, rotations and seconds, forward/backward, spin/pivot turns, and finite steering/separate-speed moves. Each ramp duration is 0–10 s. Continuous and immediate-stop commands are excluded. Short moves lower peak speed; integer speed steps can alter low-speed ratios. Experimental 20 ms on-brick updates.';
+for(const family of ['steering','tank'])for(const action of ['run','angle','time']){
+ const type=family==='tank'&&action==='run'?'ev3_tank':'ev3_'+family+'_'+action;
+ catalog.tips[type]=(family==='steering'?'Steering -100 is a left spin, -50 a left pivot, 0 straight, +50 a right pivot and +100 a right spin. Angle is the outer motor’s degrees. ':'Angle refers to the faster motor. Left/right speeds may have opposite signs. ')+(action==='run'?'Continuous command: starts immediately; ramp settings are not applied.':'Uses the shared ramp setting. Set movement motors first; the requested motor angle or duration is retained. Low-speed ratios have integer-step rounding.');
+}
 Object.assign(T,{
 '小':'small','大':'large','「動作後の停止方法」の設定':'configured end behavior',
 '戻り値は最大8個です。丸い呼び出しの「戻り値」で使う値を選びます。呼び出すたびに定義内の命令を実行します。':'Add up to 8 named results. Select one on the round call; every call runs the definition.',

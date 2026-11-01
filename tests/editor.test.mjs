@@ -25,6 +25,29 @@ test('new stop palette offers three direct methods and retains each through libr
 });
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
 
+test('movement and motor palettes expose the same shared ramp setting and preserve it in setup libraries',()=>{
+ const c=editor();
+ const saved=JSON.parse(vm.runInContext(`
+ Blockly.Events.disable();const movement=toolbox.contents.find(g=>g.name==='動き').contents,motor=toolbox.contents.find(g=>g.name==='モーター').contents;
+ const setting=movement.find(b=>b.type==='ev3_ramp');if(!setting||!motor.some(b=>b.type==='ev3_ramp'))throw Error('shared ramp missing');
+ if(movement.findIndex(b=>b.type==='ev3_ramp')<movement.findIndex(b=>b.type==='ev3_tread')||movement.findIndex(b=>b.type==='ev3_ramp')>movement.findIndex(b=>b.type==='ev3_steering_run'))throw Error('setting must precede motion');
+ const def=saveMyBlock(workspace,'走行設定',[]),setup=workspace.newBlock('ev3_movement_setup'),ramp=Blockly.serialization.blocks.append(setting,workspace);
+ ramp.setFieldValue('scurve','MODE');def.getInput('STACK').connection.connect(setup.previousConnection);setup.nextConnection.connect(ramp.previousConnection);
+ JSON.stringify(Blockly.serialization.workspaces.save(workspace));`,c));
+ const lib=createBlockLibrary(saved,'0.25.6'),number=n=>({shadow:{type:'math_number',fields:{NUM:n}}});
+ const steer={type:'ev3_steering_time',inputs:{TURN:number(25),SPEED:number(20),SECONDS:number(1)}};
+ const caller={type:'procedures_callnoreturn',extraState:{name:'走行設定',params:[]},next:{block:steer}};
+ c.lesson=JSON.stringify(mergeBlockLibrary({blocks:{languageVersion:0,blocks:[{type:'ev3_start',next:{block:caller}}]}},lib));
+ const p=JSON.parse(vm.runInContext('Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);JSON.stringify(program());',c));
+ assert.equal(p.procedures[0].body[1].type,'ramp');assert.equal(p.procedures[0].body[1].mode,'scurve');assert.equal(compile(p).usesRamps,true);
+});
+
+test('movement ramp sample reloads and generates steering-time and separate-speed angle profiles',()=>{
+ const c=editor();c.lesson=JSON.stringify(JSON.parse(readFileSync(new URL('../dist/samples/MovementRamp.ev3lab',import.meta.url),'utf8')).workspace);
+ const p=JSON.parse(vm.runInContext('Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const saved=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(saved,workspace);JSON.stringify(program());',c));
+ assert.deepEqual(p.main.filter(b=>b.type==='ramp').map(b=>b.mode),['trapezoid','scurve']);assert.equal(p.main.filter(b=>b.type==='steering').length,2);assert.equal(p.main.filter(b=>b.type==='tankFinite').length,1);assert.equal(compile(p).usesRamps,true);
+});
+
 test('persistent palettes do not reserve hidden width after closing or fitting the workspace',()=>{
  const c=editor();
  vm.runInContext(`let visible=false,autoClose=true;const metrics={getFlyoutMetrics(small){return {width:small?350:700,height:480,position:2};}},flyout={setAutoClose(value){autoClose=value;},isVisible(){return visible;}};
@@ -920,7 +943,7 @@ test('battery and PID samples compile after loading and match the downloadable f
 test('movement palette exposes only one ordered wiring block and leaves independent motor ports intact',()=>{
  const c=editor();const result=JSON.parse(vm.runInContext(`Blockly.Events.disable();const palette=toolbox.contents.find(x=>x.name==='動き').contents;const types=palette.filter(x=>x.kind==='block').map(x=>x.type);const items=types.map(type=>{const b=workspace.newBlock(type);return {type,ports:['PORTS','LEFT_PORT','RIGHT_PORT'].filter(name=>b.getField(name))};});const motor=workspace.newBlock('ev3_motor_l_pair_angle'),stop=workspace.newBlock('ev3_stop_port');const independent=!!motor.getField('PORTS')&&!!stop.getField('PORTS');Blockly.Events.enable();JSON.stringify({types,items,independent});`,c));
  assert.equal(result.types[0],'ev3_movement_setup');assert.deepEqual(result.items[0].ports,['LEFT_PORT','RIGHT_PORT']);for(const b of result.items.slice(1))assert.deepEqual(b.ports,[],b.type);assert.equal(result.independent,true);
- assert.deepEqual(result.types,['ev3_movement_setup','ev3_wheel','ev3_tread','ev3_steering_run','ev3_steering_angle','ev3_steering_time','ev3_tank_angle','ev3_tank_time','ev3_tank','ev3_spin_right','ev3_spin_left','ev3_pivot_right','ev3_pivot_left','ev3_drive_forward','ev3_drive_backward','ev3_movement_stop']);
+ assert.deepEqual(result.types,['ev3_movement_setup','ev3_wheel','ev3_tread','ev3_ramp','ev3_steering_run','ev3_steering_angle','ev3_steering_time','ev3_tank_angle','ev3_tank_time','ev3_tank','ev3_spin_right','ev3_spin_left','ev3_pivot_right','ev3_pivot_left','ev3_drive_forward','ev3_drive_backward','ev3_movement_stop']);
 });
 
 test('all downloadable examples round-trip, pass allowlist and compile; motion samples start with explicit setup',()=>{

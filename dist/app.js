@@ -8,7 +8,7 @@ const sampleActions=new Map();
 function sampleAction(id){if(!sampleActions.has(id))sampleActions.set(id,{});return sampleActions.get(id);}
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.25.5';
+const VERSION='0.25.6';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE=uiText('マイブロック');
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE=uiText('定義');
@@ -55,7 +55,7 @@ Blockly.defineBlocksWithJsonArray([
 ]);
 
 
-Blockly.defineBlocksWithJsonArray([{type:'ev3_ramp',message0:'加減速を %1 にする 加速 %2 秒 減速 %3 秒',args0:[{type:'field_dropdown',name:'MODE',options:[['台形','trapezoid'],['S字','scurve'],['なし','off']]},{type:'input_value',name:'UP',check:'Number'},{type:'input_value',name:'DOWN',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'後ろのL/Mモーターの角度・時間指定と走行・旋回に適用。0〜10秒。設定用マイブロックにも入れられます。回し続ける・停止ブロックは対象外。角度指定は停止位置を優先し、短い移動では指定速度に届かないことがあります。20ミリ秒ごとに速度指令を更新する試作機能です。'}]);
+Blockly.defineBlocksWithJsonArray([{type:'ev3_ramp',message0:'加減速を %1 にする 加速 %2 秒 減速 %3 秒',args0:[{type:'field_dropdown',name:'MODE',options:[['台形','trapezoid'],['S字','scurve'],['なし','off']]},{type:'input_value',name:'UP',check:'Number'},{type:'input_value',name:'DOWN',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'モーター・動き共通の設定。後続の角度・回転数・時間指定、前後進・旋回、ステアリングと左右別速度の角度・時間指定に適用。加速・減速は各0〜10秒。回し続ける・即時停止は対象外です。角度は停止位置を優先。短い動きでは最高速度を下げ、低速域では整数％のため左右比率に誤差があります。20msごとに本体内で更新する試作機能です。'}]);
 
 // New classroom palette separates one motor from a pair. Keep legacy types
 // above unchanged so earlier saved projects retain their port choices.
@@ -70,7 +70,7 @@ for(const [kind,label] of [['l','L'],['m','M']])for(const paired of [false,true]
 Blockly.defineBlocksWithJsonArray(classroomMotorBlocks);
 // L/Mそれぞれを単独・2個に分け、連続回転／角度／時間を同じ順番で表示する。
 function classroomMotorToolbox(){
- const items=[{kind:'label',text:'加速・減速（L・M共通）'},{kind:'block',type:'ev3_ramp',inputs:{UP:shadow(.5),DOWN:shadow(.5)}}];
+ const items=[{kind:'label',text:'加速・減速（モーター・動き共通）'},{kind:'block',type:'ev3_ramp',inputs:{UP:shadow(.5),DOWN:shadow(.5)}}];
  for(const [kind,label] of [['l','L'],['m','M']])for(const paired of [false,true]){
   items.push({kind:'label',text:label+'モーター '+(paired?'2個（同期・同時）':'1個')});
   for(const action of ['run','angle','rotation','time'])items.push({kind:'block',type:'ev3_motor_'+kind+'_'+(paired?'pair':'single')+'_'+action,inputs:{SPEED:shadow(20),...(action==='angle'?{DEGREES:shadow(90)}:action==='rotation'?{ROTATIONS:shadow(1)}:action==='time'?{SECONDS:shadow(1)}:{})}});
@@ -88,7 +88,7 @@ Blockly.defineBlocksWithJsonArray([
  {type:'ev3_motor_stop',message0:'モーター %1 を %2 で停止',args0:[commonMotorPorts(),{type:'field_dropdown',name:'STOP_MODE',options:stopOptions}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'選んだポートを、ここで選んだ方法ですぐ停止します。ブレーキ：100ミリ秒制動後に力を抜く。惰性：すぐ力を抜く。保持：停止位置を保つ（プログラム実行中のみ）。動作後の停止方法の設定には依存しません。'},
  {type:'ev3_motor_stop_mode',message0:'モーター %1 の動作後の停止方法を %2 にする',args0:[commonMotorPorts(),{type:'field_dropdown',name:'MODE',options:stopOptions}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'この後の角度・回転数・時間・距離・旋回の完了時に適用します。直接停止するブロックでは、そのブロックで選んだ停止方法を使います。旧作品の「動作後の停止方法」の設定を使う停止にも適用します。同期走行の2ポートは同じ設定にしてください。保持は本体でプログラムを終了すると解除されます。'},
  {type:'ev3_motor_speed',message0:'モーター %1 の実際の速さ（％）',args0:[{type:'field_dropdown',name:'PORT',options:singlePorts.map(([label],i)=>[label,String(i+1)])}],output:'Number',colour:'#34ccf1',tooltip:'L/M共通。設定した速さではなく、本体が測定した現在の回転速度を−100〜100％で返します。逆回転は負になります。'},
- ...['angle','time'].map(action=>({type:'ev3_tank_'+action,message0:'左の速さ %1 ％ 右の速さ %2 ％で '+(action==='angle'?'速い側を %3 度回す':'%3 秒走る'),args0:[{type:'input_value',name:'LEFT_SPEED',check:'Number'},{type:'input_value',name:'RIGHT_SPEED',check:'Number'},{type:'input_value',name:action==='angle'?'DEGREES':'SECONDS',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'同じ種類の2モーターで使います。左右−100〜100％、両方0は使えません。指定量が終わるまで待ちます。角度は速い側のモーター軸が基準。左右の回転量は速度比に応じて変わります。標準FWの比率は約1％刻み。加減速設定は適用しません。'}))
+ ...['angle','time'].map(action=>({type:'ev3_tank_'+action,message0:'左の速さ %1 ％ 右の速さ %2 ％で '+(action==='angle'?'速い側を %3 度回す':'%3 秒走る'),args0:[{type:'input_value',name:'LEFT_SPEED',check:'Number'},{type:'input_value',name:'RIGHT_SPEED',check:'Number'},{type:'input_value',name:action==='angle'?'DEGREES':'SECONDS',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'同じ種類の2モーターで使います。左右−100〜100％、両方0は使えません。指定量が終わるまで待ちます。角度は速い側のモーター軸が基準。左右の回転量は速度比に応じて変わります。加減速設定にも対応します。低速域では整数％のため比率に誤差があります。'}))
 ]);
 
 // 入力センサのポート番号は1〜4。モーター出力のビットマスクとは別の番号体系。
@@ -203,7 +203,7 @@ const dataColour='#00b85b',stmt={previousStatement:null,nextStatement:null,input
 Blockly.defineBlocksWithJsonArray([
  {type:'ev3_led',message0:'本体のランプを %1 に %2',args0:[{type:'field_dropdown',name:'COLOR',options:[['緑','1'],['赤','2'],['オレンジ','3']]},{type:'field_dropdown',name:'MODE',options:[['点灯','on'],['点滅','flash'],['ゆっくり点滅','pulse']]}],...stmt,colour:'#9966ff',tooltip:'ランプを変えてすぐ次へ進みます。表示を保つには待つ命令などを続けます。終了後は本体の通常表示へ戻ります。'},
  {type:'ev3_led_off',message0:'本体のランプを消す',...stmt,colour:'#9966ff'},
- ...['run','angle','time'].map(action=>({type:'ev3_steering_'+action,message0:'ステアリング %1 速さ %2 ％で '+({run:'回し続ける',angle:'外側を %3 度回す',time:'%3 秒走る'}[action]),args0:[numberInput('TURN'),numberInput('SPEED'),...(action==='run'?[]:[numberInput(action==='angle'?'DEGREES':'SECONDS')])],...stmt,colour:'#ff4ccd',tooltip:'L/M共通。ステアリング−100は左スピン、−50は左ピボット、0は直進、50は右ピボット、100は右スピン。角度は外側のモーター軸の角度です。加減速の設定は適用しません。'})),
+ ...['run','angle','time'].map(action=>({type:'ev3_steering_'+action,message0:'ステアリング %1 速さ %2 ％で '+({run:'回し続ける',angle:'外側を %3 度回す',time:'%3 秒走る'}[action]),args0:[numberInput('TURN'),numberInput('SPEED'),...(action==='run'?[]:[numberInput(action==='angle'?'DEGREES':'SECONDS')])],...stmt,colour:'#ff4ccd',tooltip:'L/M共通。ステアリング−100は左スピン、−50は左ピボット、0は直進、50は右ピボット、100は右スピン。角度は外側のモーター軸の角度です。角度・時間指定は共通の加減速設定に対応。回し続ける命令は対象外です。'})),
  {type:'ev3_log_start',message0:'CSVログ %1 の記録を開始する',args0:[namedField('FILE','Log')],...stmt,colour:'#c58245',tooltip:'EV3のプロジェクトフォルダへ保存。同じログ名は上書き。半角英数字・-・_で31文字以内。1行ごとに閉じて保存します。PCを切り離しても記録できます。'},
  {type:'ev3_log_value',message0:'項目 %1 値 %2 をCSVに記録する',args0:[namedField('LABEL','値'),{type:'input_value',name:'VALUE',check:['Number','String']}],...stmt,colour:'#c58245',tooltip:'記録開始からの秒数・項目名・値を1行記録。変数、演算、センサ、文字列が使えます。1回の開始につき5000行まで。開始してから使ってください。'},
  {type:'ev3_log_end',message0:'CSVログの記録を終了する',...stmt,colour:'#c58245'},
@@ -269,6 +269,7 @@ group('動き').splice(2,0,...['angle','time'].map(action=>({kind:'block',type:'
 group('動き').splice(2,0,...['run','angle','time'].map(action=>({kind:'block',type:'ev3_steering_'+action,inputs:{TURN:shadow(25),SPEED:shadow(20),...(action==='angle'?{DEGREES:shadow(360)}:action==='time'?{SECONDS:shadow(2)}:{})}})));
 const movementOrder=['ev3_movement_setup','ev3_wheel','ev3_tread','ev3_steering_run','ev3_steering_angle','ev3_steering_time','ev3_tank_angle','ev3_tank_time','ev3_tank','ev3_spin_right','ev3_spin_left','ev3_pivot_right','ev3_pivot_left','ev3_drive_forward','ev3_drive_backward'];
 group('動き').push({kind:'block',type:'ev3_movement_setup'});group('動き').sort((a,b)=>movementOrder.indexOf(a.type)-movementOrder.indexOf(b.type));
+group('動き').splice(3,0,{kind:'label',text:'加速・減速（モーター・動き共通）'},{kind:'block',type:'ev3_ramp',inputs:{UP:shadow(.5),DOWN:shadow(.5)}});
 group('動き').push({kind:'block',type:'ev3_movement_stop'});
 // 旋回は寸法設定が必要なまとまりとして、余白と説明で区切る。
 const spinIndex=group('動き').findIndex(x=>x.type==='ev3_spin_right');
@@ -1168,6 +1169,12 @@ $('sampleConfirmOpen').onclick=()=>{const id=pendingSample;pendingSample=null;$(
 
 function multiReturnSampleState(){return {"variables":[{"id":"multi-値1","name":"値1"},{"id":"multi-値2","name":"値2"}],"blocks":{"languageVersion":0,"blocks":[{"type":"ev3_start","x":40,"y":35,"next":{"block":{"type":"ev3_display_clear","next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":0,"FONT":"0","DECIMALS":1},"inputs":{"VALUE":{"block":{"type":"procedures_callreturn","extraState":{"name":"和と差","params":["値1","値2"],"outputs":["和","差"],"output":0},"inputs":{"ARG0":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"ARG1":{"shadow":{"type":"math_number","fields":{"NUM":220}}}}}}},"next":{"block":{"type":"ev3_display_number","fields":{"X":0,"Y":32,"FONT":"0","DECIMALS":1},"inputs":{"VALUE":{"block":{"type":"procedures_callreturn","extraState":{"name":"和と差","params":["値1","値2"],"outputs":["和","差"],"output":1},"inputs":{"ARG0":{"shadow":{"type":"math_number","fields":{"NUM":440}}},"ARG1":{"shadow":{"type":"math_number","fields":{"NUM":220}}}}}}},"next":{"block":{"type":"ev3_tone","fields":{"VOLUME":25},"inputs":{"FREQUENCY":{"shadow":{"type":"math_number","fields":{"NUM":660}}},"MS":{"shadow":{"type":"math_number","fields":{"NUM":400}}}},"next":{"block":{"type":"ev3_wait_seconds","inputs":{"SECONDS":{"shadow":{"type":"math_number","fields":{"NUM":2}}}}}}}}}}}}}}},{"type":"procedures_defreturn","x":650,"y":35,"fields":{"NAME":"和と差"},"extraState":{"params":[{"id":"multi-値1","name":"値1"},{"id":"multi-値2","name":"値2"}],"outputs":["和","差"]},"inputs":{"RETURN":{"block":{"type":"ev3_op_add","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"multi-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"multi-値2"},"fields":{"ARG_NAME":"値2"}}}}}},"RETURN1":{"block":{"type":"ev3_op_sub","inputs":{"A":{"block":{"type":"ev3_argument","extraState":{"name":"値1","parameterId":"multi-値1"},"fields":{"ARG_NAME":"値1"}}},"B":{"block":{"type":"ev3_argument","extraState":{"name":"値2","parameterId":"multi-値2"},"fields":{"ARG_NAME":"値2"}}}}}}}}]}};}
 sampleAction('multiReturnSample').onclick=()=>{loading=true;try{Blockly.serialization.workspaces.load(multiReturnSampleState(),workspace);$('programName').value='MultiReturn';workspace.clearUndo();}finally{loading=false;}check();saveLocal();dirty=false;feedback('丸い呼び出しで「和」「差」を選びます。それぞれ呼び出すたびに定義を実行します。本体画面の上に660、下に220を表示し、660Hzの音を鳴らします。モーターは動かしません。');};
+
+sampleAction('movementRampSample').onclick=async()=>{
+ const response=await fetch('samples/MovementRamp.ev3lab');if(!response.ok)throw Error('サンプルを読み込めません。');
+ restore(await response.json());check();saveLocal();dirty=false;
+ feedback('左右B+Cでステアリング25・速さ30％・3秒を台形→S字で比較し、最後に左右30％／15％で速い側360度を回します。加速・減速は各1秒。配線を確認し、最初は車輪を浮かせてください。');
+};
 
 // 言語は表示だけの設定。状態を複製して同じIDで再描画し、接続は作り直さない。
 globalThis.EBLi18n?.attach({

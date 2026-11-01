@@ -46,7 +46,7 @@ export function motorFeatures(c,enabled,base){
   emit(0x3a,first,speed);nonzero(speed);emit(0x16,first,second,turn);emit(0x1a,turn,C(100),turn);emit(0x1e,turn,speed,turn);const done=jump(0x40,[]);
   patch(other,position());emit(0x3a,second,speed);nonzero(speed);emit(0x16,first,second,turn);emit(0x1a,turn,C(100),turn);emit(0x1e,turn,speed,turn);patch(done,position());
   guard(turn,-200,200);
-  const amount=L(alloc());emit(0x3a,expr(b.action==='angle'?b.degrees:{scaled:{value:b.seconds,factor:1000,divisor:1}}),amount);guard(amount,1,b.action==='angle'?36000:60000);
+  const amount=L(alloc());emit(0x3a,expr(b.action==='angle'?b.degrees:b.secondsAreMs?b.seconds:{scaled:{value:b.seconds,factor:1000,divisor:1}}),amount);guard(amount,1,b.action==='angle'?36000:60000);
   const mask=b.leftPort|b.rightPort,brake=nativeBrake(mask,true);
   emit(0xa2,C(0),C(mask));emit(b.action==='angle'?0xb0:0xb1,C(0),C(mask),speed,turn,amount,brake);emit(0xaa,C(0),C(mask));finish(mask);
  };

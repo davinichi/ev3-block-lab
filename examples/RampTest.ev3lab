@@ -1,7 +1,7 @@
 {
   "format": "ev3-block-lab",
   "version": 1,
-  "appVersion": "0.9.0",
+  "appVersion": "0.25.6",
   "name": "RampTest",
   "programName": "RampTest",
   "ev3ProjectName": "EV3Lab",
@@ -16,81 +16,64 @@
           "y": 30,
           "next": {
             "block": {
-              "type": "ev3_ramp",
+              "type": "ev3_movement_setup",
               "fields": {
-                "MODE": "trapezoid"
-              },
-              "inputs": {
-                "UP": {
-                  "shadow": {
-                    "type": "math_number",
-                    "fields": {
-                      "NUM": 1
-                    }
-                  }
-                },
-                "DOWN": {
-                  "shadow": {
-                    "type": "math_number",
-                    "fields": {
-                      "NUM": 1
-                    }
-                  }
-                }
+                "LEFT_PORT": "2",
+                "RIGHT_PORT": "4"
               },
               "next": {
                 "block": {
-                  "type": "ev3_motor_l_single_angle",
+                  "type": "ev3_ramp",
                   "fields": {
-                    "PORTS": "2"
+                    "MODE": "trapezoid"
                   },
                   "inputs": {
-                    "SPEED": {
+                    "UP": {
                       "shadow": {
                         "type": "math_number",
                         "fields": {
-                          "NUM": 30
+                          "NUM": 1
                         }
                       }
                     },
-                    "DEGREES": {
+                    "DOWN": {
                       "shadow": {
                         "type": "math_number",
                         "fields": {
-                          "NUM": 720
+                          "NUM": 1
                         }
                       }
                     }
                   },
                   "next": {
                     "block": {
-                      "type": "ev3_wait_seconds",
+                      "type": "ev3_motor_l_single_angle",
+                      "fields": {
+                        "PORTS": "2"
+                      },
                       "inputs": {
-                        "SECONDS": {
+                        "SPEED": {
                           "shadow": {
                             "type": "math_number",
                             "fields": {
-                              "NUM": 1
+                              "NUM": 30
+                            }
+                          }
+                        },
+                        "DEGREES": {
+                          "shadow": {
+                            "type": "math_number",
+                            "fields": {
+                              "NUM": 720
                             }
                           }
                         }
                       },
                       "next": {
                         "block": {
-                          "type": "ev3_ramp",
-                          "fields": {
-                            "MODE": "scurve"
-                          },
+                          "type": "ev3_wait_seconds",
                           "inputs": {
-                            "UP": {
-                              "shadow": {
-                                "type": "math_number",
-                                "fields": {
-                                  "NUM": 1
-                                }
-                              }
-                            },
-                            "DOWN": {
+                            "SECONDS": {
                               "shadow": {
                                 "type": "math_number",
                                 "fields": {
@@ -101,24 +84,50 @@
                           },
                           "next": {
                             "block": {
-                              "type": "ev3_motor_l_single_angle",
+                              "type": "ev3_ramp",
                               "fields": {
-                                "PORTS": "2"
+                                "MODE": "scurve"
                               },
                               "inputs": {
-                                "SPEED": {
+                                "UP": {
                                   "shadow": {
                                     "type": "math_number",
                                     "fields": {
-                                      "NUM": 30
+                                      "NUM": 1
                                     }
                                   }
                                 },
-                                "DEGREES": {
+                                "DOWN": {
                                   "shadow": {
                                     "type": "math_number",
                                     "fields": {
-                                      "NUM": 720
+                                      "NUM": 1
+                                    }
+                                  }
+                                }
+                              },
+                              "next": {
+                                "block": {
+                                  "type": "ev3_motor_l_single_angle",
+                                  "fields": {
+                                    "PORTS": "2"
+                                  },
+                                  "inputs": {
+                                    "SPEED": {
+                                      "shadow": {
+                                        "type": "math_number",
+                                        "fields": {
+                                          "NUM": 30
+                                        }
+                                      }
+                                    },
+                                    "DEGREES": {
+                                      "shadow": {
+                                        "type": "math_number",
+                                        "fields": {
+                                          "NUM": 720
+                                        }
+                                      }
                                     }
                                   }
                                 }
