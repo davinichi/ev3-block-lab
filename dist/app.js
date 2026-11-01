@@ -961,7 +961,10 @@ $('fileInput').onchange=async e=>{
   try{if(file.size>2*1024*1024)throw Error('プロジェクトは2MB以下にしてください。');const data=JSON.parse(await file.text());
     if(dirty && !confirm('現在の編集内容をファイルの内容に置き換えますか？'))return;
     const needsMovement=restore(data);saveLocal();dirty=false;if(!needsMovement)feedback('プロジェクトを読み込みました。');
-  }catch(e){feedback(`読み込めませんでした。${e.message}`,true);}
+  }catch(e){
+    const reason=file.size>2*1024*1024?'ファイルが大きすぎます。2MB以下の作品を選んでください。':'このファイルは作品として開けません。';
+    feedback(`${reason} EV3 Block Labの「保存」で作った .ev3lab、または以前の作品の .json を選んで、もう一度「開く」を押してください。LEGO純正ソフトで作った .ev3 は開けません。LEGO純正ソフトで開いてください。名前の終わりを変えるだけでは、EV3 Block Labの作品にはなりません。困ったときは先生に相談してください。`,true);
+  }
 };
 let savedPath='';
 $('connect').onclick=async()=>{

@@ -183,6 +183,79 @@ function editor(){
  return context;
 }
 
+function projectFileEditor(){
+ const c=editor();Object.assign(c,{inspectBlocks,programFileName});
+ vm.runInContext(`let loading=false,dirty=true;const downloads=[],messages=[];let saves=0,confirmations=0,allowReplace=true;
+ function check(){} function saveLocal(){saves++;} function confirm(){confirmations++;return allowReplace;}
+ function download(data,name,type){downloads.push({data:JSON.parse(data),name,type});}
+ function feedback(message,error=false){messages.push({message,error});}`,c);
+ vm.runInContext(app.slice(app.indexOf('function project(){'),app.indexOf('function saveLocal(){')),c);
+ vm.runInContext(app.slice(app.indexOf("$('saveProject').onclick="),app.indexOf("let savedPath=")),c);
+ vm.runInContext(`Blockly.Events.disable();workspace.newBlock('ev3_start');$('programName').value='KeepMe';$('ev3ProjectName').value='Class1';`,c);
+ return c;
+}
+
+async function openProjectFile(c,file){
+ c.file=file;
+ await vm.runInContext(`$('fileInput').value='selected';$('fileInput').onchange({target:Object.assign($('fileInput'),{files:file?[file]:[]})})`,c);
+}
+
+test('project picker offers ev3lab and legacy JSON without advertising LEGO ev3',()=>{
+ const html=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
+ const input=html.match(/<input\b[^>]*id="fileInput"[^>]*>/)[0];
+ assert.equal(input.match(/accept="([^"]+)"/)[1],'.ev3lab,.json');
+});
+
+test('actual file handler saves and reloads ev3lab, JSON and content-compatible old ev3 projects',async()=>{
+ for(const extension of ['ev3lab','json','ev3']){
+  const c=projectFileEditor();
+  vm.runInContext(`$('saveProject').onclick();$('programName').value='Changed';$('ev3ProjectName').value='Other';workspace.clear();`,c);
+  const saved=JSON.parse(vm.runInContext('JSON.stringify(downloads[0])',c));
+  assert.equal(saved.name,'KeepMe.ev3lab');assert.equal(saved.type,'application/json');
+  await openProjectFile(c,{name:'KeepMe.'+extension,size:100,text:async()=>JSON.stringify(saved.data)});
+  const result=JSON.parse(vm.runInContext('JSON.stringify({data:project(),dirty,saves,messages,value:$("fileInput").value})',c));
+  assert.deepEqual(result.data,saved.data);assert.equal(result.dirty,false);assert.equal(result.saves,1);
+  assert.equal(result.messages.at(-1).error,false);assert.equal(result.value,'');
+ }
+});
+
+test('invalid files show actionable Japanese guidance and preserve the current project and unsaved state',async()=>{
+ const cases=[
+  {name:'LEGO.ev3',text:async()=>'PK\u0003\u0004binary archive'},
+  {name:'renamed.ev3lab',text:async()=>'PK\u0003\u0004binary archive'},
+  {name:'broken.json',text:async()=>'{'},
+  ...[null,{}, {format:'other',version:1,workspace:{blocks:{}}},
+   {format:'ev3-block-lab',version:2,workspace:{blocks:{}}},
+   {format:'ev3-block-lab',version:1},
+   {format:'ev3-block-lab',version:1,workspace:{blocks:{blocks:[{type:'unknown_block'}]}}}
+  ].map(data=>({name:'invalid.json',text:async()=>JSON.stringify(data)})),
+  {name:'large.ev3lab',size:2*1024*1024+1,text:async()=>{assert.fail('oversized file must not be read');}},
+  {name:'unreadable.ev3lab',text:async()=>{throw Error('NotReadableError');}}
+ ];
+ for(const file of cases){
+  const c=projectFileEditor(),before=vm.runInContext('JSON.stringify(project())',c);
+  await openProjectFile(c,{size:100,...file});
+  assert.equal(vm.runInContext('JSON.stringify(project())',c),before,file.name);
+  assert.equal(vm.runInContext('dirty',c),true);assert.equal(vm.runInContext('saves',c),0);
+  assert.equal(vm.runInContext('$("fileInput").value',c),'');
+  const message=JSON.parse(vm.runInContext('JSON.stringify(messages.at(-1))',c));
+  assert.equal(message.error,true);
+  for(const phrase of ['.ev3lab','.json','LEGO純正','「保存」','「開く」','先生'])assert.ok(message.message.includes(phrase),phrase);
+  assert.doesNotMatch(message.message,/JSON|SyntaxError|NotReadableError|unknown_block/);
+  if(file.size>2*1024*1024)assert.match(message.message,/2MB以下/);
+ }
+});
+
+test('cancelling the picker or replacement keeps the project and unsaved state',async()=>{
+ const c=projectFileEditor(),before=vm.runInContext('JSON.stringify(project())',c);
+ await openProjectFile(c,null);
+ vm.runInContext('allowReplace=false;',c);
+ await openProjectFile(c,{name:'other.ev3lab',size:100,text:async()=>before.replace('KeepMe','Another')});
+ assert.equal(vm.runInContext('JSON.stringify(project())',c),before);
+ assert.equal(vm.runInContext('dirty',c),true);assert.equal(vm.runInContext('saves',c),0);
+ assert.equal(vm.runInContext('confirmations',c),1);assert.equal(vm.runInContext('messages.length',c),0);
+});
+
 test('brick button palette and saved definitions retain selected buttons and released conditions',()=>{
  const context=editor();
  const result=JSON.parse(vm.runInContext(`
