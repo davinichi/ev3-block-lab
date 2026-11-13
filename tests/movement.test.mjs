@@ -35,7 +35,7 @@ test('negative motion speeds reverse travel with constants, variables and ramp m
   }
   for(const port of [0,3])assert.ok(Math.abs(positions[0][port]+positions[1][port])<3,JSON.stringify({mode,type,direction,positions}));
  }
- for(const speed of [0,-101,101])for(const type of ['drive','spin','pivot'])assert.throws(()=>build([setup(),{type:'wheel',diameter:56},{type:'tread',mm:112},{type,movement:true,direction:type==='drive'?'forward':'right',speed,cm:5,angle:45}]),/速度|速さ/);
+ for(const speed of [0])for(const type of ['drive','spin','pivot'])assert.throws(()=>build([setup(),{type:'wheel',diameter:56},{type:'tread',mm:112},{type,movement:true,direction:type==='drive'?'forward':'right',speed,cm:5,angle:45}]),/速度|速さ/);
 });
 
 test('movement setup alone never starts motors; same ordered setup does not stop them',()=>{

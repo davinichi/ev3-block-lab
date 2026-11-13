@@ -111,7 +111,7 @@ test('ramped movement samples effectful speed, turn and duration inputs exactly 
 });
 
 test('ramped movement rejects invalid runtime inputs before starting either selected motor',()=>{
- for(const value of [101,-101])for(const type of ['steering','tankFinite']){
+ for(const value of [-101])for(const type of ['steering','tankFinite']){
   const unknown={sensor:{kind:'distance',port:2}},command=type==='steering'?{type,turn:25,speed:unknown}:{type,leftSpeed:20,rightSpeed:unknown};
   const r=runParallel(build([profile(),{...command,leftPort:2,rightPort:4,action:'time',seconds:1}]).data,{motorDriver:new ProfileMotors(),sensorRead:()=>value});
   assert.equal(r.stopped,true);assert.equal(r.events.some(e=>['motor','motorRun'].includes(e.type)),false);
@@ -183,8 +183,8 @@ test('half and fractional rotations compile as exact degree targets inside My Bl
  assert.deepEqual(r.events.filter(e=>e.type==='motor').map(e=>e.degrees),[180,450]);
 });
 test('new motor operations validate constants and guard runtime values before moving',()=>{
- for(const invalid of [{type:'motorPower',ports:1,speed:101},{type:'motorSpeedSet',ports:0,speed:20},{type:'stopMode',ports:2,mode:'invalid'},{type:'tankFinite',leftPort:2,rightPort:2,leftSpeed:20,rightSpeed:20,action:'time',seconds:1},{type:'tankFinite',leftPort:2,rightPort:4,leftSpeed:0,rightSpeed:0,action:'angle',degrees:360}])assert.throws(()=>build([invalid]));
- const b=build([set('speed',{sensor:{kind:'distance',port:2}}),{type:'motorPower',ports:1,speed:{var:'speed'}}]),r=runParallel(b.data,{sensorRead:()=>150});assert.ok(r.stopped);assert.equal(r.events.filter(e=>e.type==='power').length,0);
+ for(const invalid of [{type:'motorSpeedSet',ports:0,speed:20},{type:'stopMode',ports:2,mode:'invalid'},{type:'tankFinite',leftPort:2,rightPort:2,leftSpeed:20,rightSpeed:20,action:'time',seconds:1},{type:'tankFinite',leftPort:2,rightPort:4,leftSpeed:0,rightSpeed:0,action:'angle',degrees:360}])assert.throws(()=>build([invalid]));
+ const b=build([set('speed',{sensor:{kind:'distance',port:2}}),{type:'motorPower',ports:1,speed:{var:'speed'}}]),r=runParallel(b.data,{sensorRead:()=>150});assert.equal(r.stopped,false);assert.equal(r.events.find(e=>e.type==='power').power,100);
 });
 test('coast and hold settings survive ramped finite and feedback native image generation',()=>{
  for(const mode of ['coast','hold','brake'])for(const ramp of ['off','scurve'])for(const sync of ['independent','feedback','sync']){

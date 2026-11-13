@@ -90,7 +90,7 @@ test('return exits only the current My Block including loops and preserves its c
  assert.throws(()=>compile({main:[{type:'myblockReturn'}],procedures:[]}),/定義の中/);
  // Early return paths must not borrow variable assignments from later code.
  const branch={main:[{type:'set',var:'speed',value:200},{type:'call',name:'setup',args:[]},{type:'motorRun',ports:2,speed:{var:'speed'}}],procedures:[{name:'setup',params:[],body:[{type:'if',condition:{button:{id:4}},then:[{type:'myblockReturn'}],else:[]},{type:'set',var:'speed',value:20}]}]};
- for(const pressed of [false,true]){const driver=new SimulatedMotors();interpret(compile(branch).data,{motorDriver:driver,buttonRead:()=>pressed});assert.equal(driver.aborted,pressed?true:undefined);}
+ for(const pressed of [false,true]){const driver=new SimulatedMotors();interpret(compile(branch).data,{motorDriver:driver,buttonRead:()=>pressed});assert.equal(driver.aborted,undefined);}
 });
 test('constants use signed EV3 primitive encodings',()=>{
   for(const [value,bytes] of [[0,[0]],[-1,[63]],[31,[31]],[-32,[32]],[32,[129,32]],[-100,[129,156]],[440,[130,184,1]],[-32769,[131,255,127,255,255]]])assert.deepEqual(constant(value),bytes);
@@ -392,7 +392,7 @@ test('nested loops and subcalls use separate local memory; zero loops skip',()=>
   const events=interpret(compile(p).data);assert.equal(events.length,6);assert.ok(events.every(e=>e.frequency===880));
 });
 test('invalid inputs and recursion fail before file generation',()=>{
-  for(const speed of [0,101,-101])assert.throws(()=>compile({main:[{type:'motor',ports:2,speed,degrees:90}],procedures:[]}));
+  for(const speed of [0,NaN,Infinity])assert.throws(()=>compile({main:[{type:'motor',ports:2,speed,degrees:90}],procedures:[]}));
   const p=structuredClone(sound);p.procedures[0].body=[{type:'call',name:'beep',args:[440]}];assert.throws(()=>compile(p),/再帰/);
   assert.throws(()=>compile({main:[{type:'call',name:'absent',args:[]}],procedures:[]}),/定義/);
   assert.throws(()=>compile({main:[{type:'wait',ms:{param:'x'}}],procedures:[]}),/引数/);
@@ -523,7 +523,7 @@ test('opposite-direction feedback records signed angles and halts if a wheel sta
 });
 test('invalid spin settings fail before generating a transfer file',()=>{
  const p={main:[{type:'wheel',diameter:56},{type:'tread',mm:112},{type:'spin',leftPort:2,rightPort:4,speed:20,angle:90,direction:'right'}],procedures:[]};
- for(const change of [{leftPort:4},{rightPort:0},{speed:0},{speed:-101},{angle:0},{angle:3601},{direction:'invalid'}]){const x=structuredClone(p);Object.assign(x.main[2],change);assert.throws(()=>compile(x));}
+ for(const change of [{leftPort:4},{rightPort:0},{speed:0},{angle:0},{angle:3601},{direction:'invalid'}]){const x=structuredClone(p);Object.assign(x.main[2],change);assert.throws(()=>compile(x));}
  assert.throws(()=>compile({...p,main:[p.main[0],p.main[2]]}),/トレッド/);
  const x=structuredClone(p);x.main[1].mm=0;assert.throws(()=>compile(x),/トレッド/);
 });
@@ -651,7 +651,6 @@ test('missing or wrong sensors, unsafe runtime speeds and zero divisors stop bef
   for(const [tail,options]of [
     [[{type:'motor',ports:2,speed:20,degrees:90}],{sensorRead:()=>NaN}],
     [[{type:'motor',ports:2,speed:20,degrees:90}],{sensorRead:()=>50,sensorType:30}],
-    [[{type:'motor',ports:2,speed:{op:'mul',left:{var:'light'},right:10},degrees:90}],{sensorRead:()=>50}],
     [[{type:'motor',ports:2,speed:{op:'div',left:20,right:{var:'light'}},degrees:90}],{sensorRead:()=>0}],
   ]){
     const events=interpret(compile({main:[...base,...tail,beep(880)],procedures:[]}).data,{...options,sensorLog:log});
@@ -659,7 +658,7 @@ test('missing or wrong sensors, unsafe runtime speeds and zero divisors stop bef
   }
 });
 test('validation checks both sensor branches and does not assume a loop or conditional setup ran',()=>{
-  assert.throws(()=>compile({main:[{type:'if',condition:sensor('color'),then:[beep(880)],else:[{type:'motor',ports:2,speed:150,degrees:90}]}],procedures:[]}),/速度/);
+  assert.throws(()=>compile({main:[{type:'if',condition:sensor('color'),then:[beep(880)],else:[{type:'motor',ports:2,speed:NaN,degrees:90}]}],procedures:[]}),/数値|速度/);
   for(const kind of ['if','while','repeat']){
     const setup={type:'wheel',diameter:56},condition=sensor('color');
     const node=kind==='if'?{type:kind,condition,then:[setup],else:[]}:kind==='while'?{type:kind,condition,body:[setup]}:{type:kind,count:condition,body:[setup]};
@@ -674,7 +673,7 @@ test('sensor-derived geometry and paired feedback retain checked values and fini
   assert.deepEqual(motors.position.slice(1,3),[205,205]);assert.equal(log.length,1);
   p.main[1].speed={op:'sub',left:sensor('reflected'),right:60};
   const reverse=new SimulatedMotors();interpret(compile(p).data,{sensorRead:()=>50,motorDriver:reverse});assert.ok(reverse.position[1]<0);assert.equal(reverse.position[1],reverse.position[2]);
-  p.main[1].speed={op:'sub',left:sensor('reflected'),right:200};assert.equal(interpret(compile(p).data,{sensorRead:()=>50}).some(e=>e.type==='motor'),false);
+  p.main[1].speed={op:'sub',left:sensor('reflected'),right:200};assert.ok(interpret(compile(p).data,{sensorRead:()=>50}).some(e=>e.type==='motor'&&e.speed===-100));
 });
 
 test('continuous motors return immediately, change speed/direction and stop at zero or program end',()=>{
@@ -691,8 +690,8 @@ test('continuous motor speed can be updated from sensor conditions inside an on-
  const readings=[10,70,30],motors=new SimulatedMotors(),events=interpret(compile(p).data,{motorDriver:motors,sensorRead:()=>readings.shift()});
  assert.deepEqual(events.filter(e=>e.type==='motorRun').map(e=>e.speed),[20,40,20]);assert.equal(motors.active.some(Boolean),false);
  const bad={main:[{type:'motorRun',ports:2,speed:20},{type:'motorRun',ports:2,speed:{op:'mul',left:sensor('reflected'),right:10}}],procedures:[]};
- const failed=new SimulatedMotors();const failedEvents=interpret(compile(bad).data,{motorDriver:failed,sensorRead:()=>50});assert.equal(failedEvents.at(-1).frequency,300);assert.equal(failed.active.some(Boolean),false);
- for(const speed of [-101,101])assert.throws(()=>compile({main:[{type:'motorRun',ports:2,speed}],procedures:[]}),/速度/);
+ const failed=new SimulatedMotors();const failedEvents=interpret(compile(bad).data,{motorDriver:failed,sensorRead:()=>50});assert.equal(failedEvents.filter(e=>e.type==='motorRun').at(-1).speed,100);assert.equal(failed.active.some(Boolean),false);
+ for(const speed of [-101,101])assert.doesNotThrow(()=>compile({main:[{type:'motorRun',ports:2,speed}],procedures:[]}));
 });
 test('a My Block can start a continuous motor and return before a later sensor wait stops it',()=>{
  const p={main:[{type:'call',name:'run',args:[-25]},{type:'while',until:true,condition:{op:'lt',left:sensor('distance',4),right:15},body:[]},{type:'stop'}],procedures:[{name:'run',params:['speed'],body:[{type:'motorRun',ports:1,speed:{param:'speed'}}]}]};
@@ -713,7 +712,7 @@ test('empty forever loops yield and have no synthetic repeat-count limit',()=>{
 test('forever loops validate changing variables conservatively and guard their motor speeds at runtime',()=>{
  const p={main:[{type:'set',var:'speed',value:0},{type:'forever',body:[{type:'change',var:'speed',value:60},{type:'motorRun',ports:6,speed:{var:'speed'}}]}],procedures:[]};
  const motors=new SimulatedMotors(),events=interpret(compile(p).data,{motorDriver:motors,waitLimit:5});
- assert.deepEqual(events.filter(e=>e.type==='motorRun').map(e=>e.speed),[60]);assert.equal(events.at(-1).frequency,300);assert.equal(motors.active.some(Boolean),false);
+ assert.deepEqual(events.filter(e=>e.type==='motorRun').map(e=>e.speed),[60,100,100,100,100]);assert.equal(motors.active.some(Boolean),true);
 });
 
 const unary=(fn,value)=>({math:{fn,value}});
@@ -843,7 +842,7 @@ test('pivot geometry and ramp control work through My Block parameters and decim
 });
 test('pivot turn settings reject invalid geometry, duplicate ports, directions, angles and speeds',()=>{
  const p={main:[{type:'wheel',diameter:56},{type:'tread',mm:112},pivot('right')],procedures:[]};
- for(const change of [{leftPort:4},{rightPort:0},{direction:'unknown'},{angle:0},{angle:3601},{speed:0},{speed:-101},{speed:101}]){const changed=structuredClone(p);Object.assign(changed.main[2],change);assert.throws(()=>compile(changed));}
+ for(const change of [{leftPort:4},{rightPort:0},{direction:'unknown'},{angle:0},{angle:3601},{speed:0}]){const changed=structuredClone(p);Object.assign(changed.main[2],change);assert.throws(()=>compile(changed));}
  assert.throws(()=>compile({...p,main:[p.main[1],p.main[2]]}),/直径/);assert.throws(()=>compile({...p,main:[p.main[0],p.main[2]]}),/トレッド/);
  const huge=structuredClone(p);huge.main[0].diameter=10;huge.main[1].mm=1000;huge.main[2].angle=3600;assert.throws(()=>compile(huge),/回転角度/);
 });
@@ -868,10 +867,10 @@ test('tank updates take effect until stopped and preserve other running ports',(
 });
 test('tank speeds can be sensor expressions or My Block arguments and invalid right input does not change left output',()=>{
  const driver=new SimulatedMotors([1,1,1,1]);const p={main:[{type:'call',name:'tank',args:[-40,20]},{type:'waitSeconds',seconds:.5}],procedures:[{name:'tank',params:['left','right'],body:[tank({param:'left'},{param:'right'})]}]};interpret(compile(p).data,{motorDriver:driver});assert.deepEqual(driver.position,[0,-200,100,0]);
- const invalid=new SimulatedMotors(),events=interpret(compile({main:[tank(40,{op:'mul',left:{sensor:{kind:'reflected',port:1}},right:2}),beep(880)],procedures:[]}).data,{motorDriver:invalid,sensorRead:()=>60});assert.equal(invalid.commands.length,0);assert.equal(invalid.busy(15),false);assert.equal(events.at(-1).frequency,300);
+ const invalid=new SimulatedMotors(),events=interpret(compile({main:[tank(40,{op:'mul',left:{sensor:{kind:'reflected',port:1}},right:2}),beep(880)],procedures:[]}).data,{motorDriver:invalid,sensorRead:()=>60});assert.equal(invalid.commands.length,2);assert.equal(invalid.busy(15),false);assert.equal(events.at(-1).frequency,880);
 });
 test('tank control rejects invalid speed ranges and duplicate or non-single ports',()=>{
- for(const block of [tank(101,0),tank(0,-101),tank(20,20,2,2),tank(20,20,3,4),tank(20,20,1,0)])assert.throws(()=>compile({main:[block],procedures:[]}));
+ for(const block of [tank(20,20,2,2),tank(20,20,3,4),tank(20,20,1,0)])assert.throws(()=>compile({main:[block],procedures:[]}));
 });
 
 

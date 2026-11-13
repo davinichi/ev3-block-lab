@@ -2,7 +2,7 @@
 // 既存作品に設定ブロックがなければ、従来の命令列を維持する。
 export const stopModes={brake:1,coast:2,hold:3};
 export function motorFeatures(c,enabled,base){
- const {emit,alloc,local:L,globalVar:G,constant:C,expr,guard,nonzero,jump,patch,position}=c;
+ const {emit,alloc,local:L,globalVar:G,constant:C,expr,percentExpr,guard,nonzero,jump,patch,position}=c;
  const ports=mask=>[0,1,2,3].filter(i=>mask&(1<<i));
  const mode=i=>G(base+4*i);
  const pause=ms=>{const t=L(alloc());emit(0x85,C(ms),t);emit(0x86,t);};
@@ -39,7 +39,7 @@ export function motorFeatures(c,enabled,base){
  };
  const tank=b=>{
   const a=L(alloc()),d=L(alloc()),speed=L(alloc()),turn=L(alloc());
-  emit(0x3a,expr(b.leftSpeed),a);guard(a,-100,100);emit(0x3a,expr(b.rightSpeed),d);guard(d,-100,100);
+  emit(0x3a,percentExpr(b.leftSpeed),a);guard(a,-100,100);emit(0x3a,percentExpr(b.rightSpeed),d);guard(d,-100,100);
   const first=b.leftPort<b.rightPort?a:d,second=b.leftPort<b.rightPort?d:a;
   const abs=x=>{const r=L(alloc());emit(0x3a,x,r);const pos=jump(0x6a,[r,C(-1)]);emit(0x16,C(0),r,r);patch(pos,position());return r;};
   const aa=abs(first),dd=abs(second),other=jump(0x66,[aa,dd]);
