@@ -1,0 +1,16 @@
+{
+  "documentationRevision": "2026-11-15",
+  "ebl": {
+    "application": "0.25.6",
+    "sourceCommit": "da5565c271c3b5c53779a6f2dad91fb28a8f2913",
+    "publicSiteDeployment": "not verified; not managed by current Sites account"
+  },
+  "eblrt": {
+    "application": "0.34.2-ev3rt.1",
+    "siteBaseline": "48467411cb287f76bb465d246e8b604655ca48ea",
+    "bridgeFeature": 13,
+    "bridgeBuild": "2026-11-13-pid-motor1",
+    "windowsApplication": "0.3.5"
+  },
+  "os": "No OS binary redistribution added. OS build, patching and licensing review are separate."
+}

@@ -1,3 +1,5 @@
+現行資料の改訂：2026年11月15日。版の対応表・現行手順は docs/CURRENT-DOCUMENTATION.md を参照してください。過去の版番号・試験結果は履歴として保持しています。
+
 # EV3 Block Lab
 
 小学校の授業で、Chromebook・WindowsのブラウザからLEGO MINDSTORMS EV3をプログラミングするための試作アプリです。現在のバージョンは **v0.25.6** です（2026年11月1日時点）。
@@ -16,7 +18,7 @@ v0.19.0では、左右別速度の角度・時間指定、ブレーキ／惰性�
 
 ## 最新版マニュアル
 
-[ブロック命令マニュアル v0.25.6（全20章・PDF 43ページ）](docs/manual-v0.25.6/README.md)
+[ブロック命令マニュアル v0.25.6（全20章・PDF 38ページ）](docs/manual-v0.25.6/README.md)
 
 [配布・印刷用PDF v0.25.6](docs/manual-v0.25.6/EV3-Block-Lab-ブロック命令マニュアル-v0.25.6.pdf) ／ [HTML版 v0.25.6](docs/manual-v0.25.6/EV3-Block-Lab-ブロック命令マニュアル-v0.25.6.html) ／ [マニュアル一覧・旧版の履歴](docs/README.md)
 
@@ -24,7 +26,7 @@ v0.19.0では、左右別速度の角度・時間指定、ブレーキ／惰性�
 
 上記はGitHubリポジトリに登録した資料へのリンクです。HTML版はファイルをダウンロードしてブラウザで開けます。GitHub Pagesでの正式公開は別工程です。
 
-[English manual (24 pages)](docs/manual-v0.25.6-en/README.md) / [English PDF](docs/manual-v0.25.6-en/EV3-Block-Lab-Manual-v0.25.6-en.pdf) / [English HTML](docs/manual-v0.25.6-en/EV3-Block-Lab-Manual-v0.25.6-en.html)
+[English manual (18 pages)](docs/manual-v0.25.6-en/README.md) / [English PDF](docs/manual-v0.25.6-en/EV3-Block-Lab-Manual-v0.25.6-en.pdf) / [English HTML](docs/manual-v0.25.6-en/EV3-Block-Lab-Manual-v0.25.6-en.html)
 
 ### 旧版の追加ガイド・サンプル
 
@@ -185,4 +187,4 @@ Choose Japanese or English at the top right. Blocks, controls and help change la
 
 「動きの加減速」サンプルを追加。設定は実行順で共有し、設定用マイブロックでも使えます。短時間では最高速度と加減速区間を圧縮し、整数％・整数度による丸めがあります。実際の軌跡・停止精度は実機確認待ちです。
 
-Finite steering and separate-speed angle/time moves now use the shared trapezoid/S-curve setting. The same setting block is available in Motors and Movement. Continuous motion and immediate stops remain unchanged. The Movement ramp profiles sample compares both shapes. Japanese/English PDF and HTML manuals are updated to v0.25.6 (43 / 24 pages). Hardware validation remains pending.
+Finite steering and separate-speed angle/time moves now use the shared trapezoid/S-curve setting. The same setting block is available in Motors and Movement. Continuous motion and immediate stops remain unchanged. The Movement ramp profiles sample compares both shapes. Japanese/English PDF and HTML manuals are updated to v0.25.6 (43 / 18 pages). Hardware validation remains pending.
