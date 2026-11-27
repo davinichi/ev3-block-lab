@@ -4,12 +4,16 @@
 
 | 対象 | 公開・配布版 | 利用先 |
 | --- | --- | --- |
-| SBL（標準SPIKE Hub OS用） | 0.11.6 / ヒント・お知らせ表示 hint-label1 | [SBL](https://spike-block-lab-davinichi-preview.davinichi-9576.chatgpt.site/) |
+| SBL（標準SPIKE Hub OS用） | 1.0.0 / 運用版 | [SBL](https://spike-block-lab-davinichi-preview.davinichi-9576.chatgpt.site/) |
 | EBL（標準EV3用） | 0.25.9 / ヒント・お知らせ表示 hint-label1 | [EBL](https://ev3-block-lab-prototype.davinichi-9576.chatgpt.site/) |
 | EBL-RT Web版 | 0.34.4-ev3rt.1 / ヒント・お知らせ表示 hint-label1 | [EBL-RT](https://ev3rt-block-lab-private.davinichi-9576.chatgpt.site/) |
 | EBL-RT Windows版 | 0.3.6 / UI改訂 2026-11-27-green1-hint-label1 | [配布・更新案内](https://ev3rt-block-lab-private.davinichi-9576.chatgpt.site/evaluation.html#windows) |
 
 通常のEBLはWindowsでもブラウザーで使用します。別のWindows配布アプリがあるのはEBL-RTです。
+
+## SBLの運用方針と変遷
+
+SBLは2026年11月27日にv1.0.0へ移行しました。当面は機能追加を休止し、不具合修正を随時行います。EBL・EBL-RTのWeb版とEBL-RT Windows版はプレビュー版として開発を継続します。[SBLの変遷履歴（v0.7.0〜v1.0.0）](SBL-CHANGELOG.md)を参照してください。
 
 ## GitHub収録ソースとの違い
 
@@ -39,7 +43,7 @@ SBLとEBL-RTは公開サイトの資料を現行の参照先とします。SPIKE
 2. EBL-RTを終了します。
 3. [更新用ZIP](https://ev3rt-block-lab-private.davinichi-9576.chatgpt.site/downloads/EBL-RT-Windows-0.3.6-Update.zip)を展開し、EBL-RT.exeがあるフォルダーへ内容を上書きします。ZIPの中だけで実行しないでください。
 4. 既存のuser-data、Cygwin、SDK、コンパイラのフォルダーは削除せず、そのまま使います。
-5. UI-REVISION.txtに2026-11-27 notices2が含まれることを確認して再起動します。新規利用では一式ZIPを全展開します。
+5. UI-REVISION.txtに2026-11-27-green1-hint-label1が含まれることを確認して再起動します。新規利用では一式ZIPを全展開します。
 
 Web版でコンパイル・転送する場合は、Windows PC上で対応する補助アプリ（機能版13以上）を使います。Windowsアプリは編集・コンパイル・転送を内蔵し、別の補助アプリを起動する方式ではありません。初回の準備にネット接続が必要です。標準EV3用.rbfとEV3RT用ARM ELFは別の実行形式です。
 
