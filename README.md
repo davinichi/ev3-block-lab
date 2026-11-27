@@ -1,4 +1,4 @@
-現行の公開版・Windows版・通知UIの案内：2026年11月27日更新。[現行利用案内](docs/CURRENT-USE-20261127.md) と [資料の対応表](docs/CURRENT-DOCUMENTATION.md) を参照してください。GitHub収録ソースと公開版の版番号は異なります。
+現行の公開版・Windows版・通知UIの案内：2026年11月27日更新。[現行利用案内](docs/CURRENT-USE-20261127.md) と [資料の対応表](docs/CURRENT-DOCUMENTATION.md) を参照してください。GitHub収録ソースと公開版の版番号は異なります。[SBLの変遷履歴（v0.7.0〜運用版v1.0.0）](docs/SBL-CHANGELOG.md)を追加しています。
 
 # EV3 Block Lab
 
