@@ -1,4 +1,4 @@
-import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.js'; import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from './library.js'; import {sensorReading} from './sensor-monitor.js'; import {DISPLAY_IMAGES,presetBitmap,rasterDisplayText} from './display.js';
+import {installNumericTextNormalization} from './numeric-text.js?v=fullwidth1'; import {installNotices} from './notices.js?v=hint-label1'; import {renderConnectionBadge} from './classroom-ui.js'; import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.js'; import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from './library.js'; import {sensorReading} from './sensor-monitor.js'; import {DISPLAY_IMAGES,presetBitmap,rasterDisplayText} from './display.js';
 // 画面とBlocklyを結び付ける入口。ブロック定義 → 中間データ → ev3.jsでRBF生成 → 接続・転送の順に処理する。
 // 外部ライブラリのdist/vendorは編集せず、独自ブロックと画面側の振る舞いをここに記述する。
 const $=id=>document.getElementById(id);
@@ -8,7 +8,7 @@ const sampleActions=new Map();
 function sampleAction(id){if(!sampleActions.has(id))sampleActions.set(id,{});return sampleActions.get(id);}
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.25.6';
+const VERSION='0.25.9';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE=uiText('マイブロック');
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE=uiText('定義');
@@ -16,11 +16,12 @@ Blockly.Msg.CONTROLS_IF_MSG_THEN=uiText('');
 Blockly.Msg.CONTROLS_IF_MSG_ELSE=uiText('');
 Blockly.Msg.CONTROLS_IF_MSG_ELSEIF=uiText('でなければ、もし');
 Blockly.Msg.CONTROLS_REPEAT_INPUT_DO=uiText('');
+Blockly.Msg.PROCEDURES_CALL_BEFORE_PARAMS='';
 Blockly.Msg.PROCEDURES_CALLNORETURN_TOOLTIP=uiText('マイブロックを呼び出します。');
 function isMyBlockDefinition(b){return ['procedures_defnoreturn','procedures_defreturn'].includes(b?.type);}
 for(const type of ['procedures_callnoreturn','procedures_callreturn']){
  const originalCallInit=Blockly.Blocks[type].init;
- Blockly.Blocks[type].init=function(){originalCallInit.call(this);this.setInputsInline(true);if(type==='procedures_callreturn')this.setOutput(true,'Number');};
+ Blockly.Blocks[type].init=function(){originalCallInit.call(this);this.setColour('#d32f2f');this.setInputsInline(true);if(type==='procedures_callreturn')this.setOutput(true,'Number');};
 }
 Blockly.Msg.PROCEDURES_DEFRETURN_TITLE=uiText('定義');Blockly.Msg.PROCEDURES_DEFRETURN_RETURN=uiText('返す値');
 const deviceNames={7:'Lモーター',8:'Mモーター',16:'EV3 タッチセンサ',29:'EV3 カラーセンサ',30:'EV3 超音波センサ',32:'EV3 ジャイロセンサ',33:'EV3 赤外線センサ'};
@@ -30,7 +31,7 @@ const singlePorts=[['A','1'],['B','2'],['C','4'],['D','8']];
 const pairPorts=[['B + C','6'],['A + B','3'],['A + C','5'],['A + D','9'],['B + D','10'],['C + D','12']];
 Blockly.defineBlocksWithJsonArray([
  {type:'ev3_movement_stop',message0:'停止',previousStatement:null,nextStatement:null,colour:'#ff4ccd',tooltip:'「動きに使うモーター」で設定した左右2個だけをブレーキ停止します。ほかのポートやプログラムは止めず、次の命令へ進みます。左右設定を先に実行してください。タイヤ直径やトレッドは不要です。'},
- {type:'ev3_return_value',message0:'%1 を返してこのマイブロックを終了する',args0:[{type:'input_value',name:'VALUE',check:'Number'}],previousStatement:null,inputsInline:true,colour:'#aa597e',tooltip:'数値を返す定義の中で使います。条件分岐や繰り返しの途中でも、値を返して呼び出し元へ戻ります。'},
+ {type:'ev3_return_value',message0:'%1 を返してこのマイブロックを終了する',args0:[{type:'input_value',name:'VALUE',check:'Number'}],previousStatement:null,inputsInline:true,colour:'#d32f2f',tooltip:'数値を返す定義の中で使います。条件分岐や繰り返しの途中でも、値を返して呼び出し元へ戻ります。'},
  {type:'ev3_movement_setup',message0:'動きに使うモーターを 左 %1 右 %2 にする',args0:[{type:'field_dropdown',name:'LEFT_PORT',options:[singlePorts[1],singlePorts[0],singlePorts[2],singlePorts[3]]},{type:'field_dropdown',name:'RIGHT_PORT',options:[singlePorts[2],singlePorts[0],singlePorts[1],singlePorts[3]]}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#ff4ccd',tooltip:'実行した時点から全処理・マイブロックで共有します。同じポートは選べません。設定だけでは回りません。変更時は以前の左右組を停止します。'},
  {type:'ev3_start',message0:'▶ スタート',nextStatement:null,colour:'#d3a238',tooltip:'EV3本体から起動すると、ここから実行します。複数置くと別々に並行して動きます。全部のスタートが終わると停止します。イベントがある場合はプログラム終了まで監視を続けます。'},
  {type:'ev3_motor',message0:'Lモーター %1 速さ %2 ％で %3 度回す',args0:[{type:'field_dropdown',name:'PORTS',options:[singlePorts[1],singlePorts[0],singlePorts[2],singlePorts[3],...pairPorts]},{type:'input_value',name:'SPEED',check:'Number'},{type:'input_value',name:'DEGREES',check:'Number'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:'#0090f5',tooltip:'速度は-100〜100（0以外）。2ポートを選んだ場合の制御方式は「先生用の設定・計測」で選択します。標準は各モーターの指定角度を優先し、同期方式は検証用です。'},
@@ -105,7 +106,7 @@ Blockly.defineBlocksWithJsonArray([
  {type:'ev3_gyro_reset',message0:'ジャイロセンサ %1 の角度を0にする',args0:[sensorPort()],previousStatement:null,nextStatement:null,colour:'#34ccf1',tooltip:'現在の向きをこのプログラム内の0度にします。ゼロ点は同じポートを使う全処理で共有します。センサ本体の再校正ではなく、接続中のポート表示の生値は変わりません。静止した状態で実行してください。'},
  {type:'ev3_battery_voltage',message0:'EV3本体のバッテリー電圧（V）',output:'Number',colour:'#34ccf1',tooltip:'本体が測定したバッテリー全体の電圧をV単位の小数で返します。残量の％ではありません。'},
  {type:'ev3_battery_current',message0:'EV3本体のバッテリー電流（A）',output:'Number',colour:'#34ccf1',tooltip:'本体が測定したバッテリー全体の消費電流をA単位の小数で返します。モーター1個ごとの電流ではありません。'},
- {type:'ev3_pid',message0:'PID %1 目標値 %2 測定値 %3',args0:[{type:'field_input',name:'NAME',text:'PID1'},{type:'input_value',name:'TARGET',check:'Number'},{type:'input_value',name:'MEASURED',check:'Number'}],message1:'kp %1 ki %2 kd %3 の出力',args1:[{type:'input_value',name:'KP',check:'Number'},{type:'input_value',name:'KI',check:'Number'},{type:'input_value',name:'KD',check:'Number'}],output:'Number',inputsInline:true,colour:'#00b85d',tooltip:'目標値−測定値の偏差と実際の経過秒数でPIDを計算。同じ名前は状態を共有します。初回はP項のみ。同じ1ms内は前回出力。PIDの出力値自体に制限はありません。モーターの速さは計算後に−100〜100へ収めます。D項は偏差の変化を経過秒数で割ります。'},
+ {type:'ev3_pid',message0:'PID %1 目標値 %2 測定値 %3',args0:[{type:'field_input',name:'NAME',text:'PID1'},{type:'input_value',name:'TARGET',check:'Number'},{type:'input_value',name:'MEASURED',check:'Number'}],message1:'kp %1 ki %2 kd %3 の出力',args1:[{type:'input_value',name:'KP',check:'Number'},{type:'input_value',name:'KI',check:'Number'},{type:'input_value',name:'KD',check:'Number'}],output:'Number',inputsInline:true,colour:'#00b85d',tooltip:'目標値−測定値の偏差と実際の経過秒数でPIDを計算。同じ名前は状態を共有します。初回はP項のみ。同じ1ms内は前回出力。出力制限はないので必要な範囲に収めて使います。'},
  {type:'ev3_pid_reset',message0:'PID %1 をリセットする',args0:[{type:'field_input',name:'NAME',text:'PID1'}],previousStatement:null,nextStatement:null,colour:'#d19636',tooltip:'同じ名前のPIDの積分・前回偏差・時刻を消します。次の計算はP項のみ。モーターを動かしたり停止したりする命令ではありません。'},
  {type:'ev3_color_is',message0:'カラーセンサ %1 の色が %2',args0:[sensorPort(),{type:'field_dropdown',name:'COLOR',options:colorNames}],output:'Boolean',inputsInline:true,colour:'#34ccf1',tooltip:'EV3カラーセンサ。選んだ色なら成り立ちます。'},
  {type:'ev3_color_value',message0:'カラーセンサ %1 の色（番号）',args0:[sensorPort()],output:'Number',colour:'#34ccf1',tooltip:'0:色なし、1:黒、2:青、3:緑、4:黄、5:赤、6:白、7:茶。'},
@@ -173,8 +174,13 @@ Blockly.Blocks.controls_if.init=function(){
 };
 // Put the condition first and the loop mode after it, as in the reference.
 Blockly.Blocks.controls_whileUntil.init=function(){
- this.jsonInit({message0:'%1 %2',args0:[{type:'input_value',name:'BOOL',check:'Boolean'},{type:'field_dropdown',name:'MODE',options:[['まで繰り返す','UNTIL'],['の間繰り返す','WHILE']]}],message1:'%1',args1:[{type:'input_statement',name:'DO'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:controlColour,extensions:['controls_whileUntil_tooltip']});
- controlFooter(this);
+ // Keep the legacy MODE value for JSON/XML, code generation and undo. Only fixed labels are visible.
+ this.jsonInit({message0:'%1 %2 %3 %4',args0:[{type:'input_value',name:'BOOL',check:'Boolean'},{type:'field_label_serializable',name:'MODE',text:'UNTIL'},{type:'field_label',name:'UNTIL_LABEL',text:'まで繰り返す'},{type:'field_label',name:'WHILE_LABEL',text:'の間繰り返す'}],message1:'%1',args1:[{type:'input_statement',name:'DO'}],previousStatement:null,nextStatement:null,inputsInline:true,colour:controlColour,extensions:['controls_whileUntil_tooltip']});
+ const mode=this.getField('MODE'),update=mode.doValueUpdate_;
+ const refresh=()=>{this.getField('UNTIL_LABEL').setVisible(mode.getValue()!=='WHILE');this.getField('WHILE_LABEL').setVisible(mode.getValue()==='WHILE');};
+ mode.doClassValidation_=value=>['UNTIL','WHILE'].includes(value)?value:null;
+ mode.doValueUpdate_=function(value){update.call(this,value);refresh();};
+ mode.setVisible(false);refresh();controlFooter(this);
 };
 for(const type of ['controls_repeat_ext','ev3_forever','ev3_wait_until','ev3_wait_seconds','ev3_wait']){
  const init=Blockly.Blocks[type].init;
@@ -255,14 +261,14 @@ const toolbox={kind:'categoryToolbox',contents:[
  {kind:'category',name:'音',colour:'#a570b3',contents:[{kind:'block',type:'ev3_tone',inputs:{FREQUENCY:shadow(440),MS:shadow(200)}}]},
  {kind:'category',name:'制御',colour:controlColour,contents:[{kind:'block',type:'ev3_wait_seconds',inputs:{SECONDS:shadow(1)}},{kind:'block',type:'controls_if'},{kind:'block',type:'controls_if',extraState:{hasElse:true}},{kind:'block',type:'ev3_forever'},{kind:'block',type:'controls_repeat_ext',inputs:{TIMES:shadow(10)}},{kind:'block',type:'controls_whileUntil',fields:{MODE:'UNTIL'}},{kind:'block',type:'controls_whileUntil',fields:{MODE:'WHILE'}},{kind:'block',type:'ev3_wait_until'},{kind:'block',type:'ev3_program_end'},{kind:'block',type:'ev3_myblock_return'}]},
  {kind:'category',name:'演算',colour:operatorColour,contents:[num(0),...['add','sub','mul','div'].map(op=>({kind:'block',type:'ev3_op_'+op,inputs:{A:shadow(1),B:shadow(1)}})),{kind:'block',type:'ev3_math_function',inputs:{VALUE:shadow(1)}},...['lt','eq','gt','lte','gte','neq'].map(op=>({kind:'block',type:'ev3_op_'+op,inputs:{A:shadow(0),B:shadow(100)}})),...['and','or'].map(op=>({kind:'block',type:'ev3_op_'+op})),{kind:'block',type:'logic_negate'},{kind:'block',type:'logic_boolean'}]},
- {kind:'category',name:'変数',colour:'#c58245',custom:'VARIABLE'},
- {kind:'category',name:'マイブロック',colour:'#aa597e',custom:'PROCEDURE'},
+ {kind:'category',name:'変数',colour:'#ff8c1a',custom:'VARIABLE'},
+ {kind:'category',name:'マイブロック',colour:'#d32f2f',custom:'PROCEDURE'},
  {kind:'category',name:'引数',colour:'#668b6d',custom:'ARGUMENTS'}
 ]};
 
 // 本体ボタンは互換読み込みのため定義を残し、新規の一覧だけから一時的に外す。
 const group=name=>toolbox.contents.find(c=>c.name===name).contents;
-group('制御').push({kind:'label',text:'PID制御'},{kind:'block',type:'ev3_pid',inputs:{TARGET:shadow(0),MEASURED:shadow(0),KP:shadow(1),KI:shadow(0),KD:shadow(0)}},{kind:'block',type:'ev3_pid_reset'});
+group('演算').push({kind:'label',text:'PID制御'},{kind:'block',type:'ev3_pid',inputs:{TARGET:shadow(0),MEASURED:shadow(0),KP:shadow(1),KI:shadow(0),KD:shadow(0)}},{kind:'block',type:'ev3_pid_reset'});
 toolbox.contents.splice(1,0,{kind:'category',name:'イベント',colour:'#d3a238',contents:[{kind:'label',text:'センサ・比較を条件の欄に入れます'},{kind:'block',type:'ev3_when_condition'},{kind:'block',type:'ev3_when_changed'},{kind:'label',text:'名前が同じメッセージで連携します'},{kind:'block',type:'ev3_when_message'},{kind:'block',type:'ev3_message_send'},{kind:'block',type:'ev3_message_wait'}]});
 group('センサー').splice(group('センサー').findIndex(x=>x.type==='ev3_encoder')+1,0,{kind:'block',type:'ev3_motor_speed'});
 group('動き').splice(2,0,...['angle','time'].map(action=>({kind:'block',type:'ev3_tank_'+action,inputs:{LEFT_SPEED:shadow(30),RIGHT_SPEED:shadow(15),...(action==='angle'?{DEGREES:shadow(360)}:{SECONDS:shadow(1)})}})));
@@ -278,8 +284,7 @@ group('動き').splice(spinIndex,0,{kind:'label',text:'旋回前にタイヤ直�
 group('演算').push(...['mod','random','min','max'].map(op=>({kind:'block',type:'ev3_data_'+op,inputs:{A:shadow(1),B:shadow(10)}})),{kind:'block',type:'ev3_data_round',inputs:{A:shadow(1.5)}},{kind:'block',type:'ev3_data_clamp',inputs:{A:shadow(120),LOW:shadow(-100),HIGH:shadow(100)}});
 const textShadow=t=>({shadow:{type:'ev3_text',fields:{TEXT:t}}});
 toolbox.contents.splice(toolbox.contents.findIndex(c=>c.name==='変数'),0,
- {kind:'category',name:'画面',colour:'#9966ff',contents:[{kind:'label',text:'EV3本体：178×128ドット／左上が0,0'},{kind:'block',type:'ev3_display_clear'},{kind:'block',type:'ev3_display_text'},{kind:'block',type:'ev3_display_image'},{kind:'block',type:'ev3_display_number',inputs:{VALUE:shadow(12.5)}}]},
- {kind:'category',name:'ランプ',colour:'#9966ff',contents:[{kind:'block',type:'ev3_led'},{kind:'block',type:'ev3_led_off'}]},
+ {kind:'category',name:'画面',colour:'#9966ff',contents:[{kind:'label',text:'EV3本体：178×128ドット／左上が0,0'},{kind:'block',type:'ev3_display_clear'},{kind:'block',type:'ev3_display_text'},{kind:'block',type:'ev3_display_image'},{kind:'block',type:'ev3_display_number',inputs:{VALUE:shadow(12.5)}},{kind:'label',text:'本体ランプ：色・点滅・明暗'},{kind:'block',type:'ev3_led'},{kind:'block',type:'ev3_led_off'}]},
  {kind:'category',name:'データ',colour:'#ff8c1a',contents:[{kind:'label',text:'文字列（UTF-8で120バイトまで）'},{kind:'block',type:'ev3_text'},{kind:'block',type:'ev3_text_get'},{kind:'block',type:'ev3_text_set',inputs:{VALUE:textShadow('こんにちは')}},{kind:'block',type:'ev3_text_join',inputs:{A:textShadow('こんにちは'),B:textShadow('EV3')}},{kind:'block',type:'ev3_text_length',inputs:{VALUE:textShadow('こんにちは')}},{kind:'block',type:'ev3_text_letter',inputs:{VALUE:textShadow('こんにちは'),INDEX:shadow(1)}},...['contains','equal'].map(op=>({kind:'block',type:'ev3_text_'+op,inputs:{A:textShadow('こんにちは'),B:textShadow('こん')}})),{kind:'block',type:'ev3_text_number',inputs:{VALUE:shadow(12.5)}},{kind:'block',type:'ev3_text_to_number',inputs:{VALUE:textShadow('12.5')}},{kind:'label',text:'数値リスト（同じ名前で共有）'},...['clear','add','set','delete','item','length','contains','stat'].map(op=>({kind:'block',type:'ev3_list_'+op,inputs:{...(['set','delete','item'].includes(op)?{INDEX:shadow(1)}:{}),...(['add','set','contains'].includes(op)?{VALUE:shadow(0)}:{})}}))]},
  {kind:'category',name:'記録',colour:'#c58245',contents:[{kind:'block',type:'ev3_log_start'},{kind:'block',type:'ev3_log_value',inputs:{VALUE:shadow(0)}},{kind:'block',type:'ev3_log_end'}]});
 
@@ -331,14 +336,14 @@ function argumentFlyout(ws){
  return globalThis.EBLi18n?.toolbox(items)??items;
 }
 Blockly.Blocks.ev3_argument={
- init:function(){this.parameterId='';this.appendDummyInput().appendField(new Blockly.FieldLabelSerializable('名前'),'ARG_NAME');this.setOutput(true,'Number');this.setColour('#aa597e');this.setTooltip('同じ引数名を定義したマイブロックの中で使えます。値は呼び出しごとに別々です。');},
+ init:function(){this.parameterId='';this.appendDummyInput().appendField(new Blockly.FieldLabelSerializable('名前'),'ARG_NAME');this.setOutput(true,'Number');this.setColour('#d32f2f');this.setTooltip('同じ引数名を定義したマイブロックの中で使えます。値は呼び出しごとに別々です。');},
  saveExtraState:function(){return {parameterId:this.parameterId,name:this.getFieldValue('ARG_NAME')};},
  loadExtraState:function(state){this.parameterId=String(state.parameterId??'');this.setFieldValue(String(state.name??'名前'),'ARG_NAME');}
 };
 for(const type of ['variables_get','variables_set','math_change']){
  const init=Blockly.Blocks[type].init;
  Blockly.Blocks[type].init=function(){
-   init.call(this);
+   init.call(this);this.setColour('#ff8c1a');
    const field=this.getField('VAR'),originalOptions=field.getOptions.bind(field);
    field.getOptions=function(useCache){
      const ws=this.getSourceBlock().workspace.targetWorkspace??this.getSourceBlock().workspace;
@@ -375,8 +380,8 @@ function setDefinitionOutputs(block,names){
 }
 for(const type of ['procedures_defnoreturn','procedures_defreturn']){
  const base=Blockly.Blocks[type],init=base.init,save=base.saveExtraState,load=base.loadExtraState;
- base.init=function(){init.call(this);this.setMutator(null);if(type==='procedures_defreturn')setDefinitionOutputs(this,['値']);
-  const menu=this.customContextMenu;this.customContextMenu=function(options){menu?.call(this,options);options.unshift({text:uiText('名前・引数・戻り値を編集'),enabled:true,callback:()=>openMyBlockDialog(this.id)});};
+ base.init=function(){init.call(this);this.setColour('#d32f2f');this.setMutator(null);if(type==='procedures_defreturn')setDefinitionOutputs(this,['値']);
+
  };
  if(type==='procedures_defreturn'){
   const mutation=base.mutationToDom; base.mutationToDom=function(...args){const node=mutation.apply(this,args);node.setAttribute('outputs',JSON.stringify(outputNames(this)));return node;};
@@ -401,7 +406,7 @@ for(const type of ['procedures_defnoreturn','procedures_defreturn']){
  };
 }
 Blockly.Blocks.ev3_return_values={
- init(){this.setPreviousStatement(true);this.setColour('#aa597e');this.setInputsInline(true);this.returnNames_=[];this.loadExtraState({outputs:['値1','値2']});},
+ init(){this.setPreviousStatement(true);this.setColour('#d32f2f');this.setInputsInline(true);this.returnNames_=[];this.loadExtraState({outputs:['値1','値2']});},
  saveExtraState(){return {outputs:this.returnNames_};},
  loadExtraState(state){this.returnNames_=state.outputs??['値1','値2'];for(const input of [...this.inputList])if(/^VALUE\d+$/.test(input.name)&&Number(input.name.slice(5))>=this.returnNames_.length)this.removeInput(input.name);this.returnNames_.forEach((name,i)=>{const key='VALUE'+i;if(!this.getInput(key))this.appendValueInput(key).setCheck('Number').appendField(name,'LABEL'+i);else this.setFieldValue(name,'LABEL'+i);});if(!this.getInput('END'))this.appendDummyInput('END').appendField('を返してこのマイブロックを終了する');else this.moveInputBefore('END',null);}
 };
@@ -550,25 +555,27 @@ function configureEditorInteractions(workspace){
   if(event.type===Blockly.Events.CLICK&&event.targetType==='workspace')workspace.getToolbox().clearSelection();
  });
 }
-const theme=Blockly.Theme.defineTheme('ev3lab',{base:Blockly.Themes.Classic,fontStyle:{family:'"Yu Gothic UI", Meiryo, sans-serif',size:12},blockStyles:{procedure_blocks:{colourPrimary:'#aa597e'},math_blocks:{colourPrimary:'#668b6d'},variable_blocks:{colourPrimary:'#c58245'},loop_blocks:{colourPrimary:'#d19636'}},componentStyles:{workspaceBackgroundColour:'#fbfcfd',toolboxBackgroundColour:'#f4f7f8',flyoutBackgroundColour:'#eef3f5',flyoutOpacity:1,scrollbarColour:'#b9c9ce',insertionMarkerColour:'#126c67',insertionMarkerOpacity:.3}});
+function sortedMyBlockDefinitions(ws){return ws.getAllBlocks(false).filter(isMyBlockDefinition).sort((a,b)=>{const x=a.getFieldValue('NAME'),y=b.getFieldValue('NAME');return x===y?0:x<y?-1:1;});}
+function myBlockFlyout(ws){
+ const items=[{kind:'button',text:'マイブロックを作る',callbackKey:'EV3_CREATE_MYBLOCK'}];
+ for(const def of sortedMyBlockDefinitions(ws)){
+  const name=def.getFieldValue('NAME'),models=def.getVarModels();
+  items.push({kind:'block',type:def.type==='procedures_defreturn'?'procedures_callreturn':'procedures_callnoreturn',extraState:{name,params:models.map(m=>m.getName()),outputs:outputNames(def)},inputs:Object.fromEntries(models.map((m,i)=>['ARG'+i,shadow(0)]))});
+  if(outputNames(def).length>1)items.push({kind:'block',type:'ev3_return_values',extraState:{outputs:outputNames(def)},inputs:Object.fromEntries(outputNames(def).map((_,i)=>['VALUE'+i,shadow(0)]))});
+ }
+ items.push({kind:'block',type:'ev3_return_value',inputs:{VALUE:shadow(0)}});
+ return globalThis.EBLi18n?.toolbox(items)??items;
+}
+Blockly.ContextMenuRegistry.registry.register({id:'eblEditMyBlock',scopeType:Blockly.ContextMenuRegistry.ScopeType.BLOCK,weight:0,displayText:()=>uiText('名前・引数・戻り値を編集'),preconditionFn:({block})=>isMyBlockDefinition(block)&&!block.isInFlyout?'enabled':'hidden',callback:({block})=>openMyBlockDialog(block.id)});
+const theme=Blockly.Theme.defineTheme('ev3lab',{base:Blockly.Themes.Classic,fontStyle:{family:'"Yu Gothic UI", Meiryo, sans-serif',size:12},blockStyles:{procedure_blocks:{colourPrimary:'#d32f2f'},math_blocks:{colourPrimary:'#668b6d'},variable_blocks:{colourPrimary:'#ff8c1a'},loop_blocks:{colourPrimary:'#d19636'}},componentStyles:{workspaceBackgroundColour:'#fbfcfd',toolboxBackgroundColour:'#f4f7f8',flyoutBackgroundColour:'#eef3f5',flyoutOpacity:1,scrollbarColour:'#b9c9ce',insertionMarkerColour:'#126c67',insertionMarkerOpacity:.3}});
 const workspace=Blockly.inject('blocklyDiv',{toolbox:globalThis.EBLi18n?.toolbox(toolbox)??toolbox,theme,renderer:'zelos',media:'vendor/media/',trashcan:true,scrollbars:true,grid:{spacing:24,length:2,colour:'#e5ebee',snap:false},zoom:{controls:true,wheel:true,startScale:.85,minScale:.35,maxScale:1.5,scaleSpeed:1.1},move:{scrollbars:true,drag:true,wheel:true},sounds:false});
 configureEditorInteractions(workspace);
 workspace.registerToolboxCategoryCallback('ARGUMENTS',argumentFlyout);
 workspace.registerToolboxCategoryCallback('VARIABLE',variableFlyout);
 workspace.registerButtonCallback('EV3_CREATE_VARIABLE',()=>openVariableDialog());
 workspace.registerButtonCallback('EV3_CREATE_MYBLOCK',()=>openMyBlockDialog());
-workspace.registerToolboxCategoryCallback('PROCEDURE',ws=>{
- const items=[{kind:'button',text:'マイブロックを作る',callbackKey:'EV3_CREATE_MYBLOCK'}];
- for(const def of ws.getAllBlocks(false).filter(b=>isMyBlockDefinition(b))){
-  const key='EV3_EDIT_'+def.id,name=def.getFieldValue('NAME'),models=def.getVarModels();
-  workspace.registerButtonCallback(key,()=>openMyBlockDialog(def.id));
-  items.push({kind:'block',type:def.type==='procedures_defreturn'?'procedures_callreturn':'procedures_callnoreturn',extraState:{name,params:models.map(m=>m.getName()),outputs:outputNames(def)},inputs:Object.fromEntries(models.map((m,i)=>['ARG'+i,shadow(0)]))},{kind:'button',text:'「'+name+'」を編集',callbackKey:key});
- }
- for(const def of ws.getAllBlocks(false).filter(b=>outputNames(b).length>1))items.push({kind:'block',type:'ev3_return_values',extraState:{outputs:outputNames(def)},inputs:Object.fromEntries(outputNames(def).map((_,i)=>['VALUE'+i,shadow(0)]))});
- items.push({kind:'block',type:'ev3_return_value',inputs:{VALUE:{shadow:{type:'math_number',fields:{NUM:0}}}}});
- return globalThis.EBLi18n?.toolbox(items)??items;
-});
-let lastBuild=null,busy=false,loading=false,dirty=false,saveTimer,baselineCounts=null,lastTimingSignature=null,monitorTimer=null;
+workspace.registerToolboxCategoryCallback('PROCEDURE',myBlockFlyout);
+let lastBuild=null,busy=false,connecting=false,loading=false,dirty=false,saveTimer,baselineCounts=null,lastTimingSignature=null,monitorTimer=null;
 const logs=[];
 // 通信と操作の記録を画面に表示する。長時間利用時の増大を防ぐため、直近1200行だけ保持する。
 function log(type,message){
@@ -578,12 +585,13 @@ function log(type,message){
 }
 const connection=new EV3Connection(log,connected=>{
   if(!connected){stopSensorMonitor();clearSensorValues();baselineCounts=null;$('countResult').textContent='切断したため計測の開始角度を解除しました。接続後に記録し直してください。';}
-  $('connection').classList.toggle('connected',connected);$('connection').innerHTML=connected?'<i></i>接続済み':'<i></i>未接続';
+  renderConnectionBadge($('connection'),{connected,connecting},uiText);
   if(!connected)$('brickLabel').textContent=($('connectionMethod').value==='usb'?'USB':'Bluetooth')+' / 未接続';
   $('connect').hidden=connected;$('disconnect').hidden=!connected;updateButtons();
 });
 // 接続済みだけで転送可能にはしない。有効な名前・生成成功・通信中でないことを合わせて判定する。
 function updateButtons(){
+  renderConnectionBadge($('connection'),{connected:connection.connected,connecting},uiText);
   let validName=true;
   try{programFileName($('programName').value);}catch{validName=false;}
   $('programName').setAttribute('aria-invalid',String(!validName));
@@ -764,7 +772,7 @@ function ensureArgumentInputs(){
   try{
     for(const block of workspace.getAllBlocks(false)){
       if(block.type==='variables_get'){
-        const argument=localArgument(block),colour=argument?'#aa597e':'#c58245';
+        const argument=localArgument(block),colour=argument?'#d32f2f':'#ff8c1a';
         if(block.getField('EV3_KIND'))block.inputList[0].removeField('EV3_KIND');
         if(block.getColour()!==colour)block.setColour(colour);
       }
@@ -787,9 +795,9 @@ function ensureArgumentInputs(){
 function check(){
   try{
     ensureArgumentInputs();
-    lastBuild=compile(program(),$('ev3ProjectName').value);$('buildStatus').textContent='✓ 転送用プログラムを生成できます';$('buildStatus').className='build-status';
+    lastBuild=compile(program(),$('ev3ProjectName').value);notices.program();
     $('buildDetails').textContent=`${lastBuild.data.length} バイト / マイブロック ${lastBuild.program.procedures.length} 個 / EV3標準形式${lastBuild.usesParallel?' / 並行 '+lastBuild.threadCount+' 処理':''}${lastBuild.usesRamps?' / 加減速（試作）':''}${lastBuild.usesFloat?' / 小数計算対応':''}${lastBuild.usesSensors?' / センサは本体実行時に読み取り':''}`;
-  }catch(e){lastBuild=null;$('buildStatus').textContent=e.message;$('buildStatus').className='build-status error';$('buildDetails').textContent='ブロックを修正すると、自動で確認します。';}
+  }catch(e){lastBuild=null;notices.program(uiText(e.message),e.blockId);$('buildDetails').textContent='ブロックを修正すると、自動で確認します。';}
   updateButtons();return lastBuild;
 }
 
@@ -827,12 +835,16 @@ function restore(data){
 function saveLocal(){
   if(loading)return;
   try{localStorage.setItem(STORAGE,JSON.stringify(project()));$('saveState').textContent='✓ この端末に自動保存済み';}
-  catch{$('saveState').textContent='自動保存できません。「保存」でファイルを保存してください。';}
+  catch{$('saveState').textContent='自動保存できません。「保存」でファイルを保存してください。';feedback('自動保存できません。「保存」でファイルを保存してください。',true,'save');}
 }
 function download(data,name,type='application/octet-stream'){
   const url=URL.createObjectURL(new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
-function feedback(message,error=false){$('transferResult').textContent=message;$('transferResult').className=`result ${error?'error':''}`;}
+const notices=installNotices({workspace,programPanel:$('programNotice'),programText:$('buildStatus'),hint:$('editorHint'),programAction:$('programActionStatus'),saveNotice:$('saveNotice'),targets:{connect:$('connectStatus'),transfer:$('transferResult')},onResize:()=>requestAnimationFrame(()=>Blockly.svgResize(workspace)),showConnection:()=>showConnectionPanel(true)});
+installNumericTextNormalization(Blockly,{document,notice:$('numberInputNotice'),message:()=>uiText('半角に直しました')});
+function feedback(message,error=false,where='program'){notices.notify(uiText(message),error,where);}
+function connectFeedback(message,error=false){feedback(message,error,'connect');}
+function transferFeedback(message,error=false){feedback(message,error,'transfer');}
 const n=(name,val)=>`<value name="${name}"><shadow type="math_number"><field name="NUM">${val}</field></shadow></value>`;
 const arg=(name)=>`<block type="variables_get"><field name="VAR" id="arg-${name}">${name}</field></block>`;
 // 授業・実機確認用のサンプルを生成する。サンプルへの置き換えは呼び出し側で未保存変更を確認する。
@@ -929,7 +941,7 @@ $('zoomToFit').onclick=()=>{
 };
 $('help').onclick=()=>$('helpDialog').showModal();
 $('newProject').onclick=()=>{
- if(workspace.getAllBlocks(false).length && !confirm('新しいプログラムを作ります。現在のプログラムが必要な場合は、先に「保存」してください。'))return;
+ if(workspace.getAllBlocks(false).length && !confirm(uiText('新しいプログラムを作ります。現在のプログラムが必要な場合は、先に「保存」してください。')))return;
  loading=true;
  try{Blockly.serialization.workspaces.load({blocks:{languageVersion:0,blocks:[{type:'ev3_start',x:30,y:35}]}},workspace);$('ev3ProjectName').value='EV3Lab';$('programName').value='MyProgram';workspace.clearUndo();}
  finally{loading=false;}
@@ -956,12 +968,12 @@ function loadRampSample(){
  check();saveLocal();dirty=false;feedback('LモーターBを台形→1秒待つ→S字の順に720度ずつ回します。速度30％、加速・減速各1秒です。実機確認をお願いします。');
 }
 sampleAction('rampSample').onclick=()=>loadRampSample();
-$('saveProject').onclick=()=>{try{const filename=programFileName($('programName').value).replace(/\.rbf$/,'.ev3lab');download(JSON.stringify(project(),null,2),filename,'application/json');dirty=false;}catch(e){feedback(e.message,true);$('programName').focus();}};
+$('saveProject').onclick=()=>{try{const filename=programFileName($('programName').value).replace(/\.rbf$/,'.ev3lab');download(JSON.stringify(project(),null,2),filename,'application/json');dirty=false;feedback('作品ファイルのダウンロードを開始しました。',false,'save');}catch(e){feedback(e.message,true,'save');$('programName').focus();}};
 $('loadProject').onclick=()=>$('fileInput').click();
 $('fileInput').onchange=async e=>{
   const file=e.target.files[0];e.target.value='';if(!file)return;
   try{if(file.size>2*1024*1024)throw Error('プロジェクトは2MB以下にしてください。');const data=JSON.parse(await file.text());
-    if(dirty && !confirm('現在の編集内容をファイルの内容に置き換えますか？'))return;
+    if(dirty && !confirm(uiText('現在の編集内容をファイルの内容に置き換えますか？')))return;
     const needsMovement=restore(data);saveLocal();dirty=false;if(!needsMovement)feedback('プロジェクトを読み込みました。');
   }catch(e){
     const reason=file.size>2*1024*1024?'ファイルが大きすぎます。2MB以下の作品を選んでください。':'このファイルは作品として開けません。';
@@ -971,33 +983,33 @@ $('fileInput').onchange=async e=>{
 let savedPath='';
 $('connect').onclick=async()=>{
   const method=$('connectionMethod').value;
-  busy=true;updateButtons();feedback(method==='usb'?'USBケーブルをEV3のPC端子につなぎ、選択画面でEV3を選んでください。':'EV3のBluetoothシリアルポートを選んでください。');
-  try{await connection.connect(method);const fw=await connection.ping();$('brickLabel').textContent=`${method==='usb'?'USB':'Bluetooth'} / EV3 / ${fw || '標準ファームウェア'}`;feedback('EV3を確認しました。「転送・照合」で本体に保存できます。');}
-  catch(e){log('エラー',`${e.name}: ${e.message}`);feedback(e.name==='NotFoundError'?'接続先の選択をキャンセルしました。':e.name==='SecurityError'||e.name==='NotAllowedError'?'接続が許可されませんでした。Chromeでサイトを直接開き、サイトや学校の端末の接続許可を確認してください。'+e.message:e.message,true);await connection.close();}
-  finally{busy=false;updateButtons();}
+  busy=true;connecting=true;updateButtons();connectFeedback(method==='usb'?'USBケーブルをEV3のPC端子につなぎ、選択画面でEV3を選んでください。':'EV3のBluetoothシリアルポートを選んでください。');
+  try{await connection.connect(method);const fw=await connection.ping();$('brickLabel').textContent=`${method==='usb'?'USB':'Bluetooth'} / EV3 / ${fw || '標準ファームウェア'}`;connectFeedback('EV3を確認しました。「転送・照合」で本体に保存できます。');}
+  catch(e){log('エラー',`${e.name}: ${e.message}`);connectFeedback(e.name==='NotFoundError'?'接続先の選択をキャンセルしました。':e.name==='SecurityError'||e.name==='NotAllowedError'?'接続が許可されませんでした。Chromeでサイトを直接開き、サイトや学校の端末の接続許可を確認してください。'+e.message:e.message,true);await connection.close();}
+  finally{connecting=false;busy=false;updateButtons();}
 };
-$('disconnect').onclick=async()=>{busy=true;updateButtons();await connection.close();feedback(savedPath?`切断しました。EV3を再起動して、${savedPath.split('/').slice(-2).join(' → ')} を選んでください。`:'切断しました。');busy=false;updateButtons();};
+$('disconnect').onclick=async()=>{busy=true;updateButtons();await connection.close();connectFeedback(savedPath?`切断しました。EV3を再起動して、${savedPath.split('/').slice(-2).join(' → ')} を選んでください。`:'切断しました。');busy=false;updateButtons();};
 // EV3用ファイル名は入力したプログラム名から作り、拡張子.rbfを自動で付ける。
 function fileName(){
   return programFileName($('programName').value);
 }
 async function transferProgram(run=false){
   const build=check();if(!build)return;
-  let filename;try{filename=fileName();}catch(e){feedback(e.message,true);return;}
-  stopSensorMonitor();busy=true;updateButtons();$('progress').hidden=false;$('progress').value=0;feedback(`「${filename}」を保存しています。同じ名前のプログラムは上書きされます…`);
+  let filename;try{filename=fileName();}catch(e){transferFeedback(e.message,true);return;}
+  stopSensorMonitor();busy=true;updateButtons();$('progress').hidden=false;$('progress').value=0;transferFeedback(`「${filename}」を保存しています。同じ名前のプログラムは上書きされます…`);
   try{
     log('プログラム',JSON.stringify({name:$('programName').value,filename,ir:build.program}));
     savedPath='';
-    const result=await connection[run?'transferAndRun':'transferWithSignal'](build.data,filename,p=>{$('progress').value=p;feedback(p===100?'送信完了。EV3から読み戻して照合しています…':`本体に保存しています… ${p}%`);},$('ev3ProjectName').value);
+    const result=await connection[run?'transferAndRun':'transferWithSignal'](build.data,filename,p=>{$('progress').value=p;transferFeedback(p===100?'送信完了。EV3から読み戻して照合しています…':`本体に保存しています… ${p}%`);},$('ev3ProjectName').value);
     savedPath=result.path;
     $('transferResult').className='result success';$('transferResult').textContent=`✓ 照合完了（${build.data.length}バイト一致）。保存先：${savedPath.split('/').slice(-2).join(' → ')}。${result.soundError?'完了音は確認できませんでしたが、転送・照合は完了しています（'+result.soundError+'）。':'EV3へ完了音を送信しました。'}${run?'今回のプログラムの起動命令を送信しました。止めるときは「実行を停止」を押してください。':'本体でこのプログラムを選んで実行してください。'}`;
-  }catch(e){if(e.verifiedPath)savedPath=e.verifiedPath;log('エラー',e.message);feedback(e.verifiedPath?`転送・照合は完了していますが、起動を確認できません。${e.message}`:`転送未完了：${e.message}`,true);}
+  }catch(e){if(e.verifiedPath)savedPath=e.verifiedPath;log('エラー',e.message);transferFeedback(e.verifiedPath?`転送・照合は完了していますが、起動を確認できません。${e.message}`:`転送未完了：${e.message}`,true);}
   finally{busy=false;$('progress').hidden=true;updateButtons();}
 };
 $('transfer').onclick=()=>transferProgram(false);
 $('transferRun').onclick=()=>transferProgram(true);
-$('stopProgram').onclick=async()=>{stopSensorMonitor();busy=true;updateButtons();try{await connection.stopProgram();feedback('EV3へプログラムと全モーターの停止命令を送信しました。');}catch(e){feedback('停止を確認できません。本体の戻るボタンで停止してください。'+e.message,true);}finally{busy=false;updateButtons();}};
-$('downloadRbf').onclick=()=>{const b=check();if(b){try{download(b.data,fileName());log('ファイル生成',`${b.data.length} bytes / ${hex(b.data.slice(0,28))}`);feedback('.rbfを保存しました。ファイルの保存だけではEV3への転送は完了していません。');}catch(e){feedback(e.message,true);}}};
+$('stopProgram').onclick=async()=>{stopSensorMonitor();busy=true;updateButtons();try{await connection.stopProgram();transferFeedback('EV3へプログラムと全モーターの停止命令を送信しました。');}catch(e){transferFeedback('停止を確認できません。本体の戻るボタンで停止してください。'+e.message,true);}finally{busy=false;updateButtons();}};
+$('downloadRbf').onclick=()=>{const b=check();if(b){try{download(b.data,fileName());log('ファイル生成',`${b.data.length} bytes / ${hex(b.data.slice(0,28))}`);feedback('.rbfを保存しました。ファイルの保存だけではEV3への転送は完了していません。',false,'save');}catch(e){feedback(e.message,true);}}};
 $('toggleLog').onclick=()=>{const open=$('logContent').hidden;$('logContent').hidden=!open;$('toggleLog').setAttribute('aria-expanded',String(open));};
 $('clearLog').onclick=()=>{logs.length=0;$('log').textContent='';$('lastLog').textContent='ログを消去しました';};
 $('saveLog').onclick=()=>download(JSON.stringify({appVersion:VERSION,time:new Date().toISOString(),userAgent:navigator.userAgent,secureContext:isSecureContext,serialSupported:!!navigator.serial,hidSupported:!!navigator.hid,connectionMethod:connection.transport,project:project(),log:logs},null,2),'ev3-test-log.json','application/json');
@@ -1062,14 +1074,15 @@ $('variableForm').onsubmit=event=>{
 // 接続パネルの開閉で編集領域の幅が変わる。次の描画でもBlocklyの寸法を更新する。
 let connectionLayoutFrame=0;
 function showConnectionPanel(open){
- $('connectionPanel').hidden=!open;$('toggleConnectionPanel').setAttribute('aria-expanded',String(open));
+ $('connectionPanel').hidden=!open;$('toggleConnectionPanel').setAttribute('aria-expanded',String(open));$('connection').setAttribute('aria-expanded',String(open));
  cancelAnimationFrame(connectionLayoutFrame);connectionLayoutFrame=requestAnimationFrame(()=>{connectionLayoutFrame=0;Blockly.svgResize(workspace);});
  if(open)$('closeConnectionPanel').focus();else $('toggleConnectionPanel').focus();
 }
 $('toggleConnectionPanel').onclick=()=>showConnectionPanel($('connectionPanel').hidden);
+$('connection').onclick=()=>showConnectionPanel($('connectionPanel').hidden);
 $('closeConnectionPanel').onclick=()=>showConnectionPanel(false);
 for(const menu of document.querySelectorAll('.toolbar-menu')){
- menu.addEventListener('click',event=>{if(event.target.closest('button'))menu.open=false;});
+ menu.addEventListener('click',event=>{if(event.target.closest('button,a[href]'))menu.open=false;});
  menu.addEventListener('toggle',()=>{if(menu.open)for(const other of document.querySelectorAll('.toolbar-menu'))if(other!==menu)other.open=false;});
 }
 document.addEventListener('click',event=>{if(!event.target.closest('.toolbar-menu'))for(const menu of document.querySelectorAll('.toolbar-menu'))menu.open=false;});
@@ -1088,7 +1101,7 @@ function clearSensorValues(){for(let p=1;p<=4;p++){$('sensorValue'+p).textConten
 async function refreshSensorValues(){
  if(!connection.connected||busy){if($('autoSensors').checked)monitorTimer=setTimeout(refreshSensorValues,500);return;}
  busy=true;updateButtons();$('sensorMonitorStatus').textContent='読み取っています…';
- try{const snapshot=await connection.readSensorSnapshot();for(const input of snapshot.inputs){const reading=sensorReading(input);$('sensorDevice'+input.port).textContent=deviceName(input.type);$('sensorLabel'+input.port).textContent=reading.label;$('sensorValue'+input.port).textContent=reading.text;}for(const motor of snapshot.motors){$('motorValue'+motor.port).textContent=motor.value===null?'—':motor.value+'°';$('motorLabel'+motor.port).textContent=deviceName(motor.type);}$('sensorMonitorStatus').textContent='更新 '+new Date().toLocaleTimeString();}
+ try{const snapshot=await connection.readSensorSnapshot();for(const input of snapshot.inputs){const reading=sensorReading(input,uiText);$('sensorDevice'+input.port).textContent=deviceName(input.type);$('sensorLabel'+input.port).textContent=reading.label;$('sensorValue'+input.port).textContent=reading.text;}for(const motor of snapshot.motors){$('motorValue'+motor.port).textContent=motor.value===null?'—':motor.value+'°';$('motorLabel'+motor.port).textContent=deviceName(motor.type);}$('sensorMonitorStatus').textContent='更新 '+new Date().toLocaleTimeString();}
  catch(e){stopSensorMonitor();clearSensorValues();$('sensorMonitorStatus').textContent='読み取れませんでした。'+e.message;}
  finally{busy=false;updateButtons();if($('autoSensors').checked&&connection.connected)monitorTimer=setTimeout(refreshSensorValues,500);}
 }

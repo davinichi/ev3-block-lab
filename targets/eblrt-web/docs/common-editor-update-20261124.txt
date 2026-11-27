@@ -1,0 +1,35 @@
+共通操作の更新 / Common editor update — 0.34.3-ev3rt.1 (2026-11-24)
+
+マイブロックの定義・呼出し・戻り値・引数を赤、通常の変数をオレンジに統一しました。データ・記録の色は変更しません。
+
+マイブロックの編集は、ワークスペースに置いた定義の見出しを右クリックし、「名前・引数・戻り値を編集」から開きます。左側一覧の個別の編集ボタンは廃止しました。
+
+呼出しブロックの「引数」という見出しを省略しました。引数の名前、順序、入力欄はそのままです。
+
+マイブロック一覧を文字コード順で表示します。英数字はASCII順です。数字の接頭辞は0、10、2の順です。日本語も同じ文字比較で並べます。定義や作品の実行順は変えません。
+
+「ランプ」を「画面」に統合しました。画面命令の後に「本体ランプ：色・点滅・明暗」があります。EV3の画面・画像ブロックは残しています。
+
+既存の作品、引数、最大8個の名前付き戻り値、マイブロックの保存・読込は維持します。今回、モーター制御、PID、待機時間、CSVの記録処理は変更していません。
+
+SBL v0.9.5〜0.9.7のSPIKE絶対角度・完了通知・距離センサー通信対応と、v0.9.9のSPIKE用サンプルはEV3には移植しません。各機種のハードウェア仕様を維持します。
+
+自動試験とブラウザ表示を確認しています。今回の変更後のEV3実機走行・転送は未確認です。EBL-RTのWindows配布物・補助アプリ・OSは更新対象外です。
+
+My Block definitions, calls, results and parameters are red; ordinary variables are orange. Data and Recording keep their existing colors.
+
+To edit a My Block, right-click its definition header in the workspace and choose Edit name, parameters and results. Individual edit buttons have been removed from the flyout.
+
+Calls omit the parameter heading, while parameter names, order and input sockets remain intact.
+
+The My Blocks flyout uses case-sensitive character-code ordering (ASCII for ASCII names). Numeric prefixes sort lexically: 0, 10, 2. Non-ASCII names use the same character comparison. Program execution order is unchanged.
+
+Lamp blocks are now at the end of the Screen group, under Hub lamp. EV3 screen and image blocks remain available.
+
+Saved projects, parameters and up to eight named results remain compatible. Motor control, PID, waits and CSV logging are unchanged in this update.
+
+SPIKE-specific absolute motor angles, completion responses, sensor communication fixes and the primary_school sample are not transferred to EV3.
+
+Automated tests and browser checks are used; physical EV3 operation and transfer have not been verified for this update. EBL-RT Windows packages, companion tools and OS images are outside this release.
+
+検証結果：EBL 307件成功・1件の実機用試験をスキップ。EBL-RT 410件成功・1件の実機用試験をスキップ。保存読込・引数・複数戻り値・RBF生成・RT側コード生成の回帰試験を含む。ブラウザで共通表示を確認。

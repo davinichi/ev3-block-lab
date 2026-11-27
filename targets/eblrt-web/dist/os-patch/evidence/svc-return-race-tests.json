@@ -1,0 +1,250 @@
+{
+  "method": "Actual SD SVC return and actual IRQ return postlude run as ARM926 instructions. Constructed IRQ-tail frame at each instruction gap; does not emulate peripheral timing or the complete kernel. Both a candidate stub and the rebuilt kernel return path are tested in emulated RAM; no SD or EV3 writes.",
+  "matches_observed_sp_transition": true,
+  "observed_before": "0xc074f520",
+  "observed_after": "0xc0409e08",
+  "tests": [
+    {
+      "linked_kernel": false,
+      "saved_return_state": "0x60000010",
+      "patched": false,
+      "gap_before_instruction": null,
+      "irq_injected": false,
+      "irq_blocked": false,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": false,
+      "saved_return_state": "0x60000010",
+      "patched": false,
+      "gap_before_instruction": 0,
+      "irq_injected": true,
+      "irq_blocked": false,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": false,
+      "saved_return_state": "0x60000010",
+      "patched": false,
+      "gap_before_instruction": 1,
+      "irq_injected": true,
+      "irq_blocked": false,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": false,
+      "saved_return_state": "0x60000010",
+      "patched": false,
+      "gap_before_instruction": 2,
+      "irq_injected": true,
+      "irq_blocked": false,
+      "return_mode": "0x13",
+      "return_sp": "0xc0409e08",
+      "correct_user_return": false
+    },
+    {
+      "linked_kernel": false,
+      "saved_return_state": "0x60000010",
+      "patched": true,
+      "gap_before_instruction": null,
+      "irq_injected": false,
+      "irq_blocked": false,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": false,
+      "saved_return_state": "0x60000010",
+      "patched": true,
+      "gap_before_instruction": 0,
+      "irq_injected": true,
+      "irq_blocked": false,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": false,
+      "saved_return_state": "0x60000010",
+      "patched": true,
+      "gap_before_instruction": 1,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": false,
+      "saved_return_state": "0x60000010",
+      "patched": true,
+      "gap_before_instruction": 2,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": false,
+      "saved_return_state": "0x60000010",
+      "patched": true,
+      "gap_before_instruction": 3,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0x60000010",
+      "patched": true,
+      "gap_before_instruction": null,
+      "irq_injected": false,
+      "irq_blocked": false,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0x60000010",
+      "patched": true,
+      "gap_before_instruction": 0,
+      "irq_injected": true,
+      "irq_blocked": false,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0x60000010",
+      "patched": true,
+      "gap_before_instruction": 1,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0x60000010",
+      "patched": true,
+      "gap_before_instruction": 2,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0x60000010",
+      "patched": true,
+      "gap_before_instruction": 3,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0xa0000010",
+      "patched": true,
+      "gap_before_instruction": 2,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0xa0000050",
+      "patched": true,
+      "gap_before_instruction": 2,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0xa0000090",
+      "patched": true,
+      "gap_before_instruction": 2,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0xa00000d0",
+      "patched": true,
+      "gap_before_instruction": 2,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x10",
+      "return_sp": "0xc074f520",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0xa0000013",
+      "patched": true,
+      "gap_before_instruction": 2,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x13",
+      "return_sp": "0xc0409e08",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0xa0000053",
+      "patched": true,
+      "gap_before_instruction": 2,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x13",
+      "return_sp": "0xc0409e08",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0xa0000093",
+      "patched": true,
+      "gap_before_instruction": 2,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x13",
+      "return_sp": "0xc0409e08",
+      "correct_user_return": true
+    },
+    {
+      "linked_kernel": true,
+      "saved_return_state": "0xa00000d3",
+      "patched": true,
+      "gap_before_instruction": 2,
+      "irq_injected": false,
+      "irq_blocked": true,
+      "return_mode": "0x13",
+      "return_sp": "0xc0409e08",
+      "correct_user_return": true
+    }
+  ]
+}

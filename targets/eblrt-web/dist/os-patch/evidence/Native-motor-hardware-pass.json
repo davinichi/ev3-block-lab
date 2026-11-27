@@ -1,0 +1,39 @@
+{
+  "header": {
+    "program": "MotorSafe",
+    "build": "2026-11-03-motorsafe1",
+    "status": "RUN_FINISHED",
+    "result": "MOTOR PASS",
+    "count": "10",
+    "phase": "2",
+    "fault": "0",
+    "api": "0",
+    "worker": "1",
+    "ref_result": "0",
+    "get_result": "-999",
+    "task_state": "2",
+    "abi": "0",
+    "task_id": "26",
+    "events_dropped": "0",
+    "drive_method": "NATIVE_STEP_SPEED",
+    "startup_os_marker": "c05ffcf4",
+    "startup_os_api": "0",
+    "encoder_start": "0",
+    "encoder_end": "901"
+  },
+  "degrees_per_cycle": [
+    90,
+    90,
+    90,
+    91,
+    90,
+    90,
+    90,
+    90,
+    90,
+    90
+  ],
+  "result": "Native EV3RT finite B90 at speed20 plus 1-second wait completed ten cycles on tested patched OS.",
+  "scope": "Driver/native motor API verified in this single workload. Original EBL software finite controller remains to be retested.",
+  "next": "MotorEBL uses exact finite-controller function from saved original failing program plus separate OS gate, supervisor, phase/total deadlines and stopped-only logging."
+}

@@ -12,6 +12,11 @@ test('motor speeds saturate before DATA32 conversion for constants and calculati
    assert.equal(r.stopped,false);assert.equal(r.events.find(e=>e.type==='motorRun').speed,expected);
   }
  }
+
+ for(const requested of [150,-150]){
+  const b=compile({main:[{type:'motorRun',ports:2,speed:{callValue:{name:'requested',args:[requested]}}}],procedures:[{name:'requested',params:['n'],returns:true,result:{param:'n'},body:[]}]});
+  const r=runParallel(b.data);assert.equal(r.stopped,false);assert.equal(r.events.find(e=>e.type==='motorRun').speed,Math.sign(requested)*100);
+ }
 });
 test('tank clamps each side independently without changing the calculation result',()=>{
  const r=run([{type:'set',var:'correction',value:200},{type:'tank',leftPort:2,rightPort:4,leftSpeed:{op:'add',left:50,right:{var:'correction'}},rightSpeed:{op:'sub',left:50,right:{var:'correction'}}}]);

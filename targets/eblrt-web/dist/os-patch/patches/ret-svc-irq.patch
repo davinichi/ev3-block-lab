@@ -1,0 +1,12 @@
+--- a/arch/arm_gcc/common/core_support.S
++++ b/arch/arm_gcc/common/core_support.S
+@@ -1609,6 +1609,9 @@
+ 	 */
+ ALABEL(ret_svc_1)
+ #if __TARGET_ARCH_ARM < 6
++	/* Keep SPSR_svc intact until the atomic exception return. An IRQ
++	 * returning to SVC may overwrite it if it arrives after MSR SPSR. */
++	msr		cpsr_c, #(CPSR_SVC_MODE AOR CPSR_FIQ_IRQ_BIT)
+ 	pop		{lr}					/* 戻り先のcpsrをspsrに設定 */
+ 	msr		spsr_cxsf, lr
+ 	ldmfd	sp!, {pc}^				/* コンテキストの復帰 */

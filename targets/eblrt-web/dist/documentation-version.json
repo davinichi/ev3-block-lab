@@ -1,0 +1,48 @@
+{
+  "documentationRevision": "2026-11-24",
+  "ebl": {
+    "application": "0.25.7",
+    "sourceCommit": "a45a770dedeb7eab96b8d5acc699695693d0e09f",
+    "publicSiteDeployment": "succeeded; version 80; 2026-11-24"
+  },
+  "eblrt": {
+    "application": "0.34.3-ev3rt.1",
+    "siteBaseline": "48467411cb287f76bb465d246e8b604655ca48ea",
+    "bridgeFeature": 13,
+    "bridgeBuild": "2026-11-13-pid-motor1",
+    "windowsApplication": "0.3.6"
+  },
+  "os": "No OS binary redistribution added. OS build, patching and licensing review are separate.",
+  "studentGuide": {
+    "revision": 6,
+    "date": "2026-11-15",
+    "format": "dynamic loader",
+    "pages": 18
+  },
+  "commonEditorUpdate": {
+    "sblBaseline": "0.9.4–0.9.10",
+    "date": "2026-11-24",
+    "note": "common-editor-update.html",
+    "physicalHardwareTested": false
+  },
+  "windowsEditorUpdate": {
+    "date": "2026-11-24",
+    "testsPassed": 253,
+    "testsFailed": 0,
+    "hardwareTested": false,
+    "fullNativeEditorObserved": false
+  },
+  "classroomUI": {
+    "revision": "2026-11-25",
+    "sblBaseline": "0.10.1",
+    "guide": "classroom-ui-guide.html",
+    "hardwareTested": false
+  },
+  "numericInput": {
+    "revision": "2026-11-27-fullwidth1",
+    "message": "半角に直しました",
+    "ime": "after composition",
+    "namesAndText": "unchanged",
+    "hardwareTested": false
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "appVersion": "0.18.0",
+  "name": "TouchEvent",
+  "programName": "TouchEvent",
+  "ev3ProjectName": "EV3Lab",
+  "pairMode": "independent",
+  "workspace": {
+    "variables": [],
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "x": 30,
+          "y": 30,
+          "next": {
+            "block": {
+              "type": "ev3_motor_l_pair_run",
+              "fields": {
+                "PORTS": "6"
+              },
+              "inputs": {
+                "SPEED": {
+                  "shadow": {
+                    "type": "math_number",
+                    "fields": {
+                      "NUM": 20
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "ev3_when_condition",
+          "x": 30,
+          "y": 220,
+          "inputs": {
+            "BOOL": {
+              "block": {
+                "type": "ev3_touch",
+                "fields": {
+                  "PORT": "1",
+                  "STATE": "1"
+                }
+              }
+            }
+          },
+          "next": {
+            "block": {
+              "type": "ev3_program_end"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

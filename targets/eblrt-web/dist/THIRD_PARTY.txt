@@ -1,0 +1,17 @@
+EV3 Block Lab 0.1.0 — 非公式の試作ツール。
+LEGO、MINDSTORMS、SPIKEはLEGO Groupの商標です。このツールはLEGO Groupの承認・提供によるものではありません。
+
+Blockly 13.4.0 is distributed under the Apache License, Version 2.0.
+The complete license is in vendor/LICENSE.
+Project: https://github.com/RaspberryPiFoundation/blockly
+
+The EV3 bytecode compiler and transport in ev3.js are an original implementation
+of the publicly documented EV3 binary format and system command protocol.
+References (not incorporated firmware code):
+https://education.lego.com/en-us/product-resources/mindstorms-ev3/downloads/developer-kits/
+https://github.com/mindboards/ev3sources
+https://github.com/ev3dev/lmsasm
+https://developer.chrome.com/blog/serial-over-bluetooth/
+
+The app does not upload projects to an application server. Projects are kept in
+browser localStorage and exported files. Hosting access logs may still exist.

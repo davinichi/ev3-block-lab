@@ -1,0 +1,25 @@
+{
+  "version": "0.3.6",
+  "editor": "0.34.3-ev3rt.1",
+  "automatedTests": {
+    "passed": 253,
+    "failed": 0,
+    "skipped": 1
+  },
+  "compiler": "Bundled ARM compiler built BundledSound successfully, 78380 bytes",
+  "unchanged": [
+    "motor runtime",
+    "PID",
+    "desktop service",
+    "compiler and SDK",
+    "transfer notification audio"
+  ],
+  "startup": "Managed command launch failed before JavaScript because of execution-context folder access. Normal Windows launch reached first-run preparation. Full editor UI observation was interrupted by automation timeout.",
+  "notVerified": [
+    "full native editor UI",
+    "fresh first-run download",
+    "physical EV3 transfer and motion",
+    "audible sound"
+  ],
+  "osBinaryIncluded": false
+}

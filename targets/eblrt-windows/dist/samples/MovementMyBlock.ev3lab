@@ -1,0 +1,109 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "appVersion": "0.23.0",
+  "programName": "MovementMyBlock",
+  "ev3ProjectName": "EV3Lab",
+  "pairMode": "feedback",
+  "workspace": {
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "x": 35,
+          "y": 35,
+          "next": {
+            "block": {
+              "type": "ev3_movement_setup",
+              "fields": {
+                "LEFT_PORT": "2",
+                "RIGHT_PORT": "4"
+              },
+              "next": {
+                "block": {
+                  "type": "ev3_wheel",
+                  "fields": {
+                    "DIAMETER": 56
+                  },
+                  "next": {
+                    "block": {
+                      "type": "procedures_callnoreturn",
+                      "extraState": {
+                        "name": "前進",
+                        "params": [
+                          "距離"
+                        ]
+                      },
+                      "inputs": {
+                        "ARG0": {
+                          "shadow": {
+                            "type": "math_number",
+                            "fields": {
+                              "NUM": 20
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defnoreturn",
+          "x": 520,
+          "y": 40,
+          "fields": {
+            "NAME": "前進"
+          },
+          "extraState": {
+            "params": [
+              {
+                "name": "距離",
+                "id": "shared-distance"
+              }
+            ]
+          },
+          "inputs": {
+            "STACK": {
+              "block": {
+                "type": "ev3_drive_forward",
+                "inputs": {
+                  "SPEED": {
+                    "shadow": {
+                      "type": "math_number",
+                      "fields": {
+                        "NUM": 20
+                      }
+                    }
+                  },
+                  "CM": {
+                    "block": {
+                      "type": "ev3_argument",
+                      "extraState": {
+                        "name": "距離",
+                        "parameterId": "shared-distance"
+                      },
+                      "fields": {
+                        "ARG_NAME": "距離"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "variables": [
+      {
+        "name": "距離",
+        "id": "shared-distance"
+      }
+    ]
+  }
+}

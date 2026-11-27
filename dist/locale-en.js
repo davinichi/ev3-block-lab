@@ -341,9 +341,134 @@ for(const family of ['steering','tank'])for(const action of ['run','angle','time
 Object.assign(T,{
 '小':'small','大':'large','「動作後の停止方法」の設定':'configured end behavior',
 '戻り値は最大8個です。丸い呼び出しの「戻り値」で使う値を選びます。呼び出すたびに定義内の命令を実行します。':'Add up to 8 named results. Select one on the round call; every call runs the definition.',
-'「数値を返す」を選んだ場合は、定義の各「返す値」に計算式などを入れます。丸い呼び出しを数値欄に入れ、「戻り値」で使う値を選びます。作成後は、定義の中に命令をつなぎます。「引数」グループから引数を取り出せます。編集はマイブロックの「編集」ボタンから開きます。':'For numeric results, place calculations in the definition’s return inputs and use a round call in a numeric input. Select the result on that call. Add commands inside the definition and use reporters from Parameters. Reopen the dialog using the My Block edit button.',
+'「数値を返す」を選んだ場合は、定義の各「返す値」に計算式などを入れます。丸い呼び出しを数値欄に入れ、「戻り値」で使う値を選びます。作成後は、定義の中に命令をつなぎます。「引数」グループから引数を取り出せます。編集は定義の見出しを右クリックして開きます。':'For numeric results, place calculations in the definition’s return inputs and use a round call in a numeric input. Select the result on that call. Add commands inside the definition and use reporters from Parameters. Reopen the dialog using the My Block edit button.',
 '文字列・リストの名前は1〜40文字にしてください。':'Text / list names must have 1–40 characters.','文字列はUTF-8で120バイト以内（日本語は通常40文字以内）にしてください。':'Text must fit in 120 UTF-8 bytes (usually up to 40 Japanese characters).','文字列の入力を確認してください。':'Check the text input.','ログ名は半角英数字・-・_で1〜31文字にしてください。':'Log names require 1–31 ASCII letters, digits, - or _.','文字列変数とリストは、それぞれ16個までです。':'Use at most 16 text variables and 16 lists.','動きの左右には異なるモーターポートを選んでください。':'Select different motor ports for left and right movement.','左右には異なるモーターポートを選んでください。':'Select different left and right motor ports.','マイブロックの再帰呼び出しは使えません。':'Recursive My Block calls are not supported.','試作版ではマイブロックの再帰呼び出しは使えません。':'Recursive My Block calls are not supported.','EV3に保存する名前は、半角英数字・「-」「_」で1〜31文字にしてください。':'EV3 program names require 1–31 ASCII letters, digits, - or _.','EV3のプロジェクト名は、半角英数字・「-」「_」で1〜31文字にしてください。':'EV3 project names require 1–31 ASCII letters, digits, - or _.','整数の範囲を超えています。':'Integer range exceeded.','平方根には0以上の数を入れてください。':'Square root requires a nonnegative input.','対数には0より大きい数を入れてください。':'Logarithms require a positive input.','asin・acosには−1〜1の数を入れてください。':'asin / acos require an input between -1 and 1.','この角度のtanは計算できません。':'tan is undefined at this angle.','0では割れません。':'Cannot divide by zero.','本体ボタンを選んでください。':'Select a brick button.','センサの種類・ポートを確認してください。':'Check the sensor type and port.','赤外線センサのチャンネルは1〜4から選んでください。':'Select infrared channel 1–4.','数値を確認してください。':'Check the numeric input.','バッテリーの測定項目を確認してください。':'Check the battery measurement type.','乱数は−32767〜32767の整数範囲で、下限≦上限にしてください。':'Random bounds must be integers in -32767..32767, with lower <= upper.','範囲の下限を上限以下にしてください。':'The lower bound must not exceed the upper bound.','文字列の演算を確認してください。':'Check the text operation.','リストの演算を確認してください。':'Check the list operation.','旋回の前に、トレッドを設定してください。':'Set track width before turning.','走行用の異なる2個のモーターポートを選んでください。':'Choose two distinct movement motor ports.','マイブロック名が重複しています。':'Duplicate My Block names.','引数は重複のない名前で8個までです。':'Use at most 8 uniquely named parameters.','戻り値は1〜8個にしてください。':'Use 1–8 results.','数値を返すマイブロックを選んでください。':'Choose a My Block that returns a number.','数値を返すマイブロックは値の入力欄で使ってください。':'Use numeric My Block calls in value inputs.','戻り値の選択を確認してください。':'Check the selected result.','実行する処理が多すぎます。繰り返し回数を減らしてください。':'Too many operations. Reduce repeat counts.','ステアリングの左右には異なるポートを選んでください。':'Choose different left and right steering ports.','有限走行の速さは0以外にしてください。':'Finite moves require a nonzero speed.','走行時間は0より大きく60秒以下にしてください。':'Movement duration must be greater than 0 and at most 60 seconds.','加速・減速時間は0〜10秒にしてください。':'Acceleration and deceleration must be 0–10 seconds.','タイヤの直径は10〜200 mmにしてください。':'Wheel diameter must be 10–200 mm.','トレッドは10〜1000 mmにしてください。':'Track width must be 10–1000 mm.','左右の速さを両方0にはできません。':'Left and right speed cannot both be zero for a finite move.','走行時間は0.001〜60秒にしてください。':'Movement duration must be 0.001–60 seconds.','モーターポートは2個まで指定できます。':'Select at most two motor ports.','1個のモーターブロックで指定できるポートは2個までです。':'A motor block can select at most two ports.','角度指定のモーター速度を0にはできません。':'Angle-controlled moves require a nonzero motor speed.','補正制御では、角度を減らすか速度を上げてください（監視時間の上限3分）。':'For correction mode, reduce angle or increase speed (3-minute watchdog limit).','待ち時間は0〜60秒にしてください。':'Wait duration must be 0–60 seconds.','モーターの速さは0以外にしてください。':'Motor speed must be nonzero.','モーターの時間は0より大きく60秒以下にしてください。':'Motor duration must be greater than 0 and at most 60 seconds.','メッセージ名は1〜40文字にしてください。':'Message names must have 1–40 characters.','返す値の数を定義の戻り値とそろえてください。':'Return all the results specified by the definition.','数値を返すマイブロックでは、値を返す終了ブロックを使ってください。':'Use a return-value exit in a numeric My Block.','マイブロックの終了は定義の中だけで使えます。':'My Block exits are valid only inside a definition.','変数は32個までです。':'Use at most 32 numeric variables.','プログラムが大きすぎます（上限64KB）。':'Program is too large (64 KB limit).','停止方法を選んでください。':'Select a stop method.','値を返す終了ブロックは、数値を返すマイブロックの中だけで使えます。':'Return-value exits are only valid inside numeric My Blocks.',
 'モーターポート':'motor ports','停止するモーターポート':'motor ports to stop','左モーターの速さ':'left motor speed','右モーターの速さ':'right motor speed','モーターの速さ':'motor speed','外側モーターの角度':'outer motor angle','速い側のモーターの角度':'faster motor angle','ランプの色':'brick light color','音量':'volume','音の長さ':'tone duration','周波数':'frequency','計算結果':'calculation result','待ち時間':'wait duration','回転角度':'rotation angle','回転数':'rotations','ステアリング':'steering','速度':'speed','速さ':'speed','角度':'angle',
 'は、その引数を定義したマイブロックの中につなげてください。':' must be used inside a My Block that defines it.','は、このマイブロックの中だけで使用できます。':' may only be used inside its My Block.','はマイブロックの中だけで使用できます。':' may only be used inside its My Block.','の定義がありません。':' has no definition.','の引数の数が一致しません。':' has a different parameter count.','未対応のブロック: ':'Unsupported block: ','が計算できる範囲を超えています。':' exceeds the finite numeric range.',
 '保存先':'Destination','接続中です。先に切断してください。':'Already connected. Disconnect first.','HTTPSのページ、またはlocalhostで開いてください。':'Open using HTTPS or localhost.','このブラウザではBluetooth接続を使えません。Chromeで開いてください。':'Bluetooth serial is unavailable. Open in Chrome.','標準ファームウェアで起動したEV3を選んでください。':'Select EV3 running standard firmware.'
 });
+
+Object.assign(catalog.text,{'本体ランプ：色・点滅・明暗':'Hub lamp: color, flashing and pulsing'});
+
+Object.assign(catalog.text,{'編集は定義の見出しを右クリックして開きます。':'To edit, right-click the definition header.'});
+
+Object.assign(catalog.text,{"教員・指導者用": "Teachers / instructors", "資料・使い方": "Guides and help", "資料・追加機能": "Resources and tools", "表示の設定": "Display settings", "授業画面の使い方": "Classroom interface guide", "EV3 接続中": "EV3 Connected", "EV3 接続確認中": "EV3 Connecting", "EV3 未接続": "EV3 Not connected", "接続・転送を開く": "Open connection and transfer", "初めてのモーター動作は車輪を浮かせて確認してください。": "Lift the wheels before the first motor test."});
+
+Object.assign(catalog.text,{'新しいプログラム':'New program','保存':'Save'});
+
+// 接続診断・作品読み込みなど、通常操作の外で表示される案内も文単位で訳す。
+Object.assign(catalog.text,{
+'読み取りだけではモーターは動きません。':'Reading values does not move the motors.',
+'A+B・A+C・A+D・B+C・B+D・C+Dに対応します。「停止タイミングを補正」は、各モーターの角度を優先しながら、進み具合の差に応じて速度を調整します。補正はEV3本体で動きます。実機での精度は確認中です。標準設定は角度優先で、終了時刻がずれる場合があります。スピンターンでは、この選択にかかわらず左右の回転量の差を補正します。':'Supports A+B, A+C, A+D, B+C, B+D and C+D. Stop timing correction adjusts speed using the difference in progress while preserving each motor’s target angle. It runs on the EV3; hardware accuracy is still being tested. The default prioritizes angle, so finish times may differ. Spin turns correct wheel progress regardless of this selection.',
+'Lモーター 1個':'Single L motor','Mモーター 1個':'Single M motor','Lモーター 2個（同期・同時）':'Two L motors (synchronized / simultaneous)','Mモーター 2個（同期・同時）':'Two M motors (synchronized / simultaneous)',
+'ファイルが大きすぎます。2MB以下の作品を選んでください。':'The file is too large. Choose a project of 2 MB or less.',
+'このファイルは作品として開けません。':'This file cannot be opened as a project.',
+' EV3 Block Labの「保存」で作った .ev3lab、または以前の作品の .json を選んで、もう一度「開く」を押してください。LEGO純正ソフトで作った .ev3 は開けません。LEGO純正ソフトで開いてください。名前の終わりを変えるだけでは、EV3 Block Labの作品にはなりません。困ったときは先生に相談してください。':' Choose an .ev3lab file created with Save in EV3 Block Lab, or a legacy .json project, and press Open again. Files created in official LEGO software (.ev3) must be opened in that software. Renaming a file does not convert it into an EV3 Block Lab project. Ask your teacher if you need help.',
+'接続が許可されませんでした。Chromeでサイトを直接開き、サイトや学校の端末の接続許可を確認してください。':'Connection permission was denied. Open the site directly in Chrome and check site permissions and school device policies.',
+'標準ファームウェア':'standard firmware',
+'.rbfを保存しました。ファイルの保存だけではEV3への転送は完了していません。':'Saved the .rbf file. Saving a file does not transfer it to EV3.',
+'転送・照合は完了していますが、起動を確認できません。':'Transfer and verification succeeded, but program start could not be confirmed. ',
+'保存データを復元できなかったため、サンプルを読み込みました。':'Could not restore the saved project; a sample was loaded. ',
+'サンプルを読み込みました。ログ名はLogです。ステアリングの例は転送して実行すると走行します。':'Sample loaded. The log name is Log. The steering example moves the robot when transferred and run.',
+'B+Cの走行と、超音波センサ2のCSV記録を並行します。ログ名はParallelです。':'Runs B+C while recording ultrasonic sensor 2 to CSV. The log name is Parallel.',
+'B+Cを回し続け、タッチセンサ1で全体を停止します。本体の戻るボタンでも停止できます。':'Runs B+C continuously and stops the whole program when touch sensor 1 is pressed. The brick’s Back button also stops it.',
+'「測定」を送って待ち、超音波センサ2をCSVに記録します。ログ名はMessageです。':'Broadcasts the measurement message and waits while ultrasonic sensor 2 is recorded to CSV. The log name is Message.',
+'モーターBを惰性→ブレーキ→保持の順で各0.25回転し、1秒ずつ待ちます。':'Turns motor B by 0.25 rotations using coast, brake, then hold, waiting 1 second after each move.',
+'B+Cを左30％・右15％で速い側180度、次に左右逆回転で0.5秒動かします。':'Runs B+C at left 30%, right 15% for 180 degrees of the faster wheel, then turns the wheels in opposite directions for 0.5 seconds.',
+'モーターBの速度指定20％→30％→パワー20％を比較し、実測速度をCSV（Power）に記録します。':'Compares motor B at speed 20%, speed 30% and power 20%, recording measured speed to the Power CSV log.',
+'ジャイロをポート1に接続して静止させてください。開始音の後、約10秒間、手で向きを変えると角度・回転速度を画面表示しCSVに記録します。':'Connect a gyro to port 1 and keep it still. After the starting tone, turn it by hand for about 10 seconds. Angle and angular speed are displayed and recorded to CSV.',
+'バッテリー全体の電圧・電流を画面表示し、ログBatteryへ記録します。モーターは動かしません。':'Displays total battery voltage and current and records them to the Battery log. Motors do not move.',
+'目標10・測定4の固定値でPIDを10回計算し、ログPIDへ記録します。モーターは動かしません。':'Calculates PID 10 times using target 10 and measured value 4, recording results to the PID log. Motors do not move.',
+'左B・右Cで前進後、旧組を停止して左A・右Dへ切替え、後退します。4個の実機配線を確認してから実行してください。':'Moves forward with left B and right C, stops that pair, switches to left A and right D, then reverses. Check all four motor connections before running.',
+'ピボットターンの左右には異なるモーターポートを選んでください。':'Choose different left and right motor ports for a pivot turn.',
+'ピボットターンの方向が不正です。':'Invalid pivot-turn direction.',
+'スピンターンの左右には異なるモーターポートを選んでください。':'Choose different left and right motor ports for a spin turn.',
+'ランプの点灯方法を選んでください。':'Select a brick light pattern.',
+'ステアリングの動作を選んでください。':'Select a steering action.',
+'条件付き繰り返しは1000回以内に終わるようにしてください。変数の更新と条件を確認してください。':'Conditional loops must finish within 1,000 iterations. Check the condition and variable updates.',
+'2個のモーターの制御方式が不正です。':'Invalid two-motor control mode.',
+'戻り値を受け取る変数を選んでください。':'Choose a variable for the returned value.',
+'戻り値のマイブロックが見つかりません。':'The My Block for this returned value was not found.',
+'停止時刻の記録形式が一致しません。0.1.6以降で再転送・実行してください。':'The stop timing record format does not match. Transfer and run again using version 0.1.6 or later.',
+'現在のプログラムと記録が一致しません。再転送したファイルを実行してください。':'The record does not match this program. Transfer again and run the newly transferred file.',
+'EV3応答の長さが不正です。接続先を確認してください。':'Invalid EV3 response length. Check the selected device.',
+'EV3のUSB通信形式を確認できません。標準ファームウェアで起動し、USBケーブルを接続し直してください。':'Could not identify the EV3 USB protocol. Start standard firmware and reconnect the USB cable.',
+'接続できませんでした。ほかのEV3アプリを閉じてください。':'Could not connect. Close other EV3 applications. ',
+'このブラウザではUSB接続（WebHID）を使えません。パソコンまたはChromebookのChromeで開いてください。':'USB (WebHID) is unavailable in this browser. Open in Chrome on a PC or Chromebook.',
+'USB接続できませんでした。ほかのEV3アプリやEV3を開いているタブを閉じ、ケーブルを挿し直してください。学校の端末では管理者のUSB機器の利用設定も確認してください。':'Could not connect over USB. Close other EV3 apps and tabs, then reconnect the cable. On school devices, also check the administrator’s USB device policy.',
+'USBケーブルの接続が切れました。挿し直して「接続する」を押してください。':'The USB cable was disconnected. Reconnect it and press Connect.',
+'USB通信の上限を超えています。EV3の保存先名・プログラム名を短くしてください。':'The USB message is too long. Shorten the EV3 project and program names.',
+'USB送信に失敗しました。ケーブルを挿し直して再接続してください。':'USB transmission failed. Reconnect the cable and connect again.',
+'EV3との接続が切れました。接続し直してください。':'The EV3 connection was lost. Connect again.',
+'USBを切断しました。EV3本体から保存したプログラムを起動できます。':'USB disconnected. You can run the stored program from the EV3 brick.',
+'EV3本体から保存したプログラムを起動できます。':'You can run the stored program from the EV3 brick.',
+'通信中です。完了を待ってください。':'Communication is in progress. Wait for it to finish.',
+'EV3から応答がありません（10秒）。接続先と本体の状態を確認して接続し直してください。':'EV3 did not respond within 10 seconds. Check the device and brick status, then reconnect.',
+'EV3の応答形式が一致しません。':'The EV3 response format does not match.',
+'EV3の確認コマンドに失敗しました。標準ファームウェアか確認してください。':'EV3 identification failed. Check that it is running standard firmware.',
+'EV3が完了音の命令を受け付けませんでした。':'EV3 did not accept the completion-tone command.',
+'照合完了後、660Hz→880Hzの短い完了音を送信しました。':'Sent short 660 Hz and 880 Hz completion tones after verification.',
+'角度の読み取りに失敗しました。EV3との接続を確認してください。':'Could not read motor angles. Check the EV3 connection.',
+'このUSB接続ではプロジェクト名とプログラム名を短くしてください。':'Shorten the project and program names for this USB connection.',
+'EV3が命令を受け付けませんでした。':'EV3 did not accept the command.',
+'EV3でプログラムが実行中です。「実行を停止」または本体の戻るボタンで停止してから転送してください。':'A program is running on EV3. Press Stop program or the brick’s Back button before transferring.',
+'起動するプログラムの保存先が不正です。':'Invalid destination for the program to run.',
+'EV3で実行エラーが発生しました。本体の表示とプログラムを確認してください。':'An execution error occurred on EV3. Check its display and the program.',
+'ユーザープログラムとすべてのモーターへ停止命令を送信しました。':'Sent stop commands to the user program and all motors.',
+'停止タイミング補正モードのプログラムを転送・実行してください。':'Transfer and run a program using stop timing correction mode.',
+'停止時刻の記録を読めません。0.1.6以降で転送した今回のファイルを実行してください。':'Could not read the stop timing record. Run the current file transferred using version 0.1.6 or later. ',
+'保存先ハンドルの応答が不正です。':'Invalid destination file-handle response.',
+'ログの読み出し前に、EV3の実行を停止してください。':'Stop the EV3 program before reading the log.',
+'CSVの名前は半角英数字・-・_で1〜31文字にしてください。':'CSV names require 1–31 ASCII letters, digits, - or _.',
+'EV3 Block LabのCSVログではありません。':'This is not an EV3 Block Lab CSV log.',
+'読み戻すファイルのサイズが上限を超えています。':'The file to read back exceeds the size limit.',
+'読み戻しハンドルが一致しません。':'The readback file handle does not match.',
+'読み戻したファイルが予定サイズを超えています。':'The file read back exceeds its expected size.',
+'読み戻したファイルのサイズが一致しません。':'The file read back has a different size.',
+'このUSB接続では、保存先名とプログラム名を合わせて短くしてください。USBハブを外して直接接続すると改善する場合があります。':'Shorten the combined project and program names for this USB connection. Connecting directly without a USB hub may help.',
+'フォルダー作成応答 0x05。既存フォルダーの可能性があるため、ファイル保存で確認します。':'Folder creation returned 0x05. The folder may already exist; checking by saving the file.',
+'実行ファイルの保存に失敗しました：':'Could not save the executable: ',
+'転送後の照合に失敗しました。再転送してください。':'Verification after transfer failed. Transfer again.',
+'全バイト一致':'all bytes match',
+'動きの設定を確認する処理が多すぎます。':'Too many operations to analyze movement setup.',
+'動きの実行順を確認する処理が多すぎます。':'Too many operations to analyze movement order.',
+'戻り値の名前・個数を確認してください（1〜8個）。':'Check result names and count (1–8).',
+'書き出すマイブロックがありません。':'There are no My Blocks to export.',
+'マイブロックを書き出したファイルを選んでください。':'Choose an exported My Block library file.',
+'マイブロックは32個まで読み込めます。':'Import at most 32 My Blocks.',
+'マイブロックの変数情報が不正です。':'Invalid variable information in the My Block library.',
+'変数の識別情報が重複しています。':'Duplicate variable identifiers.',
+'引数または変数の情報が不足しています。':'Parameter or variable information is missing.',
+'PIDの名前は1〜40文字にしてください。':'PID names must have 1–40 characters.',
+'PID制御器は16種類までです。':'Use at most 16 PID controllers.',
+'PIDの名前を確認してください。':'Check the PID name.',
+'角度（センサ生値）':'angle (raw sensor value)','ビーコンCH1方向':'beacon CH1 direction','リモコンCH1番号':'remote CH1 code',
+'度':'degrees','度／秒':'degrees/s','回':'times',
+'同期・同時':'synchronized / simultaneous'
+});
+Object.assign(catalog.text,{
+'言語':'Language','不明':'unknown','・':' / ',
+'新しいプログラムを作ります。現在のプログラムが必要な場合は、先に「保存」してください。':'Create a new program? Save first if you want to keep the current program.',
+'現在の編集内容をファイルの内容に置き換えますか？':'Replace the current program with the contents of this file?',
+'切断したため計測の開始角度を解除しました。接続後に記録し直してください。':'Disconnected: starting angles were cleared. Reconnect and record them again.',
+'保存されました。':'Saved.',
+'完了音は確認できませんでしたが、転送・照合は完了しています（':'Transfer and verification succeeded, but the completion tone could not be confirmed (',
+'）。':'). ',
+'時間切れで停止しました。':'Stopped after a timeout.',
+'前回と同じ記録です。':'This is the same record as before.',
+'最後の補正ブロックの記録：':'Last corrected move: ',
+'停止時刻の差は未確定です。':'The difference in completion times is not yet known.',
+'観測上の停止時刻は同じです。':'The observed completion times are the same.',
+'途中の通過時刻は通信ログに記録しました。':'Intermediate times were added to the communication log.',
+'秒遅く完了しました。':' seconds later.',
+'接続先を確認してください。':'Check the selected device.',
+'新しいプログラムやサンプルに切り替える前に、必要な作品は「保存」してください。':'Save any project you want to keep before opening a new program or sample.'
+});
+
+Object.assign(catalog.text,{'作品ファイルのダウンロードを開始しました。':'Started downloading the project file.'});
+
+Object.assign(catalog.text,{'ヒント・お知らせ':'Hints and messages','ブロックをつないで、動きを作ろう。':'Connect blocks to create your program.'});
+
+Object.assign(catalog.text,{'半角に直しました':'Converted to half-width characters'});
+
+Object.assign(catalog.text,{'数値入力の全角・半角':'Full-width numeric input'});

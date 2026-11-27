@@ -1,0 +1,39 @@
+{
+  "date": "2026-11-04",
+  "status": "PASS",
+  "checks": [
+    "LF: check/apply/idempotent/revert exact bytes/backup refusal/unknown source refusal",
+    "CRLF: check/apply/idempotent/revert exact bytes/backup refusal/unknown source refusal",
+    "Git patch check/apply/reverse exact source",
+    "Optional environment patch round trip on the tested configure/Makefile sources",
+    "uImage checker identifies original/patched test images and rejects corrupted data",
+    "Bash syntax and missing build argument refusal"
+  ],
+  "historical_uimages_read_only_checked": [
+    {
+      "header_and_data_crc": "PASS",
+      "bytes": 935606,
+      "sha256": "c6f7a29d889eef6a6fc3383cd5792ae832048e68b20d4e16a5a648780d832237",
+      "known_image": "previously tested original OS",
+      "load": "0xc0008000",
+      "entry": "0xc0008000",
+      "timestamp": 1624516161,
+      "name": "TOPPERS/hrp Kernel (EV3)"
+    },
+    {
+      "header_and_data_crc": "PASS",
+      "bytes": 968602,
+      "sha256": "7bc4d93b0b17a58c47e1f96e08035ff7f25405e7d7275c2f0e892140d38521de",
+      "known_image": "previously tested experimental patched OS",
+      "load": "0xc0008000",
+      "entry": "0xc0008000",
+      "timestamp": 1793677133,
+      "name": "EV3RT SVC IRQ fix TEST"
+    }
+  ],
+  "source_before_sha256_lf": "32b9e53d767f88f6a2e409db4d97c5ac8f1a6732e69599f58a55933d9260d8d4",
+  "source_after_sha256_lf": "6fd6b9147af05e2d6ca1333ca9c4437c1960f390a4312895f0b44f2f08d9a3ec",
+  "no_new_complete_OS_build_in_this_packaging_run": true,
+  "no_SD_or_EV3_writes_in_this_packaging_run": true,
+  "historical_hardware_evidence": "See the separate evidence records from 2026-11-03; not repeated hardware tests."
+}

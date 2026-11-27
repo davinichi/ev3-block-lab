@@ -1,8 +1,10 @@
+数値入力欄の全角数字・マイナス・小数点を半角へ自動変換し、「半角に直しました」と約4秒表示します。[変更内容・検証](docs/numeric-input-20261127.md)。
+
 現行の公開版・Windows版・通知UIの案内：2026年11月27日更新。[現行利用案内](docs/CURRENT-USE-20261127.md) と [資料の対応表](docs/CURRENT-DOCUMENTATION.md) を参照してください。GitHub収録ソースと公開版の版番号は異なります。[SBLの変遷履歴（v0.7.0〜運用版v1.0.0）](docs/SBL-CHANGELOG.md)を追加しています。
 
 # EV3 Block Lab
 
-小学校の授業で、Chromebook・WindowsのブラウザからLEGO MINDSTORMS EV3をプログラミングするための試作アプリです。このリポジトリ収録ソースの版は **v0.25.6** です。Sitesの公開版は **v0.25.9** で、[公開サイト](https://ev3-block-lab-prototype.davinichi-9576.chatgpt.site/)とGitHubのソースは別管理です。
+小学校の授業で、Chromebook・WindowsのブラウザからLEGO MINDSTORMS EV3をプログラミングするための試作アプリです。このリポジトリ収録ソースは公開版の **v0.25.9 / fullwidth1** と同期しています。[公開サイト](https://ev3-block-lab-prototype.davinichi-9576.chatgpt.site/)も同じ数値入力の修正を反映しています。
 
 ブロックからEV3標準形式の実行ファイル（.rbf）を生成し、本体へ転送・読み戻し照合します。本体に保存したプログラムは、PCから切り離して本体で選択・実行できます。
 
@@ -190,3 +192,9 @@ Choose Japanese or English at the top right. Blocks, controls and help change la
 「動きの加減速」サンプルを追加。設定は実行順で共有し、設定用マイブロックでも使えます。短時間では最高速度と加減速区間を圧縮し、整数％・整数度による丸めがあります。実際の軌跡・停止精度は実機確認待ちです。
 
 Finite steering and separate-speed angle/time moves now use the shared trapezoid/S-curve setting. The same setting block is available in Motors and Movement. Continuous motion and immediate stops remain unchanged. The Movement ramp profiles sample compares both shapes. Japanese/English PDF and HTML manuals are updated to v0.25.6 (43 / 18 pages). Hardware validation remains pending.
+
+## EBL-RTソースの収録
+
+`targets/eblrt-web/`に今回の公開Web版ソース、`targets/eblrt-windows/`に更新ZIP内のアプリソースを収録しています。独立したEBL-RTリポジトリが接続されていないため、このリポジトリで対象別に管理します。SDK・コンパイラ・Electron本体・インストール済み依存パッケージ・分割ダウンロードは収録しません。Windowsアプリは[公式配布先](https://ev3rt-block-lab-private.davinichi-9576.chatgpt.site/evaluation.html#windows)の一式／更新ZIPを使ってください。収録コードだけでWindows配布一式を再現できるとするものではありません。
+
+元ソースとファイル照合情報は[記録](docs/numeric-input-source-provenance.json)を参照してください。EBL321件・EBL-RT419件（各1件の外部参照試験をスキップ）、Windows配布編集処理82件の試験が成功しました。Windows固有の転送対象切替を含む2つのWeb用試験はWindows抽出試験の対象から除外しました。実機転送・走行とWindowsネイティブ画面の実起動は今回未確認です。

@@ -1,0 +1,6 @@
+Readable application source is in resources/app (.mjs/.cjs/.js).
+package.json identifies version 0.3.5; entry.cjs starts the Electron application.
+This ZIP is the runnable distribution, not a separate installer or a full desktop rebuild kit.
+The bundled Electron executable launches this source without rebuilding native components.
+Toolchain origins, licenses and exact source downloads are in THIRD_PARTY_DESKTOP.txt.
+The application generator documentation is in dist/manual/EBLRT-Guide-v0.34.2.html.

@@ -1,0 +1,47 @@
+{
+  "header": {
+    "program": "SvcGuard",
+    "build": "2026-11-03-svcguard1",
+    "status": "RUN_FINISHED",
+    "result": "LOCK PASS",
+    "count": "4000",
+    "phase": "5",
+    "fault": "0",
+    "api": "0",
+    "worker": "1",
+    "ref_result": "0",
+    "get_result": "-999",
+    "task_state": "4",
+    "abi": "0",
+    "task_id": "28",
+    "events_dropped": "0",
+    "identity_calls": "16000",
+    "semaphore_acquired": "4000",
+    "semaphore_released": "4000",
+    "last_tid": "28",
+    "worker_done": "1",
+    "guard_kind": "0",
+    "guard_index": "0",
+    "guard_before": "00000000",
+    "guard_after": "00000000",
+    "capture_stage": "3"
+  },
+  "elapsed_seconds": 4.1984,
+  "running_OS_fingerprint": "get_tid returned r1=0xc05ffcf4, matches rebuilt OS; old SD OS uses 0xc05ffc1c.",
+  "stack_before": "0xc074f520",
+  "stack_after": "0xc074f520",
+  "lr_before": "0xc0626a88",
+  "lr_after": "0xc0626a88",
+  "result": "First real-hardware 4000-cycle guarded workload passed with patched OS.",
+  "evidence_combined": [
+    "Old OS recorded switch to SVC stack, with preserved r4-r11 and stack memory.",
+    "Actual SD SVC-return and IRQ-return instructions reproduce identical stack switch in scheduled IRQ window.",
+    "Patched linked return path passed instruction-gap and saved-state tests.",
+    "Current hardware log identifies patched OS and completes all 16000 guarded calls without mismatch."
+  ],
+  "limits": [
+    "One guarded workload pass is not complete peripheral or motor validation.",
+    "Recorder temporarily sets sentinel registers and uses static storage; test original unguarded LockFix next, still no motors."
+  ],
+  "next_test": "Existing LockFix on same patched spare SD, without motors; collect next LKFXxxxx.TXT."
+}

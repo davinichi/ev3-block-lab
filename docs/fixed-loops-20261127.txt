@@ -1,0 +1,5 @@
+2026-11-27
+「〇〇まで繰り返す」は条件が成り立つと終了します。「〇〇の間繰り返す」は条件が成り立っている間だけ続けます。どちらも最初に条件を確認するため、最初から終了条件に当てはまる場合は一度も実行しません。制御グループから目的に合うブロックを選びます。切り替え用プルダウンはありません。既存作品は保存されている「まで／間」の条件を保って読み込み・再保存できます。
+
+Repeat until stops when its condition becomes true. Repeat while continues only while its condition is true. Both check before the first iteration, so the body may run zero times. Choose the required block in Control; there is no mode dropdown. Existing projects retain their saved until/while condition when loaded and saved again.
+保存形式のtype controls_whileUntil とMODEのUNTIL/WHILEは維持。実機動作は未確認。

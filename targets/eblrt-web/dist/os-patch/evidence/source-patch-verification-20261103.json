@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "target": "arch/arm_gcc/common/core_support.S",
+  "hash_normalization": "CRLF to LF",
+  "original_sha256": "32b9e53d767f88f6a2e409db4d97c5ac8f1a6732e69599f58a55933d9260d8d4",
+  "modified_sha256": "6fd6b9147af05e2d6ca1333ca9c4437c1960f390a4312895f0b44f2f08d9a3ec",
+  "patch_sha256": "f73fbbb0fd529d25c027204a8678b0c23ef4f00c90be81ce14ee3196c733a018",
+  "git_apply_check": "PASS",
+  "applied_matches_tested_source": "PASS",
+  "reverse_restores_original": "PASS",
+  "status": "experimental, not official"
+}

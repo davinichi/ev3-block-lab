@@ -191,3 +191,27 @@ test('coast and hold settings survive ramped finite and feedback native image ge
   build([stopMode(6,mode),{type:'ramp',mode:ramp,upSeconds:.1,downSeconds:.1},{type:'motor',ports:6,speed:30,degrees:90,mode:sync},{type:'motorTimed',ports:6,speed:30,seconds:.5}]);
  }
 });
+
+
+test('all finite and ramped motor paths saturate direct, variable and calculated speeds',()=>{
+ const setup=[{type:'movementSetup',leftPort:2,rightPort:4},{type:'wheel',diameter:56},{type:'tread',mm:112}];
+ for(const sign of [-1,1])for(const mode of ['off','trapezoid','scurve']){
+  const speed={op:'mul',left:{var:'requested'},right:sign};
+  const commands=[
+   ...['independent','sync','feedback'].map(mode=>({type:'motor',ports:6,speed,degrees:90,mode})),
+   {type:'motorTimed',ports:2,speed,seconds:.5},
+   ...['drive','pivot','spin'].map(type=>({type,movement:true,speed,direction:type==='drive'?'forward':'right',cm:5,angle:45})),
+   ...['angle','time'].flatMap(action=>[
+    {type:'steering',movement:true,speed,turn:25,action,degrees:90,seconds:.5},
+    {type:'tankFinite',movement:true,leftSpeed:speed,rightSpeed:{op:'mul',left:speed,right:-1},action,degrees:90,seconds:.5}])
+  ];
+  for(const command of commands){
+   const motors=new ProfileMotors();
+   const r=runParallel(build([...setup,set('requested',150),profile(mode,.1,.1),command]).data,{motorDriver:motors,maxTime:30000});
+   assert.equal(r.stopped,false,JSON.stringify({mode,sign,command}));assert.equal(r.tasks,0);
+   assert.ok(motors.position.some(v=>v!==0));
+   assert.ok(motors.commands.every(c=>Math.abs(c.speed)<=100));
+   for(const event of r.events)if('speed' in event)assert.ok(Math.abs(event.speed)<=100,JSON.stringify(event));
+  }
+ }
+});

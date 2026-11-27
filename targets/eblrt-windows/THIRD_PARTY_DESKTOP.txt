@@ -1,0 +1,40 @@
+EBL-RT Windows 0.3.2 - third-party notices and source access
+Unofficial educational evaluation software, 2026-11-04.
+
+Cygwin binaries are NOT included in this ZIP. On first run the application downloads
+unmodified upstream packages to its own directory. No administrator privileges,
+global PATH changes, host Cygwin installation or system registry registration are used.
+The pinned index is tool-setup/setup.ini; exact versions, URLs, sizes and SHA-512
+are in tool-setup/manifest.json. The official setup verifies the signed package index.
+Sources for those packages are identified by the source: entries in setup.ini:
+https://mirrors.kernel.org/sourceware/cygwin/
+https://cygwin.com/licensing.html
+Notices are installed with each package in runtime/cygwin/usr/share/doc/.
+
+GNU Arm Embedded 5-2016-q3-update (GCC 5.4.1 20160919), selected unmodified binaries for EV3 C builds:
+Other CPU multilibs, C++/LTO/debug executables and bulk manuals are omitted.
+Licenses and the exact full corresponding source download remain available:
+License notices: runtime/arm-gcc/share/doc/gcc-arm-none-eabi/license.txt
+Exact corresponding source (downloadable without charge from the same release):
+https://launchpad.net/gcc-arm-embedded/5.0/5-2016-q3-update/+download/gcc-arm-none-eabi-5_4-2016q3-20160926-src.tar.bz2
+Release/build instructions:
+https://launchpad.net/gcc-arm-embedded/5.0/5-2016-q3-update
+Use the source archive for this exact toolchain, not a newer GCC version.
+
+Electron 45.2.1 (Node.js and Chromium included):
+https://github.com/electron/electron/releases/tag/v45.2.1
+LICENSE and LICENSES.chromium.html beside EBL-RT.exe retain bundled notices.
+
+RubyInstaller 3.3.13-1 (Modified BSD / Ruby's license choices):
+https://github.com/oneclick/rubyinstaller2/releases/tag/RubyInstaller-3.3.13-1
+Complete retained notices: runtime/ruby/LICENSE.txt and runtime/ruby/share/licenses/.
+
+EV3RT HRP3 SDK source with original copyright/license headers is in runtime/sdk.
+Origin and local build adjustments are in SDK_ORIGIN.txt.
+https://github.com/ev3rt-git/ev3rt-hrp3
+https://github.com/ev3rt-git/ev3rt-hrp3-sdk
+OS uImage is not included. No OS patch is applied automatically.
+
+Blockly and UI notices: dist/THIRD_PARTY.txt. Desktop and EBL-RT application
+source is included as readable .mjs/.cjs/.js files in resources/app.
+This application does not confer any exclusive rights to third-party components.

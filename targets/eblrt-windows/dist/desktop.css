@@ -1,0 +1,15 @@
+/* Match EBL: header, project bar, editor, log and footer. */
+body.desktop-app{grid-template-rows:auto auto minmax(0,1fr) auto 18px}
+.desktop-sound-status{padding:10px 12px;background:#edf5f4;border-radius:6px;overflow-wrap:anywhere}
+.desktop-diagnostics{width:min(760px,90vw);border:1px solid #b7d8d0;border-radius:12px;padding:26px;max-height:85vh;overflow:auto}.desktop-diagnostics p{line-height:1.8}.desktop-diagnostics pre{white-space:pre-wrap;font-size:13px;background:#f0f6f5;padding:14px;border-radius:8px;max-height:260px;overflow:auto}.desktop-diagnostics button{padding:10px 18px;min-height:40px}
+
+/* Standard target is an RBF export option in this Windows RT prototype. */
+.desktop-app[data-target="standard"] #standardEv3Tools>section:not(.program-output-card),.desktop-app[data-target="standard"] #standardEv3Tools>.teacher-panel{display:none!important}
+
+/* Bundled tools are checked inside the RT workbench, not in the header. */
+body.desktop-app[data-target="ev3rt"] header #connection{display:none!important}
+
+/* Keep the language selector visible alongside the primary action, as in EBL. */
+.desktop-app .header-right>.language-switch{display:inline-flex;align-items:center;gap:6px;flex:none;font-size:14px;white-space:nowrap}
+.desktop-app .header-right>.language-switch select{min-width:92px;min-height:36px;font-size:14px}
+@media(max-width:580px){.desktop-app .header-right>.language-switch{grid-column:1/-1;justify-self:start}}

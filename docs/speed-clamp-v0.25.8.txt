@@ -1,0 +1,27 @@
+速度の自動制限（v0.25.8 / 2026年11月24日）
+
+速さ・パワーは、直接入力、変数、演算結果、センサー値、マイブロックの引数・戻り値のいずれでも、モーター指令へ渡す直前に-100～100％へ自動制限します。100を超えた値は100、-100未満は-100です。計算元の変数やPID出力、記録した値そのものは変更しません。
+
+例：150 → 100％、-150 → -100％、80 + 70 → 100％。左50 + 補正200、右50 - 補正200は、左100％・右-100％になります。左右は個別に制限し、比率を保つための一括縮小は行いません。
+
+対象はL/Mモーター1個・2個の連続／角度／回転数／時間、速さ変更、パワー指定、および動きの前進・後退・ステアリング・左右別速度・ピボット・スピンです。加減速や同期制御付きの動作も、制限後の速度を使います。
+
+小数は制限後、モーター命令へ渡す時点で0方向へ切り捨てます。負の速さは逆方向です。有限動作の0速度、無効なポート、距離・角度・時間の範囲外、非数値・無限大などの不正値は、従来どおりエラーです。ステアリング量や加減速時間など、速度以外の設定範囲は変更しません。
+
+PIDの計算結果自体は制限しません。モーターへ渡す段階では自動制限されますが、補正値を-18～18など狭い範囲に収めたい場合は「範囲に収める」を使います。従来のマニュアル内の速度範囲は、出力される速度の範囲として読んでください。
+
+検証：自動試験311件成功、実機試験1件は未実施。直接値・演算・変数・センサー・マイブロックと、正逆転・左右別速度・加減速の出力を確認しました。今回の変更のEV3実機での転送・走行は未確認です。
+
+Automatic speed limiting (v0.25.8 / 24 November 2026)
+
+Speed and power are limited to -100..100% immediately before a motor command. This applies to direct numbers, variables, calculations, sensor values, and My Block arguments and results. Values above 100 become 100; values below -100 become -100. Source variables, PID results and logged values are not changed.
+
+Examples: 150 becomes 100%; -150 becomes -100%; 80 + 70 becomes 100%. With correction = 200, left = 50 + correction and right = 50 - correction produce 100% and -100%. Each side is limited independently; their ratio is not preserved by scaling both sides.
+
+Coverage: single and paired L/M motors; continuous, angle, rotation and timed moves; speed changes; power; forward/backward, steering, separate left/right speeds, pivot and spin. Ramps and synchronization use the limited speed.
+
+After limiting, fractional motor commands are truncated toward zero. Negative speed reverses direction. Zero speed in finite movement, invalid ports, invalid distance/angle/time, and non-finite values remain errors. Steering amount and ramp-time setting ranges are unchanged.
+
+PID calculations remain unrestricted. Motor commands limit their input automatically. Use Clamp if a smaller correction range such as -18..18 is required. Speed ranges in the earlier chapters describe the resulting motor output.
+
+Validation: 311 automated tests passed; one hardware test was skipped. Direct and calculated values, variables, sensors, My Blocks, both directions, independent sides and ramps were checked. Transfer and movement on a physical EV3 have not been verified for this change.

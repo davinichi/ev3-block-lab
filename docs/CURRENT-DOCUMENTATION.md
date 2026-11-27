@@ -2,7 +2,7 @@
 
 2026年11月27日更新。現在の公開版とWindows配布版の利用案内は [CURRENT-USE-20261127.md](CURRENT-USE-20261127.md) を参照してください。
 
-公開版は SBL 1.0.0（運用版）、EBL 0.25.9、EBL-RT Web 0.34.4-ev3rt.1、Windows 0.3.6（UI改訂 2026-11-27-green1-hint-label1）。このリポジトリの収録ソースは0.25.6です。ソースの同期とサイト公開は別に確認します。
+公開版は SBL 1.0.1（運用版）、EBL 0.25.9、EBL-RT Web 0.34.4-ev3rt.1、Windows 0.3.6（UI改訂 2026-11-27-green1-hint-label1-fullwidth1）。このリポジトリのEBL収録ソースは0.25.9 / fullwidth1です。ソースの同期とサイト公開は別に確認します。
 
 [SBLの変遷履歴（v0.7.0〜v1.0.0）](SBL-CHANGELOG.md)を追加しました。SBLは当面、機能追加を休止して不具合修正を継続します。EBL・EBL-RTはプレビュー開発を継続します。
 
@@ -48,3 +48,5 @@ OSの修正はカーネルのSVC復帰経路です。保存記録ではhelloEV3�
 
 
 高校生向けloader版別冊：13ページ。EBL-RTの動的ローディング形式を主手順に変更。作成済みhelloEV3版は別構成の記録として区別します。
+
+数値入力の全角・半角については[numeric-input-20261127.md](numeric-input-20261127.md)を参照してください。

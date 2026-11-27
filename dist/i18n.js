@@ -11,6 +11,19 @@ export function makeTranslator(dictionary,language){
   if(language()!=='en'||typeof text!=='string')return text;
   if(Object.hasOwn(dictionary,text))return dictionary[text];
   const trimmed=text.trim();if(Object.hasOwn(dictionary,trimmed))return text.replace(trimmed,dictionary[trimmed]);
+  // 可変部分はそのまま残す。ファイル名や利用者が付けた名前を翻訳しない。
+  const patterns=[
+   [/^種類 (\d+)・モード (\d+)$/,(_,type,mode)=>`Device type ${type}, mode ${mode}`],
+   [/^モード (\d+) の先頭値$/,(_,mode)=>`First value of mode ${mode}`],
+   [/^同じ名前のマイブロック「(.+)」があります。名前を変更してから読み込んでください。$/,(_,name)=>`A My Block named “${name}” already exists. Rename it before importing.`],
+   [/^「(.+)」を保存しています。同じ名前のプログラムは上書きされます…$/,(_,name)=>`Saving “${name}”. A program with the same name will be overwritten…`],
+   [/^切断しました。EV3を再起動して、(.+) を選んでください。$/,(_,path)=>`Disconnected. Restart EV3 and select ${path}.`],
+   [/^対応する送信がない応答 #(\d+)$/,(_,id)=>`Response #${id} has no matching request`],
+   [/^(.+) の起動命令をEV3が受け付けました。$/,(_,path)=>`EV3 accepted the start command for ${path}.`],
+   [/^開始角度を記録しました（B ([-\d.]+)° \/ C ([-\d.]+)°）。本体で今回のファイルを1回実行し、停止後に「終了角度を読む」を押してください。$/,(_,b,c)=>`Starting angles recorded (B ${b}° / C ${c}°). Run the current file once on EV3, then press Read final angles after stopping.`],
+   [/^開始からの回転角度：B ([-\d.]+)° \/ C ([-\d.]+)°（本体の角度センサー値）。$/,(_,b,c)=>`Rotation since start: B ${b}° / C ${c}° (brick encoder readings).`]
+  ];
+  for(const [pattern,render]of patterns)if(pattern.test(text))return text.replace(pattern,render);
   const range=text.match(/^(.+)は ([−\-\d.]+)〜([−\-\d.]+) の整数にしてください。$/);
   if(range){let label=range[1];for(const [from,to]of entries)label=label.split(from).join(to);return `${label}: use an integer from ${range[2]} to ${range[3]}.`;}
   text=text.replace(/(\d+) バイト \/ マイブロック (\d+) 個/g,'$1 bytes / $2 My Blocks');
@@ -28,7 +41,7 @@ export function installI18n({Blockly,jaMessages,enMessages,catalog,document,stor
   if(key==='text'&&value.callbackKey?.startsWith('EV3_EDIT_'))return [key,language==='en'?'Edit “'+item.replace(/^「|」を編集$/g,'')+'”':item];
   return [key,(key==='name'&&value.kind==='category'||key==='text'&&['label','button'].includes(value.kind))?t(item):key==='contents'?translateToolbox(item):item];
  })):value;
- const overrides={PROCEDURES_DEFNORETURN_PROCEDURE:'マイブロック',PROCEDURES_DEFNORETURN_TITLE:'定義',PROCEDURES_DEFRETURN_TITLE:'定義',PROCEDURES_DEFRETURN_RETURN:'返す値',CONTROLS_IF_MSG_THEN:'',CONTROLS_IF_MSG_ELSE:'',CONTROLS_IF_MSG_ELSEIF:'でなければ、もし',CONTROLS_REPEAT_INPUT_DO:'',PROCEDURES_CALLNORETURN_TOOLTIP:'マイブロックを呼び出します。',DUPLICATE_BLOCK:'複製'};
+ const overrides={PROCEDURES_CALL_BEFORE_PARAMS:'',PROCEDURES_DEFNORETURN_PROCEDURE:'マイブロック',PROCEDURES_DEFNORETURN_TITLE:'定義',PROCEDURES_DEFRETURN_TITLE:'定義',PROCEDURES_DEFRETURN_RETURN:'返す値',CONTROLS_IF_MSG_THEN:'',CONTROLS_IF_MSG_ELSE:'',CONTROLS_IF_MSG_ELSEIF:'でなければ、もし',CONTROLS_REPEAT_INPUT_DO:'',PROCEDURES_CALLNORETURN_TOOLTIP:'マイブロックを呼び出します。',DUPLICATE_BLOCK:'複製'};
  function messages(){Blockly.setLocale(language==='en'?enMessages:jaMessages);for(const [key,value]of Object.entries(overrides))Blockly.Msg[key]=t(value);}
  const jsonInit=Blockly.Block.prototype.jsonInit;
  Blockly.Block.prototype.jsonInit=function(source){
@@ -75,13 +88,13 @@ export function installI18n({Blockly,jaMessages,enMessages,catalog,document,stor
   const select=document.getElementById('uiLanguage');if(select)select.value=language;
   const pdf=document.getElementById('manualDownload'),html=document.getElementById('manualHtml');
   if(pdf){const stem=language==='en'?'EV3-Block-Lab-Manual-v0.25.6-en':'EV3-Block-Lab-ブロック命令マニュアル-v0.25.6';pdf.href='manual/'+stem+'.pdf';pdf.download=stem+'.pdf';}
-  if(pdf){const title=language==='en'?'Manual v0.25.6 · 20 chapters · 24 pages':'最新版マニュアル v0.25.6・全20章・43ページ';if(pdf.title!==title)pdf.title=title;}
+  if(pdf){const title=language==='en'?'Manual v0.25.8 · 20 chapters · 31 pages':'最新版マニュアル v0.25.8・全20章・50ページ';if(pdf.title!==title)pdf.title=title;}
   if(html)html.href='manual/'+(language==='en'?'EV3-Block-Lab-Manual-v0.25.6-en':'EV3-Block-Lab-ブロック命令マニュアル-v0.25.6')+'.html';
-  const guideChapters={'v019-guide.html':5,'v018-guide.html':4,'v017-guide.html':13,'pid-battery-guide.html':10,'gyro-guide.html':7,'display-guide.html':11};
+  const guideChapters={'v019-guide.html':5,'v018-guide.html':4,'v017-guide.html':13,'pid-battery-guide.html':10,'gyro-guide.html':7,'display-guide.html':11,'classroom-ui-guide.html':'classroom-ui-guide.html#english'};
   for(const link of document.querySelectorAll('a[href]')){
    const source=guideLinks.get(link)??link.getAttribute('href');
    if(!guideChapters[source])continue;guideLinks.set(link,source);
-   const target=language==='en'?'manual/EV3-Block-Lab-Manual-v0.25.6-en.html#chapter-'+guideChapters[source]:source;
+   const chapter=guideChapters[source],target=language==='en'?(typeof chapter==='string'?chapter:'manual/EV3-Block-Lab-Manual-v0.25.6-en.html#chapter-'+chapter):source;
    if(link.getAttribute('href')!==target)link.setAttribute('href',target);
   }
  }

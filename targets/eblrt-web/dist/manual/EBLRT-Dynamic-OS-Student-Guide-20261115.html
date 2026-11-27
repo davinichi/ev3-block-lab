@@ -1,0 +1,368 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>EBL RT用の修正版OSを作る 改訂6</title><style>body{max-width:840px;margin:40px auto;padding:0 24px;font:16px/1.7 sans-serif;color:#111}pre{white-space:pre-wrap;background:#f4f6f8;padding:14px;font:13px/1.5 monospace}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:8px}h1{font-size:28px}h2{margin-top:32px}h3{font-size:19px}</style>
+<h1>EBL RT用の修正版OSを作る</h1>
+<p>高校生向け実習手順　動的ローディング形式</p>
+<p>2026年11月15日　改訂6</p>
+<p>この実習では、EBL-RTの作品を後から読み込んで実行できるOSを作ります。SVC復帰処理を修正し、できたuImageを予備SDへ保存して、EV3で音だけの作品を実行するところまで確認します。</p>
+<h3>完成したときの状態</h3>
+<table>
+<tr><th>置くもの</th><th>保存先</th><th>確認すること</th></tr>
+<tr><td>修正したOS</td><td>SD直下のuImage</td><td>起動後にLoad Appが表示される</td></tr>
+<tr><td>作品の実行ファイル</td><td>SDのev3rt/apps内</td><td>本体から選んで2回実行できる</td></tr>
+</table>
+<p></p>
+<h3>実習の順序</h3>
+<p>1 道具 → 2 ARM GCC → 3 Ruby → 4 ソース → 5 共通準備 → 6 SVC修正 → 7 ビルド → 8 成果物確認 → 9 SDへコピー → 10 起動 → 11 作品を実行 → 12 記録と復元</p>
+<h3>始める前に</h3>
+<p>Windows PC、EV3本体、動作している元のmicroSD、予備のmicroSD、SDを読み書きできる機器を用意します。元のSDは変更しません。最初はモーターをすべて外します。</p>
+<p>本文のコマンドはCygwin Terminalへ、節ごとに入力します。コマンド集全体を一度に実行しないでください。WindowsのD:\EV3RTは、Cygwinでは/cygdrive/d/EV3RTと書きます。</p>
+<p>「入力するコマンド」の行頭の $ は仮のプロンプトです。$ とその後の空白は入力せず、続くコマンドだけを入力してEnterを押します。行末が \ の場合は続きの行があり、次の行の &gt; もプロンプトなので入力しません。# で始まる行は説明コメントです。ソースコードと表示結果の例にはプロンプトを付けず、見出しで区別します。</p>
+<p>本書は過去のビルド記録を基にした手順です。今回の文書改訂では、新規PCでの全工程と実機試験を再実施していません。環境により追加確認が必要です。各節の結果が合わなければ、次へ進む前に先生や指導者へ相談してください。</p>
+<h2>1 Cygwinとパッケージの導入状況を確認する</h2>
+<h3>行う作業</h3>
+<p>WindowsのスタートメニューからCygwin Terminalを開けるか確認します。開けなければCygwin Setupで導入してから、以下を行います。すでに使えるPCへ、別のCygwinを追加する必要はありません。</p>
+<h3>入力するコマンド</h3>
+<pre>$ cygcheck -c bash coreutils make perl ruby rubygems
+$ cygcheck -c gcc-core binutils tar xz unzip diffutils
+$ cygcheck -c findutils grep sed gawk ca-certificates python3</pre>
+<h3>確認した結果</h3>
+<p>指定したパッケージごとにPackage・Version・Statusが表示され、StatusがOKであること。名前が一覧に出ないものは未導入、Incompleteは部品不足の可能性があります。表に出た版を記録してください。</p>
+<h3>表示結果の例 入力しません</h3>
+<pre>Cygwin Package Information
+Package       Version       Status
+make          版番号        OK
+ruby          版番号        OK</pre>
+<p>上は表示の形の例です。実際の版番号はPCによって違います。2項目だけを確認するのではなく、コマンドで指定したすべてのパッケージを確認します。</p>
+<h3>追加機能を使う場合だけ確認するもの</h3>
+<h3>入力するコマンド</h3>
+<pre>$ cygcheck -c git patch</pre>
+<p>Git取得やパッチファイル適用を使う場合に確認します。本書の手編集だけなら、これらがなくても進められます。</p>
+<h3>うまくいかない場合</h3>
+<p>不足やIncompleteがあれば、次ページのSetupで該当パッケージを追加・再導入します。すべてOKでも、別の環境の実行ファイルが選ばれる場合があるため、次ページのtype -aも確認します。</p>
+<p>確認方法の公式説明　https://cygwin.com/cygwin-ug-net/cygcheck.html</p>
+<h2>1 続き 不足するCygwinの道具を追加する</h2>
+<h3>行う作業</h3>
+<p>Cygwin公式サイトのsetup-x86_64.exeを起動し、下のパッケージを選びます。導入済みのPCも同じSetupで追加できます。検索したパッケージのSkipを版番号に切り替え、依存部品も導入します。</p>
+<table>
+<tr><th>パッケージ</th><th>用途</th></tr>
+<tr><td>bash、coreutils</td><td>コマンド実行、ファイル操作、SHA-256確認</td></tr>
+<tr><td>make、perl、ruby</td><td>ビルド手順と設定ファイルの生成</td></tr>
+<tr><td>rubygems</td><td>Ruby追加ライブラリーを導入するgemコマンド</td></tr>
+<tr><td>gcc-core、binutils</td><td>PC上で動くビルド補助プログラムの作成</td></tr>
+<tr><td>tar、xz、unzip</td><td>配布ファイルの展開</td></tr>
+<tr><td>diffutils、findutils、grep、sed、gawk</td><td>差分確認、ファイルとログの検索</td></tr>
+<tr><td>ca-certificates</td><td>HTTPS接続に必要な証明書</td></tr>
+<tr><td>python3</td><td>同梱のuImage確認ツールの実行</td></tr>
+</table>
+<p></p>
+<p>Gitで取得する場合はgit、パッチファイルを適用する場合はpatchも追加します。本書は展開済みソースを手で編集する手順です。これは実習に用いる道具の一覧で、新規PCの最小構成を確定した一覧ではありません。</p>
+<h3>入力するコマンド</h3>
+<pre>$ type -a bash cp sha256sum make perl ruby gem gcc as
+$ type -a tar xz unzip diff find grep sed gawk python3
+$ make --version
+$ ruby -v</pre>
+<h3>確認した結果</h3>
+<p>必要なコマンドの保存先が表示され、MakeとRubyの版番号が表示されること。Setupで追加した場合は前ページのcygcheck -cも再実行し、一覧がOKになったことを確認します。</p>
+<h3>うまくいかない場合</h3>
+<p>command not foundは道具が見つからないという意味です。Setupで導入したか確認します。Cygwinを開き直して再確認してください。DLLを他のPCから個別にコピーして補わないでください。</p>
+<h2>2 ARM GCCとmkimageの導入状況を確認する</h2>
+<h3>行う作業</h3>
+<p>Cygwin Terminalで、ARM用の道具がすでに見つかるか確認します。見つかる場合は、その保存先を記録して次の確認へ進みます。</p>
+<h3>入力するコマンド</h3>
+<pre>$ type -a arm-none-eabi-gcc arm-none-eabi-objdump mkimage
+$ arm-none-eabi-gcc --version</pre>
+<h3>確認した結果</h3>
+<p>ARM用GCC・objdump・mkimageの保存先が表示され、GCCの版が確認できること。本書の記録環境はARM GCC 5.4.1です。他の版で動くと決めつけず、指導者と確認します。</p>
+<h3>見つからない場合に導入済みフォルダーを確認する</h3>
+<p>Windowsのエクスプローラーで、ARM GCCのインストール先のbin内にarm-none-eabi-gcc.exeとarm-none-eabi-objdump.exeがあるか確認します。mkimage.exeは配置したtoolsフォルダーを確認します。実体があれば、未導入ではなくPATHの問題の可能性があります。次ページでPATHを設定します。</p>
+<p>実体がなければ、次ページの配布元・配置先を確認して必要な道具だけを導入します。すでにあるフォルダーを削除したり、違う版へ無条件に置き換えたりしません。</p>
+<h3>導入とPATH設定の後に確かめるもの</h3>
+<p>ARM GCCの基本ライブラリーは次ページの確認コマンドを使います。mkimageはファイルの存在だけでは十分ではないので、下のコマンドで起動して使い方が表示されることも確認します。</p>
+<h3>入力するコマンド</h3>
+<pre>$ mkimage -h</pre>
+<h3>確認した結果</h3>
+<p>Usageなどの使い方が表示されること。古い版で-hが未対応でも、使い方が表示される場合があります。ヘルプ表示の終了コードが0とは限りません。実際のuImage作成と内容の確認は手順7・8で行います。</p>
+<h3>うまくいかない場合</h3>
+<p>command not foundなら保存先とPATH、実行形式エラーならWindowsで実行できる実体かを確認します。Cygwinのgcc-coreはARM GCCの代わりになりません。</p>
+<h2>2 続き ARM GCCの配置とライブラリーを確認する</h2>
+<h3>行う作業</h3>
+<p>未導入の道具だけを準備します。使用記録のあるARM GCCは5.4.1です。Windowsで動く道具を使い、配布元と配置先を指導者と確認します。</p>
+<p>下のARM GCCの場所は、自分のPCの保存先へ置き換えます。mkimage.exeはD:\EV3RT\toolsに置いた例です。Cygwinを開き直した場合もPATHを設定します。</p>
+<h3>入力するコマンド</h3>
+<pre>$ export PATH=&quot;/cygdrive/c/Program Files (x86)/GNU Tools ARM Embedded/5.4 2016q3/bin:$PATH&quot;
+$ export PATH=&quot;/cygdrive/d/EV3RT/tools:$PATH&quot;
+$ hash -r
+$ type -a arm-none-eabi-gcc mkimage
+$ arm-none-eabi-gcc --version
+$ arm-none-eabi-gcc -print-file-name=libc.a
+$ arm-none-eabi-gcc -print-file-name=libm.a
+$ arm-none-eabi-gcc -print-libgcc-file-name
+$ ls -l &quot;$(arm-none-eabi-gcc -print-file-name=libc.a)&quot;
+$ ls -l &quot;$(arm-none-eabi-gcc -print-file-name=libm.a)&quot;
+$ ls -l &quot;$(arm-none-eabi-gcc -print-libgcc-file-name)&quot;</pre>
+<h3>確認した結果</h3>
+<p>ARM GCCの版と保存先、3つのライブラリーのフルパスが分かること。最後のlsで3ファイルのサイズ・日時が表示され、No such file or directoryが出ないこと。名前だけの表示は導入済みの確認になりません。</p>
+<h3>うまくいかない場合</h3>
+<p>libc.aなどの名前だけが表示される場合は部品を発見できていません。完全なツールチェーンとPATHを確認します。Cygwin用のライブラリーで代用しません。mkimageの配布元と配置が不明な場合は指導者と確認してください。Linux用の実行ファイルはそのまま使用できません。</p>
+<h3>入手と配置の参考</h3>
+<p>ARM GCC　https://launchpad.net/gcc-arm-embedded/5.0/5-2016-q3-update</p>
+<p>使用した道具とビルド環境の記録　https://qiita.com/davinichi/items/fe3ac1cbd3c9863fc3d9</p>
+<h2>3 gemが使えることを確認する</h2>
+<h3>行う作業</h3>
+<p>Cygwin Terminalでrubyとgemの保存先・版番号を確認します。gemはRubyGemsの管理コマンドで、Cygwinのrubyとは別パッケージです。</p>
+<h3>入力するコマンド</h3>
+<pre>$ type -a ruby gem
+$ ruby --version
+$ gem --version</pre>
+<h3>確認した結果</h3>
+<p>rubyとgemの場所、および両方の版番号が表示されること。確認できたら、次ページのライブラリー導入へ進みます。</p>
+<h3>gemが見つからない場合の作業</h3>
+<p>1　gem: command not found、またはtype: gem: not foundと表示されたら、Cygwin Terminalを閉じます。</p>
+<p>2　Cygwin公式のsetup-x86_64.exeを起動し、現在使っているCygwinと同じインストール先を選びます。別の場所へ新規導入しません。</p>
+<p>3　パッケージ選択画面でViewをFullにし、Searchへrubygemsと入力します。rubygemsのSkipを版番号へ切り替え、必要な依存部品とともにインストールします。rubygems-docだけを選ばないでください。rubyが未導入ならrubyも選びます。</p>
+<p>4　Setupが完了したらCygwin Terminalを開き直し、次を入力します。</p>
+<h3>入力するコマンド</h3>
+<pre>$ hash -r
+$ type -a ruby gem
+$ gem --version</pre>
+<h3>確認した結果</h3>
+<p>gemの保存先と版番号が表示され、command not foundが出ないこと。確認できるまでgem installへ進みません。</p>
+<h3>うまくいかない場合</h3>
+<p>Setupのインストール先が同じか確認します。type -aが別のWindows用Rubyを示す場合は、混在の可能性があります。追加のRubyを入れず、表示結果を指導者へ見せてください。</p>
+<p>https://cygwin.com/packages/summary/rubygems.html</p>
+<h2>3 続き 指定したgemが導入済みか確認する</h2>
+<h3>行う作業</h3>
+<p>gemが使えることを確認してから、下の5行を1行ずつ入力します。指定した名前と版のgemが、今使っているRubyの環境から見えるかを調べます。ダウンロードやインストールは行いません。</p>
+<h3>入力するコマンド</h3>
+<pre>$ gem list --local --installed --exact e2mmap -v 0.1.0
+$ gem list --local --installed --exact sync -v 0.5.0
+$ gem list --local --installed --exact shell -v 0.8.1
+$ gem list --local --installed --exact csv -v 3.3.7
+$ gem list --local --installed --exact pstore -v 0.3.0</pre>
+<h3>確認した結果</h3>
+<p>それぞれの行の結果がtrueなら、指定版が導入済みです。そのgemの再インストールは不要です。falseなら、その名前・版が現在の環境からは見つかりません。falseはエラーではなく確認結果で、終了コード1になることがあります。結果とgem名を対応させて記録します。</p>
+<h3>別の版だけがあるかを確認する</h3>
+<h3>入力するコマンド</h3>
+<pre>$ gem list --local --exact e2mmap
+$ gem list --local --exact sync
+$ gem list --local --exact shell
+$ gem list --local --exact csv
+$ gem list --local --exact pstore</pre>
+<h3>確認した結果</h3>
+<p>例としてcsv (3.3.7, 3.3.6)と出れば、3.3.7も導入済みです。csv (3.3.6)だけなら、本書の指定版3.3.7はありません。defaultと付くものはRubyに付属するgemです。付属版を削除する必要はありません。</p>
+<h3>うまくいかない場合</h3>
+<p>falseでも、別のRubyへ導入済みの場合があります。type -a ruby gem、gem env、ruby -e &#x27;puts Gem.path&#x27;で環境を照合します。環境が合っていて指定版がないものだけ、次ページで導入します。</p>
+<p>公式説明　https://guides.rubygems.org/command-reference/</p>
+<h2>3 続き 不足するgemを導入して読み込みを確認する</h2>
+<h3>行う作業</h3>
+<p>前ページでfalseだったgemについてだけ、対応する行を実行します。5行すべてを無条件に再実行する必要はありません。shellというgemはCygwinのBashとは別です。</p>
+<h3>入力するコマンド</h3>
+<pre>$ gem install --user-install e2mmap -v 0.1.0 --no-document
+$ gem install --user-install sync -v 0.5.0 --no-document
+$ gem install --user-install shell -v 0.8.1 --no-document
+$ gem install --user-install csv -v 3.3.7 --no-document
+$ gem install --user-install pstore -v 0.3.0 --no-document
+$ ruby -rshell -rcsv -rpstore -e &#x27;puts &quot;Ruby libraries OK&quot;&#x27;</pre>
+<h3>確認した結果</h3>
+<p>導入したgemは前ページの指定版確認を再実行してtrueになったことを確認します。最後のrubyコマンドは、導入しなかった場合も全員が実行します。Ruby libraries OKと表示されればshell・csv・pstoreを読み込めています。これは5つの指定版の存在確認とは別の確認です。</p>
+<h3>うまくいかない場合</h3>
+<p>LoadErrorが出る場合は、次の結果を先生へ見せます。別のRubyにgemを入れていないか、実行するRubyと保存先を照合します。</p>
+<h3>入力するコマンド</h3>
+<pre>$ type -a ruby gem
+$ gem env
+$ ruby -e &#x27;puts Gem.path&#x27;</pre>
+<h3>作業を進める条件</h3>
+<p>ライブラリーの読み込みが成功してから、次へ進みます。Rubyの版に応じたソースの互換修正は手順5で確認します。OS用のARMライブラリーをgemで導入することはありません。</p>
+<h2>4 ソースを2つの作業先へ展開する</h2>
+<h3>行う作業</h3>
+<p>EV3RT v1.1の配布物からhrp3.tar.xzを取り出し、D:\EV3RTへ置きます。同じアーカイブを2か所へ展開します。baselineは修正前、fixedはSVC修正後です。両方を作ることで、先にビルド環境が動くことを確認できます。</p>
+<h3>入力するコマンド</h3>
+<pre>$ mkdir -p /cygdrive/d/EV3RT/svc-compare
+$ cd /cygdrive/d/EV3RT/svc-compare
+$ mkdir baseline fixed</pre>
+<p>baselineまたはfixedがすでに存在する場合は、ここで止めます。既存フォルダーへ重ねず、新しい作業名を決めて以後のパスをそろえてください。</p>
+<h3>入力するコマンド</h3>
+<pre>$ tar -xJf /cygdrive/d/EV3RT/hrp3.tar.xz -C baseline
+$ tar -xJf /cygdrive/d/EV3RT/hrp3.tar.xz -C fixed
+$ ls baseline/hrp3/sdk/firmware/loader/Makefile.inc
+$ ls fixed/hrp3/sdk/firmware/loader/Makefile.inc</pre>
+<h3>確認した結果</h3>
+<p>2つのloader/Makefile.incのパスが表示され、No such file or directoryが出ないこと。Cygwinのtarで展開し、配布物のリンク構造も保ちます。</p>
+<h3>うまくいかない場合</h3>
+<p>hrp3.tar.xzの場所、展開後のフォルダーの階層、配布版がv1.1かを確認します。以前ビルドしたフォルダーの生成物はコピーしません。</p>
+<p>配布元　https://toppers.jp/trac_user/ev3pf/wiki/Download</p>
+<h2>5 SDKのライブラリーがあるか確認する</h2>
+<h3>行う作業</h3>
+<p>baseline/hrp3とfixed/hrp3のそれぞれで、SDKに対応する次のARMライブラリーがあるか確認します。これはCygwin Setupで導入する部品ではありません。</p>
+<h3>入力するコマンド</h3>
+<pre>$ cd /cygdrive/d/EV3RT/svc-compare/baseline/hrp3
+$ ls -l modules/usblib/Release/libusblib.a
+$ ls -l modules/mbed-on-toppers/build/libmbed-hrp3.a
+$ ls -l modules/btstack/platforms/ev3rt/libBTstack.a
+$ cd /cygdrive/d/EV3RT/svc-compare/fixed/hrp3
+$ ls -l modules/usblib/Release/libusblib.a
+$ ls -l modules/mbed-on-toppers/build/libmbed-hrp3.a
+$ ls -l modules/btstack/platforms/ev3rt/libBTstack.a</pre>
+<h3>確認するファイル名 入力コマンドではありません</h3>
+<pre>modules/usblib/Release/libusblib.a
+modules/mbed-on-toppers/build/libmbed-hrp3.a
+modules/btstack/platforms/ev3rt/libBTstack.a</pre>
+<p>上は確認するファイル名で、実行コマンドではありません。見つからない場合は、対応する配布SDKや部品の作成手順を指導者と確認します。異なる版から無条件にコピーしません。</p>
+<h3>確認した結果</h3>
+<p>両方の作業先で3つのファイル名・サイズ・日時が表示され、No such file or directoryが出ないこと。存在確認だけではSDKとの互換性までは分かりません。対応する配布物の部品か確認します。</p>
+<h3>うまくいかない場合</h3>
+<p>見つからないファイルがある場合は、このままビルドへ進みません。ファイル名と作業先を指導者へ見せ、対応するSDKの準備方法を確認してください。</p>
+<h2>5 続き Rubyの互換性を確認する</h2>
+<p>次に両方のcfg/pass1.rbを開き、CSV.openの引数を確認します。下の変更前の書き方なら、両方を変更後にそろえます。Rubyのキーワード引数に対応するための変更で、SVC修正とは別です。</p>
+<h3>ソースコードの例 入力コマンドではありません</h3>
+<pre># 変更前
+symvalCsv = CSV.open(symvalTableFileName,
+                    { skip_blanks: true, skip_lines: /^#/ })
+# 変更後
+symvalCsv = CSV.open(symvalTableFileName,
+                    skip_blanks: true, skip_lines: /^#/ )</pre>
+<h3>入力するコマンド</h3>
+<pre>$ cd /cygdrive/d/EV3RT/svc-compare
+$ ruby -c baseline/hrp3/cfg/pass1.rb
+$ ruby -c fixed/hrp3/cfg/pass1.rb</pre>
+<h3>確認した結果</h3>
+<p>2回ともSyntax OKが出ること。両方に同じ互換修正を適用し、変更前ファイルも別名で残します。Syntax OKは文法確認であり、ビルド成功の意味ではありません。</p>
+<h3>うまくいかない場合</h3>
+<p>該当コードが異なる場合は無理に置換せず相談します。既存のloader再ビルド成功記録はRuby 3.3.13です。本書のCygwin Ruby構成での全工程は、今回再試験していません。</p>
+<h2>6 fixed側のSVC復帰処理を修正する</h2>
+<h3>行う作業</h3>
+<p>fixed/hrp3/arch/arm_gcc/common/core_support.Sを開き、ret_svc_1を探します。その直後の__TARGET_ARCH_ARM &lt; 6の区間で、popの直前へmsr cpsr_cの1行を追加して保存します。baselineは変更しません。</p>
+<h3>ソースコードの例 入力コマンドではありません</h3>
+<pre>ALABEL(ret_svc_1)
+#if __TARGET_ARCH_ARM &lt; 6
+    msr     cpsr_c, #(CPSR_SVC_MODE AOR CPSR_FIQ_IRQ_BIT)
+    pop     {lr}
+    msr     spsr_cxsf, lr
+    ldmfd   sp!, {pc}^</pre>
+<p>上は編集後の該当部分です。周囲の命令や条件分岐は削除しません。すでに追加命令があれば二重に追加しません。</p>
+<h3>入力するコマンド</h3>
+<pre>$ cd /cygdrive/d/EV3RT/svc-compare
+$ diff -u \
+&gt;   baseline/hrp3/arch/arm_gcc/common/core_support.S \
+&gt;   fixed/hrp3/arch/arm_gcc/common/core_support.S</pre>
+<h3>確認した結果</h3>
+<p>追加したmsr cpsr_cの行に＋が付いて表示されること。＋は差分表示の記号で、ソースへ入力しません。diffの終了コード1は差分ありの意味です。</p>
+<h3>うまくいかない場合</h3>
+<p>違う場所の変更、元の命令の削除、命令の重複がないか見直します。行番号よりもラベルと条件分岐を照合してください。</p>
+<h3>この修正が行うこと</h3>
+<p>OSからアプリへ戻る直前の短い区間でIRQ/FIQをマスクし、復帰先の状態が割り込みで上書きされることを防ぎます。最後の例外復帰で保存済みの状態を復元します。開発者からも修正方針は妥当との回答を得ています。</p>
+<p>この1行だけでは起動時のB: SVCFIX ON表示は追加されません。本実習では、組み込まれた命令とuImageのSHA-256を確認して識別します。</p>
+<h2>7 2つのOSを順にビルドする</h2>
+<h3>行う作業</h3>
+<p>まずbaseline、成功したらfixedをビルドします。両方ともApp Loaderを組み込むimg=loaderを指定します。以下のまとまりをそれぞれ続けて実行します。</p>
+<h3>入力するコマンド</h3>
+<pre>$ cd /cygdrive/d/EV3RT/svc-compare/baseline/hrp3/sdk/firmware
+$ set -o pipefail
+$ make PWD=. img=loader 2&gt;&amp;1 | tee build-baseline-loader.log
+$ build_status=${PIPESTATUS[0]}
+$ printf &quot;make exit status: %s\n&quot; &quot;$build_status&quot;
+$ test &quot;$build_status&quot; -eq 0</pre>
+<h3>確認した結果</h3>
+<p>baselineでmake exit status: 0と表示されること。0以外ならfixedの作業へ進まず、ログを確認します。PIPESTATUSの取得前に別のコマンドを挟まないでください。</p>
+<h3>入力するコマンド</h3>
+<pre>$ cd /cygdrive/d/EV3RT/svc-compare/fixed/hrp3/sdk/firmware
+$ set -o pipefail
+$ make PWD=. img=loader 2&gt;&amp;1 | tee build-fixed-loader.log
+$ build_status=${PIPESTATUS[0]}
+$ printf &quot;make exit status: %s\n&quot; &quot;$build_status&quot;
+$ test &quot;$build_status&quot; -eq 0
+$ ls -l uImage</pre>
+<h3>確認した結果</h3>
+<p>fixedもmake exit status: 0で、今回作ったuImageの日時とサイズが表示されること。成果物はD:\EV3RT\svc-compare\fixed\hrp3\sdk\firmware\uImageです。</p>
+<h3>うまくいかない場合</h3>
+<p>失敗しても古いuImageが残る場合があります。ファイルの存在だけで成功と判断しません。ログ末尾のエラーと版番号を保存して相談してください。Makeがhrp.exeを要求し実体がhrpの場合も、名前を変えて通さず設定を確認します。</p>
+<h2>8 修正命令とuImageの内容を確認する</h2>
+<h3>行う作業</h3>
+<p>fixedのsdk/firmwareで、リンク済みのARM実行ファイルを逆アセンブルします。</p>
+<h3>入力するコマンド</h3>
+<pre>$ cd /cygdrive/d/EV3RT/svc-compare/fixed/hrp3/sdk/firmware
+$ elf=../OBJ/hrp
+$ if test ! -f &quot;$elf&quot;; then elf=../OBJ/hrp.exe; fi
+$ test -f &quot;$elf&quot;
+$ arm-none-eabi-objdump -d &quot;$elf&quot; &gt; loader-disassembly.txt
+$ grep -n -A 12 -B 4 ret_svc_1 loader-disassembly.txt</pre>
+<h3>確認した結果</h3>
+<p>ret_svc_1の先頭で、次の4命令がこの順に並ぶこと。先頭が追加命令です。baselineの同じ場所では先頭の追加命令がないことも照合します。</p>
+<h3>表示結果の例 入力しません</h3>
+<pre>e321f0d3
+e49de004
+e16ff00e
+e8fd8000</pre>
+<h3>行う作業</h3>
+<p>同梱のtools/check_image.pyをD:\EV3RT\toolsへコピーし、次を実行します。この道具はファイルを読み取って検査するだけです。</p>
+<h3>入力するコマンド</h3>
+<pre>$ python3 /cygdrive/d/EV3RT/tools/check_image.py uImage
+$ sha256sum uImage &gt; uImage-loader-fixed.sha256
+$ sha256sum -c uImage-loader-fixed.sha256</pre>
+<h3>確認した結果</h3>
+<p>JSONのchecks内がすべてtrueで、loadとentryは0xc0008000。ハッシュ照合はuImage: OKと表示されること。CRCは破損を、SHA-256はファイルの一致を確認します。実機の動作保証ではありません。</p>
+<h3>うまくいかない場合</h3>
+<p>命令が違う場合は、編集先・ビルド対象・古い生成物の再利用を確認します。チェックがfalse、ELFが見つからない、逆アセンブルが失敗した場合はSDへ進みません。</p>
+<h2>9 予備SDへコピーして照合する</h2>
+<h3>行う作業</h3>
+<p>EV3の電源を切り、ランプが消えたことを確認します。動作している元のSDは保管し、予備SDの内容をPCへ全体バックアップします。予備SDには、元のSDと同じ動作用のファイル構成を用意します。</p>
+<p>エクスプローラーで予備SDのドライブ文字と中身を確認します。手順7のfixed側のuImageを、そのSDの一番上へuImageという名前でコピーし、元のuImageを置き換えます。ev3rtフォルダーの中へ入れないでください。</p>
+<h3>確認した結果</h3>
+<p>SDの一番上にuImageとev3rtフォルダーがあり、ev3rt内のappsへ作品を保存できる構成になっていること。</p>
+<h3>行う作業</h3>
+<p>コピー元とSD上のuImageのSHA-256を比べます。下のSD_DRIVEは必ず自分のSDのドライブ文字へ置き換えます。例えばKドライブならkです。確認せずにkを使わないでください。</p>
+<h3>入力するコマンド</h3>
+<pre># 例 Kドライブの場合。自分のSDの文字へ変更する
+$ sha256sum /cygdrive/d/EV3RT/svc-compare/fixed/hrp3/sdk/firmware/uImage
+$ sha256sum /cygdrive/k/uImage</pre>
+<h3>確認した結果</h3>
+<p>2行の先頭にある64文字のSHA-256が完全に一致すること。ファイル名とパスの部分は異なって構いません。記録票にSDのドライブ文字とハッシュを残します。</p>
+<h3>うまくいかない場合</h3>
+<p>一致しない場合は、コピー元・コピー先・保存先の階層を確認します。結果が一致するまでEV3で試しません。</p>
+<h2>10 EV3で新しいOSを起動する</h2>
+<h3>行う作業</h3>
+<p>WindowsでSDを安全に取り外し、完全に電源が切れたEV3へ入れます。USBケーブルを外し、モーターもすべて外した状態でEV3の電源を入れます。</p>
+<h3>確認した結果</h3>
+<p>起動が進み、EV3RTの画面とLoad Appのメニューが表示されること。画面の写真を残します。今回の1行修正だけの場合はB: SVCFIX ONの表示を期待しません。</p>
+<h3>うまくいかない場合</h3>
+<p>起動しない、例外画面になる、Load Appが見つからない場合は実行を中止します。電源を完全に切り、元のSDへ戻して元の起動を確認します。新しいSDのSHA-256とビルドログを先生へ見せます。</p>
+<h3>戻るボタンだけではOSは切り替わらない</h3>
+<p>アプリを戻るボタンで終了しても、動いているOSはそのままです。SDを替えたOSの確認は、必ずランプが消えた状態から起動し直して行います。電源が入った状態でSDを抜き差ししません。</p>
+<h3>起動できたら次へ</h3>
+<p>この時点では、OSを起動できたことが確認できただけです。次の手順で、EBL-RTから作った作品を読み込んで実行できるか確かめます。モーターはまだ接続しません。</p>
+<h2>11 EBL RTの作品を2回実行する</h2>
+<h3>行う作業</h3>
+<p>EBL-RTで「スタート→短い音を鳴らす」だけの作品を作ります。Web版は対応する補助アプリ、Windows版は内蔵のビルド機能を使ってコンパイルします。動くモーターを含む作品は使いません。</p>
+<p>コンパイル成功後、転送方法をUSB／SDへの保存にし、作品の実行ファイルを予備SDのev3rt/apps内へ保存します。画面の読み戻し照合が完了したことを確認します。編集用の.ev3labやCソースのZIPは、本体で選ぶ実行ファイルではありません。</p>
+<h3>確認した結果</h3>
+<p>EBL-RTでコンパイル成功と転送・照合完了が確認できること。ev3rt/apps内に保存した実行ファイル名を記録します。PCの通知音だけで成功と判定しません。</p>
+<h3>行う作業</h3>
+<p>安全に取り外してUSBを抜き、必要なら完全に電源を切って予備SDを戻して起動します。本体でLoad App→SD cardから、保存した作品を選んで実行します。終了後、同じ作品をもう一度選んで実行します。</p>
+<h3>確認した結果</h3>
+<p>1回目と2回目の両方でEV3から音が出て、例外や停止がなく作品が終了すること。本体の音と終了をそれぞれ記録します。音量設定が消音の場合は本体の設定も確認します。</p>
+<h3>うまくいかない場合</h3>
+<p>作品が見つからなければ保存先とファイル種別、コンパイル結果を確認します。例外や操作不能が出たら、電源を切って元のSDへ戻します。</p>
+<h3>この実習で確認できる範囲</h3>
+<p>OSの起動とアプリの読み込み・基本実行を確認します。割り込み競合の再現試験や長時間動作の試験が完了したことにはなりません。これらは、別途用意した診断プログラムと試験計画で確認します。</p>
+<h2>12 結果を記録して元の状態へ戻す</h2>
+<h3>行う作業</h3>
+<p>同梱のTest-Record.csvへ、実際の結果を記入します。未実施の欄は未確認とし、過去の別のOSの結果で埋めません。ログ、ハッシュ、起動画面の写真も同じフォルダーへ保存します。</p>
+<table>
+<tr><th>確認項目</th><th>合格条件</th></tr>
+<tr><td>道具とRuby</td><td>版・保存先が分かり、Ruby libraries OK</td></tr>
+<tr><td>ソースと差分</td><td>fixed側だけにSVC修正命令が1行追加</td></tr>
+<tr><td>2つのビルド</td><td>両方のmake終了コードが0</td></tr>
+<tr><td>修正命令</td><td>ret_svc_1の4命令を確認</td></tr>
+<tr><td>uImage検査</td><td>checksがすべてtrue、SHA照合がOK</td></tr>
+<tr><td>SDのコピー</td><td>コピー元とSDのSHA-256が一致</td></tr>
+<tr><td>起動</td><td>Load Appメニューを確認</td></tr>
+<tr><td>作品の実行</td><td>同じ音の作品を2回実行して正常終了</td></tr>
+</table>
+<p></p>
+<h3>確認した結果</h3>
+<p>どこまで実施したか、どこで失敗したかが記録から分かること。uImage・ログ・SHA-256を組にして保管し、修正ありと修正なしを混ぜないようにします。</p>
+<h3>元へ戻す操作</h3>
+<p>EV3の電源を切ってランプ消灯を確認し、保管していた元のSDへ交換します。起動し、従来の画面と作品を確認します。元のSDを保持していれば、ファイルを再編集せず復元できます。</p>
+<h3>うまくいかない場合</h3>
+<p>元のSDでも起動できない場合は、電源・電池・SDの差し込みを確認し、追加の書き換えをせず相談します。</p>
+<p>本資料と検査ツールにはOSバイナリを同梱していません。OSを他の人へ配布する場合は、第三者部品も含めた利用条件と著作権表示を別途確認してください。</p>
+</html>

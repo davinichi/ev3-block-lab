@@ -1,0 +1,22 @@
+0.3.6 - 2026-11-24
+Shared editor UI parity with Web 0.34.3-ev3rt.1. Desktop transport and toolchain unchanged.
+
+0.3.5 - 2026-11-15
+- Replace system beep with a bundled WAV played by the editor.
+- Add an always-available completion sound test button and playback error status.
+- Enable audio playback after asynchronous confirmed transfer completion.
+- Correct the served setup page version.
+
+0.3.5 - 2026-11-15
+- Play the PC system notification sound after successful verified USB/SD save or PAN acknowledgment.
+- Do not sound on cancellation, failure, compilation or download only.
+- Retain 0.3.3 motor speed saturation and continuous steering fixes.
+
+0.3.3 - 2026-11-15
+- Bound final motor commands independently to -100..100 before integer conversion.
+- Retain PID equation, PID result and shared calculation variables.
+- Avoid intermediate braking when continuously updating steering correction.
+- Embed bridge feature 13 (bounded-motor-speed).
+- Reserve compiler slot before asynchronous preparation to prevent concurrent build races.
+- Update version labels, local guide and update instructions.
+- Preserve separated generated C files and MyBlock/argument naming features.

@@ -1,0 +1,121 @@
+参照用コマンド集 改訂6
+本文の節ごとに実行します。全体の一括実行は禁止です。
+行頭の $ と続きの行の > はプロンプトです。入力しません。
+# で始まる行は説明コメントです。
+ソースコードや表示結果はこのコマンド集に含めていません。
+
+$ cygcheck -c bash coreutils make perl ruby rubygems
+$ cygcheck -c gcc-core binutils tar xz unzip diffutils
+$ cygcheck -c findutils grep sed gawk ca-certificates python3
+
+$ cygcheck -c git patch
+
+$ type -a bash cp sha256sum make perl ruby gem gcc as
+$ type -a tar xz unzip diff find grep sed gawk python3
+$ make --version
+$ ruby -v
+
+$ type -a arm-none-eabi-gcc arm-none-eabi-objdump mkimage
+$ arm-none-eabi-gcc --version
+
+$ mkimage -h
+
+$ export PATH="/cygdrive/c/Program Files (x86)/GNU Tools ARM Embedded/5.4 2016q3/bin:$PATH"
+$ export PATH="/cygdrive/d/EV3RT/tools:$PATH"
+$ hash -r
+$ type -a arm-none-eabi-gcc mkimage
+$ arm-none-eabi-gcc --version
+$ arm-none-eabi-gcc -print-file-name=libc.a
+$ arm-none-eabi-gcc -print-file-name=libm.a
+$ arm-none-eabi-gcc -print-libgcc-file-name
+$ ls -l "$(arm-none-eabi-gcc -print-file-name=libc.a)"
+$ ls -l "$(arm-none-eabi-gcc -print-file-name=libm.a)"
+$ ls -l "$(arm-none-eabi-gcc -print-libgcc-file-name)"
+
+$ type -a ruby gem
+$ ruby --version
+$ gem --version
+
+$ hash -r
+$ type -a ruby gem
+$ gem --version
+
+$ gem list --local --installed --exact e2mmap -v 0.1.0
+$ gem list --local --installed --exact sync -v 0.5.0
+$ gem list --local --installed --exact shell -v 0.8.1
+$ gem list --local --installed --exact csv -v 3.3.7
+$ gem list --local --installed --exact pstore -v 0.3.0
+
+$ gem list --local --exact e2mmap
+$ gem list --local --exact sync
+$ gem list --local --exact shell
+$ gem list --local --exact csv
+$ gem list --local --exact pstore
+
+$ gem install --user-install e2mmap -v 0.1.0 --no-document
+$ gem install --user-install sync -v 0.5.0 --no-document
+$ gem install --user-install shell -v 0.8.1 --no-document
+$ gem install --user-install csv -v 3.3.7 --no-document
+$ gem install --user-install pstore -v 0.3.0 --no-document
+$ ruby -rshell -rcsv -rpstore -e 'puts "Ruby libraries OK"'
+
+$ type -a ruby gem
+$ gem env
+$ ruby -e 'puts Gem.path'
+
+$ mkdir -p /cygdrive/d/EV3RT/svc-compare
+$ cd /cygdrive/d/EV3RT/svc-compare
+$ mkdir baseline fixed
+
+$ tar -xJf /cygdrive/d/EV3RT/hrp3.tar.xz -C baseline
+$ tar -xJf /cygdrive/d/EV3RT/hrp3.tar.xz -C fixed
+$ ls baseline/hrp3/sdk/firmware/loader/Makefile.inc
+$ ls fixed/hrp3/sdk/firmware/loader/Makefile.inc
+
+$ cd /cygdrive/d/EV3RT/svc-compare/baseline/hrp3
+$ ls -l modules/usblib/Release/libusblib.a
+$ ls -l modules/mbed-on-toppers/build/libmbed-hrp3.a
+$ ls -l modules/btstack/platforms/ev3rt/libBTstack.a
+$ cd /cygdrive/d/EV3RT/svc-compare/fixed/hrp3
+$ ls -l modules/usblib/Release/libusblib.a
+$ ls -l modules/mbed-on-toppers/build/libmbed-hrp3.a
+$ ls -l modules/btstack/platforms/ev3rt/libBTstack.a
+
+$ cd /cygdrive/d/EV3RT/svc-compare
+$ ruby -c baseline/hrp3/cfg/pass1.rb
+$ ruby -c fixed/hrp3/cfg/pass1.rb
+
+$ cd /cygdrive/d/EV3RT/svc-compare
+$ diff -u \
+>   baseline/hrp3/arch/arm_gcc/common/core_support.S \
+>   fixed/hrp3/arch/arm_gcc/common/core_support.S
+
+$ cd /cygdrive/d/EV3RT/svc-compare/baseline/hrp3/sdk/firmware
+$ set -o pipefail
+$ make PWD=. img=loader 2>&1 | tee build-baseline-loader.log
+$ build_status=${PIPESTATUS[0]}
+$ printf "make exit status: %s\n" "$build_status"
+$ test "$build_status" -eq 0
+
+$ cd /cygdrive/d/EV3RT/svc-compare/fixed/hrp3/sdk/firmware
+$ set -o pipefail
+$ make PWD=. img=loader 2>&1 | tee build-fixed-loader.log
+$ build_status=${PIPESTATUS[0]}
+$ printf "make exit status: %s\n" "$build_status"
+$ test "$build_status" -eq 0
+$ ls -l uImage
+
+$ cd /cygdrive/d/EV3RT/svc-compare/fixed/hrp3/sdk/firmware
+$ elf=../OBJ/hrp
+$ if test ! -f "$elf"; then elf=../OBJ/hrp.exe; fi
+$ test -f "$elf"
+$ arm-none-eabi-objdump -d "$elf" > loader-disassembly.txt
+$ grep -n -A 12 -B 4 ret_svc_1 loader-disassembly.txt
+
+$ python3 /cygdrive/d/EV3RT/tools/check_image.py uImage
+$ sha256sum uImage > uImage-loader-fixed.sha256
+$ sha256sum -c uImage-loader-fixed.sha256
+
+# 例 Kドライブの場合。自分のSDの文字へ変更する
+$ sha256sum /cygdrive/d/EV3RT/svc-compare/fixed/hrp3/sdk/firmware/uImage
+$ sha256sum /cygdrive/k/uImage

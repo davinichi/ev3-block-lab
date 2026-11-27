@@ -1,0 +1,1 @@
+const {ipcRenderer}=require('electron');ipcRenderer.on('setup-progress',(_event,message)=>{const p=document.getElementById('progress');if(p)p.textContent=message;});

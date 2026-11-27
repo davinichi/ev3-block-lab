@@ -1,0 +1,4 @@
+Windows 0.3.6: 253 automated tests PASS, 0 FAIL, 1 hardware test skipped.
+Bundled ARM sound-program compilation PASS (78380 bytes).
+Native launch reached first-run preparation; full editor GUI confirmation incomplete due to automation timeout.
+Physical transfer, motion, first-run download and audible playback not verified.

@@ -1,0 +1,176 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "appVersion": "0.19.0",
+  "name": "MotorStopTest",
+  "programName": "MotorStopTest",
+  "ev3ProjectName": "EV3Lab",
+  "pairMode": "independent",
+  "workspace": {
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "x": 30,
+          "y": 30,
+          "next": {
+            "block": {
+              "type": "ev3_motor_stop_mode",
+              "fields": {
+                "PORTS": "2",
+                "MODE": "coast"
+              },
+              "next": {
+                "block": {
+                  "type": "ev3_motor_l_single_rotation",
+                  "fields": {
+                    "PORTS": "2"
+                  },
+                  "inputs": {
+                    "SPEED": {
+                      "shadow": {
+                        "type": "math_number",
+                        "fields": {
+                          "NUM": 20
+                        }
+                      }
+                    },
+                    "ROTATIONS": {
+                      "shadow": {
+                        "type": "math_number",
+                        "fields": {
+                          "NUM": 0.25
+                        }
+                      }
+                    }
+                  },
+                  "next": {
+                    "block": {
+                      "type": "ev3_wait_seconds",
+                      "inputs": {
+                        "SECONDS": {
+                          "shadow": {
+                            "type": "math_number",
+                            "fields": {
+                              "NUM": 1
+                            }
+                          }
+                        }
+                      },
+                      "next": {
+                        "block": {
+                          "type": "ev3_motor_stop_mode",
+                          "fields": {
+                            "PORTS": "2",
+                            "MODE": "brake"
+                          },
+                          "next": {
+                            "block": {
+                              "type": "ev3_motor_l_single_rotation",
+                              "fields": {
+                                "PORTS": "2"
+                              },
+                              "inputs": {
+                                "SPEED": {
+                                  "shadow": {
+                                    "type": "math_number",
+                                    "fields": {
+                                      "NUM": 20
+                                    }
+                                  }
+                                },
+                                "ROTATIONS": {
+                                  "shadow": {
+                                    "type": "math_number",
+                                    "fields": {
+                                      "NUM": 0.25
+                                    }
+                                  }
+                                }
+                              },
+                              "next": {
+                                "block": {
+                                  "type": "ev3_wait_seconds",
+                                  "inputs": {
+                                    "SECONDS": {
+                                      "shadow": {
+                                        "type": "math_number",
+                                        "fields": {
+                                          "NUM": 1
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "next": {
+                                    "block": {
+                                      "type": "ev3_motor_stop_mode",
+                                      "fields": {
+                                        "PORTS": "2",
+                                        "MODE": "hold"
+                                      },
+                                      "next": {
+                                        "block": {
+                                          "type": "ev3_motor_l_single_rotation",
+                                          "fields": {
+                                            "PORTS": "2"
+                                          },
+                                          "inputs": {
+                                            "SPEED": {
+                                              "shadow": {
+                                                "type": "math_number",
+                                                "fields": {
+                                                  "NUM": 20
+                                                }
+                                              }
+                                            },
+                                            "ROTATIONS": {
+                                              "shadow": {
+                                                "type": "math_number",
+                                                "fields": {
+                                                  "NUM": 0.25
+                                                }
+                                              }
+                                            }
+                                          },
+                                          "next": {
+                                            "block": {
+                                              "type": "ev3_wait_seconds",
+                                              "inputs": {
+                                                "SECONDS": {
+                                                  "shadow": {
+                                                    "type": "math_number",
+                                                    "fields": {
+                                                      "NUM": 1
+                                                    }
+                                                  }
+                                                }
+                                              },
+                                              "next": {
+                                                "block": {
+                                                  "type": "ev3_program_end"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

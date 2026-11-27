@@ -1,0 +1,56 @@
+{
+  "header": {
+    "program": "MotorEBL",
+    "build": "2026-11-03-motorebl1",
+    "status": "RUN_FINISHED",
+    "result": "MOTOR PASS",
+    "count": "10",
+    "phase": "2",
+    "fault": "0",
+    "api": "0",
+    "worker": "1",
+    "ref_result": "0",
+    "get_result": "-999",
+    "task_state": "4",
+    "abi": "0",
+    "task_id": "28",
+    "events_dropped": "0",
+    "drive_method": "EBL_SOFTWARE_FINITE",
+    "startup_os_marker": "c05ffcf4",
+    "startup_os_api": "0",
+    "encoder_start": "0",
+    "encoder_end": "898"
+  },
+  "cycle_degrees": [
+    90,
+    90,
+    90,
+    90,
+    90,
+    90,
+    90,
+    90,
+    90,
+    90
+  ],
+  "sum_immediate_cycle_deltas": 900,
+  "overall_encoder_delta": 898,
+  "timing_delta_note": "Per-cycle before/after and overall before/after are different sampling boundaries. Net - sum = -2 degrees; physical cause not determined from this log. Do not claim overall 900 degrees.",
+  "finding": "Original saved EBL finite-control function completed ten B20-percent 90-degree plus one-second-wait cycles under independently supervised test on patched OS. No checked API or diagnostic fault; final motor-stop confirmation passed before SD final logging.",
+  "original_function_unchanged": true,
+  "root_cause_evidence": [
+    "Old OS SVC return race reproduced with identical switch to SVC stack",
+    "Patched return path tested at instruction gaps with saved modes and masks",
+    "Guarded hardware workload passed 16000 calls",
+    "Unguarded hardware workload passed 16000 calls",
+    "Native finite motor workload passed 10 cycles",
+    "Original EBL software finite workload now passed 10 cycles"
+  ],
+  "scope_limits": [
+    "One motor B unloaded, 20%, positive 90 degrees and 1-second wait, 10 cycles.",
+    "Supervisor and diagnostic instrumentation wrap original program; this is not a complete end-to-end public-web or desktop application acceptance test.",
+    "Other ports, M motors, reverse/spin/pivot/sensors/event workloads and long-run robustness on rebuilt OS remain unverified.",
+    "Web app, helper, and Windows prototype have not been changed or republished."
+  ],
+  "next_validation": "Normal app compilation/transfer for same small program; then staged ports/motor/motion/event tests, retaining original SD and owner-private site."
+}

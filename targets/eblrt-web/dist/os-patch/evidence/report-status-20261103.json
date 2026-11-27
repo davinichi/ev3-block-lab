@@ -1,0 +1,37 @@
+{
+  "report_date": "2026-11-03",
+  "status": "Experimental patch; hardware improvement confirmed in specified workloads; not an official release",
+  "old_uimage": {
+    "bytes": 935606,
+    "sha256": "c6f7a29d889eef6a6fc3383cd5792ae832048e68b20d4e16a5a648780d832237"
+  },
+  "patched_uimage": {
+    "bytes": 968602,
+    "sha256": "7bc4d93b0b17a58c47e1f96e08035ff7f25405e7d7275c2f0e892140d38521de"
+  },
+  "emulation": {
+    "cases": 22,
+    "old_expected_failure_cases": 1,
+    "patched_cases": 18,
+    "patched_passes": 18,
+    "physical_interrupt_timing_emulated": false
+  },
+  "hardware": {
+    "guarded_identity_calls": 16000,
+    "guarded_semaphore_cycles": 4000,
+    "unguarded_identity_calls": 16000,
+    "unguarded_semaphore_cycles": 4000,
+    "native_motor_cycles": 10,
+    "ebl_finite_motor_cycles": 10
+  },
+  "ordinary_app_result": "User reported previously failing normally generated/compiled/transferred application now works; no additional machine-readable log for that report",
+  "scope": "One tested hardware environment; general compatibility and timing impact remain unverified",
+  "historical_note": "The earlier OS-package verification.json said no hardware boot test yet. It describes packaging time; subsequent hardware records supersede that status. Raw historical records are otherwise unchanged.",
+  "excluded": [
+    "OS binaries",
+    "complete kernel source archive",
+    "diagnostic executables",
+    "private screenshots"
+  ],
+  "upstream_commit": "Not established for complete local build source; identify binaries by SHA-256, not folder/version name alone"
+}

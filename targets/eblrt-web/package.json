@@ -1,0 +1,11 @@
+{
+  "name": "ev3-block-lab",
+  "version": "0.34.4-ev3rt.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "start": "node server.mjs",
+    "bridge": "node bridge/server.mjs"
+  }
+}

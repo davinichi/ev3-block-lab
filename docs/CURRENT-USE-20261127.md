@@ -4,10 +4,10 @@
 
 | 対象 | 公開・配布版 | 利用先 |
 | --- | --- | --- |
-| SBL（標準SPIKE Hub OS用） | 1.0.0 / 運用版 | [SBL](https://spike-block-lab-davinichi-preview.davinichi-9576.chatgpt.site/) |
-| EBL（標準EV3用） | 0.25.9 / ヒント・お知らせ表示 hint-label1 | [EBL](https://ev3-block-lab-prototype.davinichi-9576.chatgpt.site/) |
-| EBL-RT Web版 | 0.34.4-ev3rt.1 / ヒント・お知らせ表示 hint-label1 | [EBL-RT](https://ev3rt-block-lab-private.davinichi-9576.chatgpt.site/) |
-| EBL-RT Windows版 | 0.3.6 / UI改訂 2026-11-27-green1-hint-label1 | [配布・更新案内](https://ev3rt-block-lab-private.davinichi-9576.chatgpt.site/evaluation.html#windows) |
+| SBL（標準SPIKE Hub OS用） | 1.0.1 / 運用版 | [SBL](https://spike-block-lab-davinichi-preview.davinichi-9576.chatgpt.site/) |
+| EBL（標準EV3用） | 0.25.9 / 数値入力の自動変換 fullwidth1 | [EBL](https://ev3-block-lab-prototype.davinichi-9576.chatgpt.site/) |
+| EBL-RT Web版 | 0.34.4-ev3rt.1 / 数値入力の自動変換 fullwidth1 | [EBL-RT](https://ev3rt-block-lab-private.davinichi-9576.chatgpt.site/) |
+| EBL-RT Windows版 | 0.3.6 / UI改訂 2026-11-27-green1-hint-label1-fullwidth1 | [配布・更新案内](https://ev3rt-block-lab-private.davinichi-9576.chatgpt.site/evaluation.html#windows) |
 
 通常のEBLはWindowsでもブラウザーで使用します。別のWindows配布アプリがあるのはEBL-RTです。
 
@@ -17,7 +17,7 @@ SBLは2026年11月27日にv1.0.0へ移行しました。当面は機能追加を
 
 ## GitHub収録ソースとの違い
 
-このリポジトリのmainにあるpackage.jsonは0.25.6です。上表はSitesで公開している版を示し、GitHub収録ソースに全変更が反映済みという意味ではありません。今回GitHubで更新したのは現行の利用案内と説明です。ソースの同期、GitHub Pagesの公開、Sitesの公開は別の作業です。
+このリポジトリのmainにあるpackage.jsonは0.25.9です。EBL公開ソースをfullwidth1へ同期し、EBL-RTの変更ソースもtargetsフォルダーに収録しました。上表はSitesの公開版です。今回EBLのソースを同期し、EBL-RT Web／Windowsのアプリソースもtargetsフォルダーへ収録しました。SDK・依存パッケージ・配布用分割ファイルは別管理です。GitHub Pagesの公開とSitesの公開は別の作業です。
 
 SBLとEBL-RTは公開サイトの資料を現行の参照先とします。SPIKE-RT-Block-Labは別のSPIKE-RT向けプロジェクトであり、標準Hub OS用SBLとは実行環境・対応機能・作品形式が異なります。
 
@@ -43,7 +43,7 @@ SBLとEBL-RTは公開サイトの資料を現行の参照先とします。SPIKE
 2. EBL-RTを終了します。
 3. [更新用ZIP](https://ev3rt-block-lab-private.davinichi-9576.chatgpt.site/downloads/EBL-RT-Windows-0.3.6-Update.zip)を展開し、EBL-RT.exeがあるフォルダーへ内容を上書きします。ZIPの中だけで実行しないでください。
 4. 既存のuser-data、Cygwin、SDK、コンパイラのフォルダーは削除せず、そのまま使います。
-5. UI-REVISION.txtに2026-11-27-green1-hint-label1が含まれることを確認して再起動します。新規利用では一式ZIPを全展開します。
+5. UI-REVISION.txtに2026-11-27-green1-hint-label1-fullwidth1が含まれることを確認して再起動します。新規利用では一式ZIPを全展開します。
 
 Web版でコンパイル・転送する場合は、Windows PC上で対応する補助アプリ（機能版13以上）を使います。Windowsアプリは編集・コンパイル・転送を内蔵し、別の補助アプリを起動する方式ではありません。初回の準備にネット接続が必要です。標準EV3用.rbfとEV3RT用ARM ELFは別の実行形式です。
 
@@ -58,3 +58,5 @@ SBLでは「Pythonを見る」でブロックと作ったPythonを左右に並�
 各公開サイトの「教員・指導者用」から現行HTML・PDFを参照してください。SBLの出典・ライセンスはUTF-8の[閲覧用ページ](https://spike-block-lab-davinichi-preview.davinichi-9576.chatgpt.site/credits.html)です。
 
 今回の通知変更では、保存読込、コード生成、通知の独立性・表示解除と画面表示を確認しています。SBL175件、EBL317件、EBL-RT415件の自動試験が成功しました。通常のEV3参照ファイルがない環境の比較試験1件はスキップです。Windows版は編集処理・配布ZIPの照合を行っています。今回更新したWindowsアプリの実起動と実機接続・走行は未確認で、自動試験の合格を実機確認済みとして扱いません。
+
+数値入力の全角・半角については[numeric-input-20261127.md](numeric-input-20261127.md)を参照してください。

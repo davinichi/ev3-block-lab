@@ -1,0 +1,5 @@
+EV3RT HRP3: https://github.com/ev3rt-git/ev3rt-hrp3
+SDK: https://github.com/ev3rt-git/ev3rt-hrp3-sdk
+RubyInstaller: https://github.com/oneclick/rubyinstaller2/releases/tag/RubyInstaller-3.3.13-1
+SDK source copyrights are retained in each source file. RubyInstaller license: runtime/ruby/LICENSE.txt.
+The local SDK copy trims Makefile.prj.common arguments and resolves the Makefile.workspace output copy path for a relative PWD.

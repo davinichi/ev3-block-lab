@@ -1,0 +1,114 @@
+/* Classroom toolbar: student actions are primary; teaching tools share one menu. */
+header{position:relative;z-index:1500;min-height:60px;padding:8px 14px;gap:8px 14px}
+.header-right{gap:8px;align-items:center;flex-wrap:wrap}
+.header-right>.language-switch{display:inline-flex;align-items:center;gap:6px;flex:none;font-size:14px;white-space:nowrap}
+.header-right>.language-switch select{min-width:92px;min-height:36px;font-size:14px}
+.transfer-toggle{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;font-size:16px;font-weight:700;padding:10px 16px;white-space:nowrap;flex-shrink:0}
+.action-icon,.state-icon{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.connection-status{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:156px;min-height:44px;padding:9px 12px;border:1px solid #b5c2c9;border-radius:8px;background:#f1f4f6;color:#435967;font-size:14px;font-weight:700;white-space:nowrap}
+.connection-status:hover:not(:disabled){background:#e5edf1;border-color:#829baa}
+.connection-status .state-connected,.connection-status .state-checking{display:none}
+.connection-status.connected{background:#e2f5eb;color:#116342;border-color:#74b597}
+.connection-status.connected:hover{background:#d3eddc;border-color:#398963}
+.connection-status.connected .state-connected{display:block}
+.connection-status.connected .state-offline{display:none}
+.connection-status.connecting{background:#fff4dc;color:#815919;border-color:#d5b47c}
+.connection-status.connecting .state-offline,.connection-status.connecting .state-connected{display:none}
+.connection-status.connecting .state-checking{display:block}
+#fileMenu{display:block;flex:none}
+#fileMenu>summary{display:flex;align-items:center;justify-content:center;gap:5px;min-height:44px;padding:10px 12px;font-size:14px;font-weight:600;background:#fff;color:#42596b;border-color:#bfcbd2}
+#fileMenu[open]>summary{background:#eaf0f5;border-color:#738b9e}
+#fileMenu .menu-items{top:calc(100% + 8px);width:282px;max-width:calc(100vw - 24px);max-height:min(78vh,560px);padding:8px;gap:0;z-index:2000;text-align:left}
+.menu-group{display:flex;flex-direction:column;padding:6px 0;gap:2px}
+.menu-group+.menu-group{border-top:1px solid #dce4e9}
+.menu-heading{font-size:12px;font-weight:700;letter-spacing:.03em;color:#637c8d;padding:4px 10px 5px}
+#fileMenu .menu-action{display:flex;align-items:center;min-height:42px;padding:9px 10px;font-size:14px;line-height:1.5;font-weight:500;white-space:normal;border:0;border-radius:5px;background:white;color:#263f50;text-align:left;text-decoration:none}
+#fileMenu .menu-action:hover{background:#edf4f7;color:#163e5a}
+#fileMenu .menu-action:focus-visible{outline:3px solid #d3a238;outline-offset:-3px}
+.project-actions{display:flex;gap:8px;margin-left:auto}
+.project-actions>button{font-size:14px;min-height:38px;padding:8px 13px}
+.project-actions #newProject{font-weight:700}
+@media(max-width:1100px){header .badge{display:none}.brand{font-size:17px}.projectbar .project-actions>button{font-size:14px;padding:7px 11px}}
+@media(max-width:760px){header{min-height:56px;padding:6px 8px}.brand{font-size:16px;letter-spacing:-.3px}.header-right{gap:6px}.transfer-toggle{font-size:14px;padding:9px 11px;gap:6px}.connection-status{font-size:13px;min-width:140px;padding:8px 9px;gap:5px}#fileMenu>summary{font-size:13px;padding:9px 10px}.project-actions>button{font-size:13px}.projectbar{min-height:48px}.projectbar .project-actions{flex:initial}}
+@media(max-width:580px){header{align-items:center;gap:8px}.brand{font-size:16px}.header-right{width:100%;justify-content:space-between;gap:5px}.transfer-toggle{padding:8px;font-size:13px;gap:5px}.connection-status{min-width:0;padding:8px;font-size:12px;gap:4px}.action-icon,.state-icon{width:20px;height:20px}#fileMenu>summary{font-size:12px;padding:8px}.projectbar{height:auto;min-height:84px;flex-wrap:wrap}.project-names{flex:1 1 100%}.project-names input{max-width:none!important;width:100%}.projectbar .project-actions{flex:1 1 100%;justify-content:flex-end}.projectbar .project-actions>button{font-size:13px;min-height:36px;padding:7px 12px}}
+
+#fileMenu select{width:100%;font:inherit;font-size:14px;padding:10px;border:1px solid #b8c9d3;border-radius:6px;background:#fff;color:#263f50;min-height:42px}#fileMenu .menu-setting-label{font-size:13px;color:#42596b;padding:4px 10px 6px}
+
+@media(max-width:580px){.header-right{gap:4px}#fileMenu>summary{padding:8px 6px}header,.projectbar{min-width:0}}
+
+/* Student file actions: consistent touch targets and balanced spacing. */
+.projectbar .project-actions{align-items:center;gap:8px}
+.projectbar .project-actions>button{height:44px;min-height:44px;min-width:88px;padding:10px 16px;font-size:14px;line-height:20px;font-weight:600;white-space:nowrap}
+.projectbar .project-actions #newProject{min-width:168px;font-weight:600}
+@media(max-width:580px){.projectbar .project-actions{display:grid;grid-template-columns:minmax(0,1.7fr) repeat(2,minmax(0,1fr));width:100%}.projectbar .project-actions>button,.projectbar .project-actions #newProject{min-width:0;width:100%;padding:10px 8px;font-size:14px}.projectbar .project-actions>input[hidden]{display:none}}
+
+/* Samples follow Open in the student toolbar. */
+.projectbar .project-actions{flex-wrap:wrap}
+.project-samples{display:flex;align-items:center;gap:8px;min-height:44px}
+.projectbar .project-samples label{font-size:14px;color:#42596b;white-space:nowrap}
+.project-samples select{height:44px;min-width:0;width:190px;max-width:100%;padding:8px 10px;font:inherit;font-size:14px;border:1px solid #bdcdd5;border-radius:7px;background:#fff;color:#314953}
+@media(max-width:580px){.project-samples{grid-column:1/-1;width:100%}.project-samples select{flex:1;width:0}}
+
+/* Readable program name and persistent autosave feedback. */
+.projectbar .project-names label{font-size:16px;font-weight:600;color:#42596b;gap:10px}
+.projectbar .project-names input{font-size:18px;line-height:1.4;min-height:40px;width:180px;min-width:0}
+.projectbar .save-state{display:block;font-size:14px;line-height:1.5;font-weight:500;color:#42596b;max-width:100%;overflow-wrap:anywhere}
+@media(max-width:580px){.projectbar .project-names label{width:100%}.projectbar .project-names input{flex:1;width:0}.projectbar .save-state{flex:1 1 100%;padding-bottom:2px}}
+
+/* EV3 keeps its project folder and program name; blue identity stays unchanged. */
+.projectbar{padding-top:6px;padding-bottom:6px;row-gap:8px}
+.project-names{flex-wrap:wrap;gap:8px 16px;max-width:100%}
+.projectbar .project-names input{width:145px;max-width:180px!important}
+.projectbar .project-samples .sample-picker{display:flex;align-items:center;gap:8px}
+.projectbar .project-samples .sample-picker label{display:block;font-size:14px}
+.projectbar .project-samples select{max-width:none}
+#fileMenu .language-switch{display:block;margin:4px 10px}
+#fileMenu .language-switch select{width:100%}
+#fileMenu .menu-items a,#fileMenu .menu-items button{white-space:normal}
+.connection-status{cursor:pointer}
+@media(max-width:760px){.projectbar .project-names label{font-size:16px}.projectbar .project-names input{font-size:18px}.header-right .language-switch{display:block}}
+@media(max-width:580px){.project-names{width:100%;flex:1 1 100%}.project-names label{flex:1 1 100%!important}.projectbar .project-names input{max-width:none!important}.project-samples .sample-picker{width:100%}.projectbar .project-samples select{width:0;flex:1}}
+
+#fileMenu .menu-items :is(a,button){display:flex;align-items:center;min-height:42px;padding:9px 10px;font-size:14px;line-height:1.5;font-weight:500;border:0;border-radius:5px;background:white;color:#263f50;text-align:left;text-decoration:none;white-space:normal}
+#fileMenu .menu-items :is(a,button):hover{background:#edf4f7}
+
+@media(max-width:580px){header{height:auto;min-height:0;flex-wrap:wrap}.brand{flex:1 1 100%}.header-right{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);width:100%;min-width:0}.header-right #fileMenu{grid-column:1/-1}.transfer-toggle,.connection-status{min-width:0;width:100%;white-space:normal;line-height:1.3}.header-right #fileMenu>summary{width:100%;min-height:40px}.projectbar .project-samples .sample-picker{min-width:0}}
+
+/* Let the header grow when language controls wrap; never cover project names. */
+body{grid-template-rows:auto auto minmax(0,1fr) auto 18px}
+header{height:auto}
+@media(max-width:580px){.header-right>.language-switch{grid-column:1/-1;justify-self:start}}
+
+/* Keep the panel opener/offline indicator original; highlight connected status and Connect. */
+#connection.connected,#connect,#ev3rtBridgeConnect{background:#b83232;color:#fff;border-color:#b83232;font-weight:700}
+#connection.connected:hover:not(:disabled),#connect:hover:not(:disabled),#ev3rtBridgeConnect:hover:not(:disabled){background:#972727;color:#fff;border-color:#972727}
+#connection.connected:focus-visible,#connect:focus-visible,#ev3rtBridgeConnect:focus-visible{outline:3px solid #173c60;outline-offset:3px}
+
+/* Contextual notices keep the workspace clear until an action needs attention. */
+.program-notice{flex:0 0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;background:#fff1ef;border-bottom:1px solid #e7b2ac;color:#99291f;font-size:16px;line-height:1.6;max-height:30vh;overflow:auto}
+.program-notice>span{flex:1 1 220px;min-width:0;overflow-wrap:anywhere}
+.operation-notice{margin:8px 0;color:#176b65;font-size:15px;line-height:1.6;overflow-wrap:anywhere}
+.operation-notice.notice-error{color:#99291f;background:#fff1ef;border-left:3px solid #bc3930;padding:8px 10px}
+.program-action-status{flex-shrink:0;margin:0;padding:8px 12px;border-bottom:1px solid #dce4e5}
+.save-action{display:flex;align-items:center;gap:8px;flex:0 1 auto;flex-wrap:wrap;max-width:100%;min-width:0}
+.save-action .save-notice{margin:0;max-width:260px;padding:6px 10px;background:white;border:1px solid #a5c4bc;border-radius:7px;white-space:normal;font-size:14px}
+.sbl-error-block>.blocklyPath{stroke:#b22c24;stroke-width:3px}
+.program-notice[hidden],.operation-notice[hidden]{display:none!important}
+@media(max-width:600px){.program-notice{padding:8px;font-size:15px}.save-action .save-notice{max-width:220px}}
+
+.save-action #saveProject{min-width:88px;min-height:44px;flex:none}
+
+@media(max-width:580px){.projectbar .project-actions .save-action{display:contents}.projectbar .project-actions .save-action #saveProject{width:100%;min-width:0;padding:10px 8px;font-size:14px;line-height:20px;font-weight:600}.projectbar .project-actions .save-notice{grid-column:1/-1;max-width:none;order:10;margin:0}}
+
+/* notices-header1: error text shares the Program heading row. */
+.editor-toolbar .program-notice{flex:1 1 260px;min-width:0;margin:0;padding:5px 10px;border:0;border-left:4px solid #a91e16;border-radius:4px;background:#fff0ee;color:#8c1710;font-size:17px;font-weight:700;line-height:1.55;max-height:25vh;overflow:auto}
+.editor-toolbar .program-notice>span{flex:1 1 auto;font-size:inherit;font-weight:inherit;color:inherit}
+.editor-toolbar .sample-tools{margin-left:auto;flex-shrink:0}
+
+/* hint-label1: a child-facing advice row with no divider line. */
+.editor-toolbar .advice-label{color:#176b65;font-size:14px;font-weight:700;flex:none}
+.editor-toolbar .editor-hint{flex:1 1 220px;min-width:0;font-size:14px;line-height:1.6;color:#36575d}
+.editor-toolbar .editor-hint[hidden]{display:none}
+.editor-toolbar .program-notice{border:0;border-left:0;padding:5px 8px}
+
+.number-input-notice{font-size:16px;line-height:1.5;font-weight:700;color:#126c67;background:#e7f5f0;padding:4px 10px;border-radius:5px}.number-input-notice[hidden]{display:none}

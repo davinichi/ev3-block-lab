@@ -485,8 +485,3 @@ Application: https://ev3-block-lab-prototype.davinichi-9576.chatgpt.site/?lang=e
 Source: https://github.com/davinichi/ev3-block-lab
 
 EV3 Block Lab is an unofficial experimental application, not LEGO's official software. Its .ev3lab and .ev3blocks formats are not interchangeable with Classroom or old EV3 Lab project files.
-
-
-## Revision: 15 November 2026
-
-Final motor speeds are bounded independently to -100..100. PID output and integral remain unlimited. Reset once before the experiment; compute once per loop and reuse the result for both motors. See the updated HTML and PDF for details.

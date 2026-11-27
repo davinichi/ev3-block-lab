@@ -1,0 +1,27 @@
+{
+  "header": {
+    "program": "LockFix",
+    "build": "2026-11-03-lockfix1",
+    "status": "RUN_FINISHED",
+    "result": "LOCK PASS",
+    "count": "4000",
+    "phase": "5",
+    "fault": "0",
+    "api": "0",
+    "worker": "1",
+    "ref_result": "0",
+    "get_result": "-999",
+    "task_state": "4",
+    "abi": "0",
+    "task_id": "31",
+    "events_dropped": "0",
+    "identity_calls": "16000",
+    "semaphore_acquired": "4000",
+    "semaphore_released": "4000",
+    "last_tid": "31",
+    "worker_done": "1"
+  },
+  "finding": "Unmodified ordinary get_tid/semaphore workload passes after patched-OS boot; special SvcGuard register/static-state recovery is not required for this pass.",
+  "limits": "No motor/sensor or complete application validation yet; same patched OS is inferred from preceding verified boot workflow.",
+  "next": "MotorSafe: finite native B90+1s repeat10, no unlimited power commands, per-move and total limits, paired OS preflight, SD logging after confirmed stop."
+}

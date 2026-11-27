@@ -6,6 +6,7 @@ import {installI18n,makeTranslator,preferredLanguage,LANGUAGE_KEY} from '../dist
 import {catalog} from '../dist/locale-en.js';
 import {DISPLAY_IMAGES,presetBitmap} from '../dist/display.js';
 import {compile} from '../dist/ev3.js';
+import {sensorReading} from '../dist/sensor-monitor.js';
 
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
 class XmlNode{
@@ -43,6 +44,29 @@ test('translation preserves numbers and reports numeric ranges in English',()=>{
  let language='en';const t=makeTranslator(catalog.text,()=>language);
  assert.equal(t('マニュアル PDF'),'PDF manual');assert.equal(t('モーターの速さは -100〜100 の整数にしてください。'),'motor speed: use an integer from -100 to 100.');
  assert.equal(t('CustomProject_123'),'CustomProject_123');language='ja';assert.equal(t('マニュアル PDF'),'マニュアル PDF');
+});
+
+test('sensor values, connection errors and imported project guidance are fully localized',()=>{
+ const t=makeTranslator(catalog.text,()=> 'en');
+ for(const reading of [
+  sensorReading({type:32,mode:0,value:12.5},t),sensorReading({type:32,mode:1,value:-7},t),
+  sensorReading({type:16,mode:1,value:3},t),sensorReading({type:29,mode:2,value:5},t),
+  sensorReading({type:33,mode:1,value:8},t),sensorReading({type:33,mode:2,value:1},t),
+  sensorReading({type:99,mode:3,value:0},t),sensorReading({type:32,mode:7,value:4},t)
+ ])assert.doesNotMatch(reading.label+' '+reading.text,/[ぁ-龯]/);
+ for(const message of ['通信中です。完了を待ってください。','USBケーブルの接続が切れました。挿し直して「接続する」を押してください。','このファイルは作品として開けません。','読み取りだけではモーターは動きません。'])assert.doesNotMatch(t(message),/[ぁ-龯]/);
+ assert.equal(t('「計測_2026.rbf」を保存しています。同じ名前のプログラムは上書きされます…'),'Saving “計測_2026.rbf”. A program with the same name will be overwritten…');
+ assert.equal(t('同じ名前のマイブロック「モーター計測」があります。名前を変更してから読み込んでください。'),'A My Block named “モーター計測” already exists. Rename it before importing.');
+ assert.match(t('開始角度を記録しました（B -12.5° / C 30°）。本体で今回のファイルを1回実行し、停止後に「終了角度を読む」を押してください。'),/Starting angles recorded \(B -12.5° \/ C 30°\)/);
+});
+
+test('the single language selector is before transfer and outside the teacher menu',()=>{
+ const html=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
+ const start=html.indexOf('<header>'),end=html.indexOf('</header>'),header=html.slice(start,end);
+ assert.equal((html.match(/id="uiLanguage"/g)||[]).length,1);
+ assert.ok(header.indexOf('id="uiLanguage"')<header.indexOf('id="toggleConnectionPanel"'));
+ assert.ok(header.indexOf('id="uiLanguage"')<header.indexOf('id="fileMenu"'));
+ assert.match(header,/<span>言語<\/span>/);
 });
 
 test('all EV3 block templates and dropdown choices render in English without changing port values',()=>{

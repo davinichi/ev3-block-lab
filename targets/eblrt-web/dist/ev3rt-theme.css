@@ -1,0 +1,29 @@
+/* EBL-RT identity. Scope to the RT target so standard EBL keeps its blue shell. */
+body[data-target="ev3rt"]{
+  --teal:#196b45;--line:#c6dccd;--muted:#607b6b;
+  background:#edf5ef;color:#244435;
+}
+body[data-target="ev3rt"] header{background:#f6fbf7;border-bottom-color:#c6dccd}
+body[data-target="ev3rt"] .brand{color:#164d32}
+body[data-target="ev3rt"] .brand-icon{background:#24583e}
+body[data-target="ev3rt"] .badge{background:#e7f2ea;border-color:#c2d9ca;color:#426b53}
+body[data-target="ev3rt"] .projectbar{background:#d4eadc;border-bottom:1px solid #b8d4c1}
+body[data-target="ev3rt"] .projectbar .project-names label,
+body[data-target="ev3rt"] .projectbar .save-state{color:#355d49}
+body[data-target="ev3rt"] .projectbar .project-names input{color:#234d35;border-bottom-color:#98bda5}
+body[data-target="ev3rt"] .blocklyToolbox,
+body[data-target="ev3rt"] .blocklyToolboxDiv{background:#dceee2!important;border-right-color:#b7d4c1!important}
+body[data-target="ev3rt"] .blocklyFlyoutBackground{fill:#f0f8f2!important}
+body[data-target="ev3rt"] .editor,
+body[data-target="ev3rt"] .log-panel{border-color:#bfd7c7}
+body[data-target="ev3rt"] .editor-toolbar{background:#f3f9f5;border-bottom-color:#d1e3d6}
+body[data-target="ev3rt"] .editor-caption{background:#f1f7f3;color:#627b6a;border-top-color:#d1e3d6}
+body[data-target="ev3rt"] aside#connectionPanel,
+body[data-target="ev3rt"] .panel-heading{background:#f0f7f2;border-color:#bfd7c7}
+body[data-target="ev3rt"] .panel-heading strong{color:#24563a}
+body[data-target="ev3rt"] .transfer-toggle{background:#196b45;border-color:#196b45;color:white}
+body[data-target="ev3rt"] .transfer-toggle:hover:not(:disabled){background:#125737;border-color:#125737;color:white}
+body[data-target="ev3rt"] .project-actions #newProject{background:#eef7f1;border-color:#abcdb6;color:#265b3b}
+body[data-target="ev3rt"] .project-actions #newProject:hover{background:#dcefe2}
+body[data-target="ev3rt"] #ev3rtBlockSupport:not([data-status="unsupported"]):not([data-status="conditional"]){background:#edf6ef;border-color:#cadfce}
+body[data-target="ev3rt"] footer{color:#607b6b}

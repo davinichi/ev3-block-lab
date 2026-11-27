@@ -1,0 +1,5 @@
+UI revision: 2026-11-25-classroom-ui
+EBL-RT Windows 0.3.6 / editor 0.34.3-ev3rt.1
+Teachers / instructors menu, readable names and autosave, balanced student actions, samples after Open, connection status and sensor/CSV order.
+Compiler, transports and executable binaries are unchanged.
+Hardware and final native Windows interaction are unverified.

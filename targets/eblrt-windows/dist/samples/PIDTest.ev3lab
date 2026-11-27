@@ -1,0 +1,203 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "projectName": "EV3Lab",
+  "programName": "PIDTest",
+  "workspace": {
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "x": 40,
+          "y": 35,
+          "next": {
+            "block": {
+              "type": "ev3_display_clear",
+              "next": {
+                "block": {
+                  "type": "ev3_pid_reset",
+                  "fields": {
+                    "NAME": "PID1"
+                  },
+                  "next": {
+                    "block": {
+                      "type": "ev3_log_start",
+                      "fields": {
+                        "FILE": "PID"
+                      },
+                      "next": {
+                        "block": {
+                          "type": "controls_repeat_ext",
+                          "inputs": {
+                            "TIMES": {
+                              "shadow": {
+                                "type": "math_number",
+                                "fields": {
+                                  "NUM": 10
+                                }
+                              }
+                            },
+                            "DO": {
+                              "block": {
+                                "type": "variables_set",
+                                "fields": {
+                                  "VAR": {
+                                    "id": "pid-example-output",
+                                    "name": "PID出力"
+                                  }
+                                },
+                                "inputs": {
+                                  "VALUE": {
+                                    "block": {
+                                      "type": "ev3_pid",
+                                      "fields": {
+                                        "NAME": "PID1"
+                                      },
+                                      "inputs": {
+                                        "TARGET": {
+                                          "shadow": {
+                                            "type": "math_number",
+                                            "fields": {
+                                              "NUM": 10
+                                            }
+                                          }
+                                        },
+                                        "MEASURED": {
+                                          "shadow": {
+                                            "type": "math_number",
+                                            "fields": {
+                                              "NUM": 4
+                                            }
+                                          }
+                                        },
+                                        "KP": {
+                                          "shadow": {
+                                            "type": "math_number",
+                                            "fields": {
+                                              "NUM": 1
+                                            }
+                                          }
+                                        },
+                                        "KI": {
+                                          "shadow": {
+                                            "type": "math_number",
+                                            "fields": {
+                                              "NUM": 0.5
+                                            }
+                                          }
+                                        },
+                                        "KD": {
+                                          "shadow": {
+                                            "type": "math_number",
+                                            "fields": {
+                                              "NUM": 0.1
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                "next": {
+                                  "block": {
+                                    "type": "ev3_log_value",
+                                    "fields": {
+                                      "LABEL": "output"
+                                    },
+                                    "inputs": {
+                                      "VALUE": {
+                                        "block": {
+                                          "type": "variables_get",
+                                          "fields": {
+                                            "VAR": {
+                                              "id": "pid-example-output",
+                                              "name": "PID出力"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "next": {
+                                      "block": {
+                                        "type": "ev3_display_number",
+                                        "fields": {
+                                          "X": 0,
+                                          "Y": 0,
+                                          "FONT": "2",
+                                          "DECIMALS": 3
+                                        },
+                                        "inputs": {
+                                          "VALUE": {
+                                            "block": {
+                                              "type": "variables_get",
+                                              "fields": {
+                                                "VAR": {
+                                                  "id": "pid-example-output",
+                                                  "name": "PID出力"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "next": {
+                                          "block": {
+                                            "type": "ev3_wait_seconds",
+                                            "inputs": {
+                                              "SECONDS": {
+                                                "shadow": {
+                                                  "type": "math_number",
+                                                  "fields": {
+                                                    "NUM": 0.1
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "next": {
+                            "block": {
+                              "type": "ev3_log_end",
+                              "next": {
+                                "block": {
+                                  "type": "ev3_wait_seconds",
+                                  "inputs": {
+                                    "SECONDS": {
+                                      "shadow": {
+                                        "type": "math_number",
+                                        "fields": {
+                                          "NUM": 2
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "variables": [
+      {
+        "id": "pid-example-output",
+        "name": "PID出力"
+      }
+    ]
+  }
+}

@@ -1,15 +1,11 @@
-# 現行資料の対応表
-
-[2026年11月15日改訂の一覧](CURRENT-DOCUMENTATION.md)を先に参照してください。
-
 # EV3 Block Lab マニュアル
 
 ## 最新版：v0.25.6
 
-2026年11月15日改訂。現在のアプリ v0.25.6 に対応した **全20章・PDF 38ページ** の統合マニュアルです。
+2026年11月1日更新。現在のアプリ v0.25.6 に対応した **全20章・PDF 43ページ** の統合マニュアルです。
 
 - [最新版 v0.25.6 の目次と全文](manual-v0.25.6/README.md)
-- [最新版PDF v0.25.6（38ページ）](manual-v0.25.6/EV3-Block-Lab-ブロック命令マニュアル-v0.25.6.pdf)
+- [最新版PDF v0.25.6（43ページ）](manual-v0.25.6/EV3-Block-Lab-ブロック命令マニュアル-v0.25.6.pdf)
 - [最新版HTML v0.25.6](manual-v0.25.6/EV3-Block-Lab-ブロック命令マニュアル-v0.25.6.html)
 
 画面のブロックグループ順に整理しています。第2章に横並びの接続パネルと画面幅変更時の操作、第6章に動きの共通モーター設定、第7章にセンサー、第9章にPID制御、第16章に数値・複数の戻り値を持つマイブロック、第20章にEV3 Classroomとの比較表と開発の目的を掲載しています。
@@ -22,9 +18,9 @@ GitHub Pagesでの正式公開は別工程です。この一覧への登録やma
 
 ### English edition
 
-[English source (20 chapters)](manual-v0.25.6-en/README.md) / [English PDF (18 pages)](manual-v0.25.6-en/EV3-Block-Lab-Manual-v0.25.6-en.pdf) / [English HTML](manual-v0.25.6-en/EV3-Block-Lab-Manual-v0.25.6-en.html)
+[English source (20 chapters)](manual-v0.25.6-en/README.md) / [English PDF (24 pages)](manual-v0.25.6-en/EV3-Block-Lab-Manual-v0.25.6-en.pdf) / [English HTML](manual-v0.25.6-en/EV3-Block-Lab-Manual-v0.25.6-en.html)
 
-画面右上の日本語・English選択に合わせてPDF・HTMLのリンクも切り替わります。日本語版は38ページです。
+画面右上の日本語・English選択に合わせてPDF・HTMLのリンクも切り替わります。日本語版は43ページです。
 The language selector also switches manual links. User-entered names remain unchanged; switching clears undo history.
 
 ## 過去のマニュアル（履歴）

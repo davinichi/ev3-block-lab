@@ -1,0 +1,121 @@
+{
+  "version": "0.1.1-experimental",
+  "self_excluded": true,
+  "files": [
+    {
+      "path": "docs/distribution-note.txt",
+      "bytes": 946,
+      "sha256": "bb0c93b779c1c944af7a0879e267eaa604805b3f57771ef3dc89d2ca5a658098"
+    },
+    {
+      "path": "docs/hardware-test-record.csv",
+      "bytes": 189,
+      "sha256": "422a5e423017de46656ab02a6545c1f26150fb890b117ec6212f3e1a02ecc2b8"
+    },
+    {
+      "path": "docs/mechanism.png",
+      "bytes": 121355,
+      "sha256": "a1b5d01db4c3ab0bc5921a6604673d972eb57c7ba3b06675e4f38b36372df65a"
+    },
+    {
+      "path": "evidence/EBL-motor-hardware-pass.json",
+      "bytes": 2341,
+      "sha256": "e5f7bdedafdddc6aaa8be0d474111bf9f43f541ebeed9a446161ac59ea8a6d29"
+    },
+    {
+      "path": "evidence/LockFix-unguarded-hardware-pass.json",
+      "bytes": 1013,
+      "sha256": "bcbdd57de5209efaf85b118972989a9bef6ca3dd11bd35d10abb044fe3227e79"
+    },
+    {
+      "path": "evidence/Native-motor-hardware-pass.json",
+      "bytes": 1101,
+      "sha256": "da9416bbece636e349a2d10201d80ed22b0167289d53a8f44b79527ccd5c03d9"
+    },
+    {
+      "path": "evidence/package-tests.json",
+      "bytes": 1724,
+      "sha256": "e2406017070a6050ee18927b90e170f5bf1bce29750ee63e38efc6fcff09ca64"
+    },
+    {
+      "path": "evidence/report-status-20261103.json",
+      "bytes": 1624,
+      "sha256": "f6599c7c9b6d0ec0effb495f96264719f4b8a69ed5ad546fa1197c3e3d56139c"
+    },
+    {
+      "path": "evidence/source-patch-verification-20261103.json",
+      "bytes": 542,
+      "sha256": "ee4bbec14f16c9b245dbcd53d5c5c27ea84d5656e3da4822764fb5d3f96cfea4"
+    },
+    {
+      "path": "evidence/svc-return-race-tests.json",
+      "bytes": 7185,
+      "sha256": "ceed1621077879caee3c79c922dfb808968522d81282b47f0d0bd3fe5d0a1cd6"
+    },
+    {
+      "path": "evidence/SvcGuard-patched-hardware-pass.json",
+      "bytes": 1790,
+      "sha256": "5eb869708a7b001d702cc84f7a732cc009dce1b99539c01f583f6fb14994de38"
+    },
+    {
+      "path": "index.html",
+      "bytes": 15640,
+      "sha256": "5da6aaa8583e4131007b2996a045ebeec863109bbde18136892204382e188404"
+    },
+    {
+      "path": "licenses/PACKAGE-ADDITIONS.txt",
+      "bytes": 469,
+      "sha256": "f9db817472157c54b2d7eaad86b08ce580d6d7fb0496dfb218270508f193f9f8"
+    },
+    {
+      "path": "licenses/TOPPERS-configure-LICENSE.txt",
+      "bytes": 2883,
+      "sha256": "ed9f5a76492055706fffc1b0a65845b5adc3e4eaf4a8073c7a6bfd8b17cb7611"
+    },
+    {
+      "path": "licenses/TOPPERS-core_support-LICENSE.txt",
+      "bytes": 3213,
+      "sha256": "7ba291a46b7b6c35f0dc422d1511a16ddc6c643bfbb4b07a6194ffaf23b14ff4"
+    },
+    {
+      "path": "patches/build-environment-compatibility.patch",
+      "bytes": 969,
+      "sha256": "745a4dcba216881d77948149baa1803cc445cbd13dabe4632c6021ed8ea29824"
+    },
+    {
+      "path": "patches/ret-svc-irq.patch",
+      "bytes": 493,
+      "sha256": "562ef60cd0a80dc958f6d3760f1c0f03286cccc4af91450110684c31a9ef34c3"
+    },
+    {
+      "path": "README.txt",
+      "bytes": 15260,
+      "sha256": "b1b05b995fc9f00e1bfba73f79856e820501c904c6ad015a6c1639d2c4e2f364"
+    },
+    {
+      "path": "scripts/apply_svc_patch.py",
+      "bytes": 2732,
+      "sha256": "2f0645314acb910fd945b0b65d2dd3daa4b88f08abad34e6380eb4060835bb3e"
+    },
+    {
+      "path": "scripts/build_os.sh",
+      "bytes": 1315,
+      "sha256": "ba89c87bc4568e46e101212c621bec7d96b6ff29c1a116ba789836b57313e29e"
+    },
+    {
+      "path": "scripts/check_build_env.sh",
+      "bytes": 726,
+      "sha256": "9c15e6a62b68e735e575abfb2d49203cad703fe844b297eddeb244efab2e715d"
+    },
+    {
+      "path": "scripts/verify_uimage.py",
+      "bytes": 1880,
+      "sha256": "e3bc9a3c603630b3ad52dfd7018bedd6a89e18ef87dd72efc48922ee790b953a"
+    },
+    {
+      "path": "source/arch/arm_gcc/common/core_support.S",
+      "bytes": 59759,
+      "sha256": "e745527742d18c4b5fb2e566765dc181d360aef44ab16b5cf4fbd0e71189a9ce"
+    }
+  ]
+}
