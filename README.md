@@ -1,10 +1,12 @@
+EBL Web版はv0.26.0へ更新しました。[SBLとの相互読み込み・元作品の保持](docs/project-interop-20261128.md)。EBL-RT Web版・Windows版は今回の対象外です。
+
 数値入力欄の全角数字・マイナス・小数点を半角へ自動変換し、「半角に直しました」と約4秒表示します。[変更内容・検証](docs/numeric-input-20261127.md)。
 
 現行の公開版・Windows版・通知UIの案内：2026年11月27日更新。[現行利用案内](docs/CURRENT-USE-20261127.md) と [資料の対応表](docs/CURRENT-DOCUMENTATION.md) を参照してください。GitHub収録ソースと公開版の版番号は異なります。[SBLの変遷履歴（v0.7.0〜運用版v1.0.0）](docs/SBL-CHANGELOG.md)を追加しています。
 
 # EV3 Block Lab
 
-小学校の授業で、Chromebook・WindowsのブラウザからLEGO MINDSTORMS EV3をプログラミングするための試作アプリです。このリポジトリ収録ソースは公開版の **v0.25.9 / fullwidth1** と同期しています。[公開サイト](https://ev3-block-lab-prototype.davinichi-9576.chatgpt.site/)も同じ数値入力の修正を反映しています。
+小学校の授業で、Chromebook・WindowsのブラウザからLEGO MINDSTORMS EV3をプログラミングするための試作アプリです。このリポジトリ収録ソースは公開版の **v0.26.0 / interop1** と同期しています。[公開サイト](https://ev3-block-lab-prototype.davinichi-9576.chatgpt.site/)も同じ数値入力の修正を反映しています。
 
 ブロックからEV3標準形式の実行ファイル（.rbf）を生成し、本体へ転送・読み戻し照合します。本体に保存したプログラムは、PCから切り離して本体で選択・実行できます。
 

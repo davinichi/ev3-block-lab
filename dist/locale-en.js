@@ -1,5 +1,6 @@
 // 英語の表示カタログ。命令の識別子や利用者のデータは翻訳しない。
 export const catalog={blocks:{},tips:{},text:{}};
+catalog.text['小学校向けサンプルを読み込みました。転送・実行前にモーターとセンサーの配線を確認してください。']='Primary school sample loaded. Check motor and sensor connections before transferring and running.';
 const B=catalog.blocks,T=catalog.text;
 const messages={
 ev3_movement_stop:'stop moving',ev3_return_value:'return %1 and exit this My Block',ev3_movement_setup:'set movement motors: left %1 right %2',ev3_start:'▶ start',

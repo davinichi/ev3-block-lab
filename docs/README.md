@@ -1,3 +1,5 @@
+[v0.26.0 共通作品読み込み追補付きマニュアル](manual-v0.26.0/README.md) ／ [操作・互換性・検証範囲](project-interop-20261128.md)
+
 # EV3 Block Lab マニュアル
 
 ## 最新版：v0.25.6

@@ -1,3 +1,4 @@
+import {installInteropBlocks,convertProject,isForeignProject,installInteropUI} from '../dist/project-interop.js';
 import vm from 'node:vm';
 import {readFileSync,readdirSync} from 'node:fs';
 import {test} from 'node:test';
@@ -24,6 +25,16 @@ test('new stop palette offers three direct methods and retains each through libr
  }
 });
 const app=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
+
+test('primary school samples reload, round-trip and compile',()=>{
+ for(const number of [1,2]){
+  const sample=JSON.parse(readFileSync(new URL('../dist/samples/Primary_School_'+number+'.ev3lab',import.meta.url),'utf8'));
+  inspectBlocks(sample.workspace.blocks);
+  const c=editor();c.lesson=JSON.stringify(sample.workspace);
+  const p=JSON.parse(vm.runInContext(`Blockly.Events.disable();Blockly.serialization.workspaces.load(JSON.parse(lesson),workspace);const state=Blockly.serialization.workspaces.save(workspace);workspace.clear();Blockly.serialization.workspaces.load(state,workspace);ensureArgumentInputs();const p=program();Blockly.Events.enable();JSON.stringify(p);`,c));
+  compile(p);
+ }
+});
 
 test('movement and motor palettes expose the same shared ramp setting and preserve it in setup libraries',()=>{
  const c=editor();
@@ -199,10 +210,10 @@ class XmlNode{
 }
 function editor(){
  const elements=new Map();
- const context=vm.createContext({DISPLAY_IMAGES,presetBitmap,rasterDisplayText,console,setTimeout,clearTimeout,structuredClone,XMLSerializer:class{serializeToString(n){return '<'+n.nodeName+' '+[...n.attrs].map(([k,v])=>k+'='+JSON.stringify(v)).join(' ')+'>'+n.childNodes.map(c=>this.serializeToString(c)).join('')+'</'+n.nodeName+'>'; }},document:{createElementNS:(_ns,name)=>new XmlNode(name),createTextNode:text=>new XmlNode('#text',3,text),querySelector:()=>({}),getElementById:id=>{if(!elements.has(id))elements.set(id,{value:id==='pairMode'?'independent':'',textContent:''});return elements.get(id);}}});
+ const context=vm.createContext({installInteropBlocks,convertProject,isForeignProject,installInteropUI:()=>({update(){},review:async()=>true}),DISPLAY_IMAGES,presetBitmap,rasterDisplayText,console,setTimeout,clearTimeout,structuredClone,XMLSerializer:class{serializeToString(n){return '<'+n.nodeName+' '+[...n.attrs].map(([k,v])=>k+'='+JSON.stringify(v)).join(' ')+'>'+n.childNodes.map(c=>this.serializeToString(c)).join('')+'</'+n.nodeName+'>'; }},document:{createElementNS:(_ns,name)=>new XmlNode(name),createTextNode:text=>new XmlNode('#text',3,text),querySelector:()=>({}),getElementById:id=>{if(!elements.has(id))elements.set(id,{value:id==='pairMode'?'independent':'',textContent:''});return elements.get(id);}}});
  for(const file of ['blockly_compressed.js','blocks_compressed.js','ja.js'])vm.runInContext(readFileSync(new URL('../dist/vendor/'+file,import.meta.url),'utf8'),context);
  const prefix=app.slice(app.indexOf('\n')+1,app.indexOf('const theme='));vm.runInContext(prefix,context);
- vm.runInContext('const workspace=new Blockly.Workspace();',context);
+ vm.runInContext('installInteropBlocks(Blockly);const workspace=new Blockly.Workspace();',context);
  vm.runInContext(app.slice(app.indexOf('function expression('),app.indexOf('function check(){')),context);
  return context;
 }
@@ -227,7 +238,7 @@ async function openProjectFile(c,file){
 test('project picker offers ev3lab and legacy JSON without advertising LEGO ev3',()=>{
  const html=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
  const input=html.match(/<input\b[^>]*id="fileInput"[^>]*>/)[0];
- assert.equal(input.match(/accept="([^"]+)"/)[1],'.ev3lab,.json');
+ assert.equal(input.match(/accept="([^"]+)"/)[1],'.ev3lab,.spikelab,.json');
 });
 
 test('actual file handler saves and reloads ev3lab, JSON and content-compatible old ev3 projects',async()=>{

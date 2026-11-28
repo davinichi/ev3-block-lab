@@ -1,6 +1,6 @@
 {
   "name": "ev3-block-lab",
-  "version": "0.25.9",
+  "version": "0.26.0",
   "private": true,
   "type": "module",
   "scripts": {

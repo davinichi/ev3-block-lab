@@ -1,4 +1,4 @@
-import {installNumericTextNormalization} from './numeric-text.js?v=fullwidth1'; import {installNotices} from './notices.js?v=hint-label1'; import {renderConnectionBadge} from './classroom-ui.js'; import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.js'; import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from './library.js'; import {sensorReading} from './sensor-monitor.js'; import {DISPLAY_IMAGES,presetBitmap,rasterDisplayText} from './display.js';
+import {convertProject,isForeignProject,installInteropUI,installInteropBlocks} from './project-interop.js'; import {installNumericTextNormalization} from './numeric-text.js?v=fullwidth1'; import {installNotices} from './notices.js?v=hint-label1'; import {renderConnectionBadge} from './classroom-ui.js'; import {compile,EV3Connection,hex,programFileName,projectDirectory} from './ev3.js'; import {inspectBlocks,createBlockLibrary,mergeBlockLibrary} from './library.js'; import {sensorReading} from './sensor-monitor.js'; import {DISPLAY_IMAGES,presetBitmap,rasterDisplayText} from './display.js';
 // 画面とBlocklyを結び付ける入口。ブロック定義 → 中間データ → ev3.jsでRBF生成 → 接続・転送の順に処理する。
 // 外部ライブラリのdist/vendorは編集せず、独自ブロックと画面側の振る舞いをここに記述する。
 const $=id=>document.getElementById(id);
@@ -8,7 +8,7 @@ const sampleActions=new Map();
 function sampleAction(id){if(!sampleActions.has(id))sampleActions.set(id,{});return sampleActions.get(id);}
 // 自動保存はこのブラウザのlocalStorageに1作品分を保存する。クラウドやGitHubへの保存ではない。
 const STORAGE='ev3-block-lab-v1';
-const VERSION='0.25.9';
+const VERSION='0.26.0';
 document.querySelector('.badge').textContent=`PROTOTYPE ${VERSION}`;
 Blockly.Msg.PROCEDURES_DEFNORETURN_PROCEDURE=uiText('マイブロック');
 Blockly.Msg.PROCEDURES_DEFNORETURN_TITLE=uiText('定義');
@@ -568,6 +568,7 @@ function myBlockFlyout(ws){
 }
 Blockly.ContextMenuRegistry.registry.register({id:'eblEditMyBlock',scopeType:Blockly.ContextMenuRegistry.ScopeType.BLOCK,weight:0,displayText:()=>uiText('名前・引数・戻り値を編集'),preconditionFn:({block})=>isMyBlockDefinition(block)&&!block.isInFlyout?'enabled':'hidden',callback:({block})=>openMyBlockDialog(block.id)});
 const theme=Blockly.Theme.defineTheme('ev3lab',{base:Blockly.Themes.Classic,fontStyle:{family:'"Yu Gothic UI", Meiryo, sans-serif',size:12},blockStyles:{procedure_blocks:{colourPrimary:'#d32f2f'},math_blocks:{colourPrimary:'#668b6d'},variable_blocks:{colourPrimary:'#ff8c1a'},loop_blocks:{colourPrimary:'#d19636'}},componentStyles:{workspaceBackgroundColour:'#fbfcfd',toolboxBackgroundColour:'#f4f7f8',flyoutBackgroundColour:'#eef3f5',flyoutOpacity:1,scrollbarColour:'#b9c9ce',insertionMarkerColour:'#126c67',insertionMarkerOpacity:.3}});
+installInteropBlocks(Blockly);
 const workspace=Blockly.inject('blocklyDiv',{toolbox:globalThis.EBLi18n?.toolbox(toolbox)??toolbox,theme,renderer:'zelos',media:'vendor/media/',trashcan:true,scrollbars:true,grid:{spacing:24,length:2,colour:'#e5ebee',snap:false},zoom:{controls:true,wheel:true,startScale:.85,minScale:.35,maxScale:1.5,scaleSpeed:1.1},move:{scrollbars:true,drag:true,wheel:true},sounds:false});
 configureEditorInteractions(workspace);
 workspace.registerToolboxCategoryCallback('ARGUMENTS',argumentFlyout);
@@ -742,6 +743,7 @@ function chain(block){
 }
 // スタート・イベントから到達する命令と、そこから呼ばれるマイブロックだけを集める。未接続の試作ブロックは転送対象に含めない。
 function program(){
+ const unresolved=workspace.getAllBlocks(false).filter(b=>b.type==='blocklab_unconverted');if(unresolved.length){const error=Error(`変換できないブロックが${unresolved.length}個あります。赤い「要確認」を使う機種のブロックに置き換えてください。元の作品は「教員・指導者用」から保存できます。`);error.blockId=unresolved[0].id;throw error;}
   const roots=workspace.getTopBlocks(true).filter(b=>b.isEnabled());
   const starts=roots.filter(b=>b.type==='ev3_start');
   const events=roots.filter(b=>['ev3_when_condition','ev3_when_changed','ev3_when_message'].includes(b.type));
@@ -813,7 +815,7 @@ function importMyBlockLibrary(data){
 }
 
 // 編集用保存形式（.ev3lab）。Blocklyの配置や未接続ブロックも含み、EV3用の.rbfとは用途が異なる。
-function project(){return {format:'ev3-block-lab',version:1,appVersion:VERSION,name:$('programName').value,programName:$('programName').value,ev3ProjectName:$('ev3ProjectName').value,pairMode:$('pairMode').value,workspace:Blockly.serialization.workspaces.save(workspace)};}
+function project(){return {...(workspace.importedFrom?{importedFrom:workspace.importedFrom}:{}),format:'ev3-block-lab',version:1,appVersion:VERSION,name:$('programName').value,programName:$('programName').value,ev3ProjectName:$('ev3ProjectName').value,pairMode:$('pairMode').value,workspace:Blockly.serialization.workspaces.save(workspace)};}
 // 保存形式を確認して復元する。古い作品の保存先名・プログラム名がない場合は既定値を使う。
 function restore(data){
   if(data?.format!=='ev3-block-lab' || data.version!==1 || !data.workspace?.blocks)throw Error('EV3 Block Labのプロジェクト（バージョン1）を選んでください。');
@@ -827,6 +829,7 @@ function restore(data){
   $('ev3ProjectName').value=typeof data.ev3ProjectName==='string'?data.ev3ProjectName:'EV3Lab';
   $('programName').value=typeof data.programName==='string'?data.programName:'MyProgram';
   $('pairMode').value=['sync','feedback'].includes(data.pairMode)?data.pairMode:'independent';
+  workspace.importedFrom=data.importedFrom;workspace.updateImportRecovery?.();
   workspace.clearUndo();check();
   if(oldMovement)feedback('以前の作品です。「動きに使うモーター」を追加し、左右の配線を再確認してください。B+Cは自動設定しません。',true);
   return oldMovement;
@@ -969,15 +972,18 @@ function loadRampSample(){
 }
 sampleAction('rampSample').onclick=()=>loadRampSample();
 $('saveProject').onclick=()=>{try{const filename=programFileName($('programName').value).replace(/\.rbf$/,'.ev3lab');download(JSON.stringify(project(),null,2),filename,'application/json');dirty=false;feedback('作品ファイルのダウンロードを開始しました。',false,'save');}catch(e){feedback(e.message,true,'save');$('programName').focus();}};
+const projectInterop=installInteropUI({document,target:'ebl',download,getProject:()=>project()});
+workspace.updateImportRecovery=projectInterop.update;
 $('loadProject').onclick=()=>$('fileInput').click();
 $('fileInput').onchange=async e=>{
   const file=e.target.files[0];e.target.value='';if(!file)return;
   try{if(file.size>2*1024*1024)throw Error('プロジェクトは2MB以下にしてください。');const data=JSON.parse(await file.text());
     if(dirty && !confirm(uiText('現在の編集内容をファイルの内容に置き換えますか？')))return;
-    const needsMovement=restore(data);saveLocal();dirty=false;if(!needsMovement)feedback('プロジェクトを読み込みました。');
+    if(isForeignProject(data,'ebl')){const report=convertProject(data,'ebl',file.name);inspectBlocks(report.project.workspace.blocks);if(!await projectInterop.review(report))return;restore(report.project);saveLocal();dirty=true;projectInterop.update();if(!report.unsupported.length)feedback('共通ブロックを変換して開きました。元の作品は変更していません。');}
+    else {const needsMovement=restore(data);saveLocal();dirty=false;projectInterop.update();if(!needsMovement)feedback('プロジェクトを読み込みました。');}
   }catch(e){
     const reason=file.size>2*1024*1024?'ファイルが大きすぎます。2MB以下の作品を選んでください。':'このファイルは作品として開けません。';
-    feedback(`${reason} EV3 Block Labの「保存」で作った .ev3lab、または以前の作品の .json を選んで、もう一度「開く」を押してください。LEGO純正ソフトで作った .ev3 は開けません。LEGO純正ソフトで開いてください。名前の終わりを変えるだけでは、EV3 Block Labの作品にはなりません。困ったときは先生に相談してください。`,true);
+    feedback(`${reason} SBLの .spikelab も共通ブロックを変換して開けます。 EV3 Block Labの「保存」で作った .ev3lab、または以前の作品の .json を選んで、もう一度「開く」を押してください。LEGO純正ソフトで作った .ev3 は開けません。LEGO純正ソフトで開いてください。名前の終わりを変えるだけでは、EV3 Block Labの作品にはなりません。困ったときは先生に相談してください。`,true);
   }
 };
 let savedPath='';
@@ -1187,6 +1193,15 @@ sampleAction('movementRampSample').onclick=async()=>{
  const response=await fetch('samples/MovementRamp.ev3lab');if(!response.ok)throw Error('サンプルを読み込めません。');
  restore(await response.json());check();saveLocal();dirty=false;
  feedback('左右B+Cでステアリング25・速さ30％・3秒を台形→S字で比較し、最後に左右30％／15％で速い側360度を回します。加速・減速は各1秒。配線を確認し、最初は車輪を浮かせてください。');
+};
+
+// 提供された小学校向け作品をそのまま復元する。実行・転送は利用者の操作を待つ。
+for(const number of [1,2])sampleAction('primarySchool'+number+'Sample').onclick=async()=>{
+ const response=await fetch('samples/Primary_School_'+number+'.ev3lab',{cache:'no-store'});
+ if(!response.ok)throw Error('サンプルを読み込めません。');
+ restore(await response.json());check();saveLocal();dirty=false;
+ requestAnimationFrame(()=>$('zoomToFit').onclick());
+ feedback('小学校向けサンプルを読み込みました。転送・実行前にモーターとセンサーの配線を確認してください。');
 };
 
 // 言語は表示だけの設定。状態を複製して同じIDで再描画し、接続は作り直さない。

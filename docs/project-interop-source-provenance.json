@@ -1,0 +1,110 @@
+{
+  "date": "2026-11-28",
+  "version": "0.26.0",
+  "site_source_commit": "8114cc944a10d40ddf0d56e6b7adbbfec4c148b3",
+  "files": [
+    {
+      "path": "dist/app.js",
+      "sha256": "e0bef96a33f16acc20d5d88263b426546e2edb834c71baeb9b7b762dc35d42ad"
+    },
+    {
+      "path": "dist/i18n-bootstrap.js",
+      "sha256": "e8ebf0ea36fcefd1e0aab55213f59fc203806fa2238e63f3dd04d589d1333913"
+    },
+    {
+      "path": "dist/i18n.js",
+      "sha256": "43c44fecf58be7478f4c3ef0ec0d43c7653e44b2f8ed9e42bce9f8588c4b96e8"
+    },
+    {
+      "path": "dist/index.html",
+      "sha256": "af70c5c0d5e6b5ebed96457f326f919d1cfbef45ae99e8dd28c81ad18ba98dbc"
+    },
+    {
+      "path": "dist/library.js",
+      "sha256": "7b95a9319f98edd531141a096c8c509366025505edaf258a2f05efd4ddf21279"
+    },
+    {
+      "path": "dist/locale-en.js",
+      "sha256": "f7638889e3fef1a353835694d131e7b6afb6b3ac03855741bec056084861fc05"
+    },
+    {
+      "path": "dist/manual/EV3-Block-Lab-Manual-v0.26.0-en.html",
+      "sha256": "8544049d4dd605f202b3ddf518ae4e8fe05264a0a47d3a5453ae5218cca93b80"
+    },
+    {
+      "path": "dist/manual/EV3-Block-Lab-Manual-v0.26.0-en.pdf",
+      "sha256": "38663a326a7404172d0fd736e23074edeaf6e13f48cb00ae73acd90e3cb1cb26"
+    },
+    {
+      "path": "dist/manual/EV3-Block-Lab-ブロック命令マニュアル-v0.26.0.html",
+      "sha256": "8958b87040cb78743cbdd0dfa8ddf40e297c46ce47537557237c3d831ce7fb4d"
+    },
+    {
+      "path": "dist/manual/EV3-Block-Lab-ブロック命令マニュアル-v0.26.0.pdf",
+      "sha256": "00d4ca96975c9676d830f8cb831519f392b05bd191d6bdb9b60812fc1b1c9cb3"
+    },
+    {
+      "path": "dist/project-interop-guide.html",
+      "sha256": "7f47aa9a57863ba927eee84fe8506ece3cb4c8462158a537efbacb2d1686b8b9"
+    },
+    {
+      "path": "dist/project-interop-guide.pdf",
+      "sha256": "7fb111d248d8024cd00e55297d534ff181656756ddb13be9c6a05a90a25c5ecf"
+    },
+    {
+      "path": "dist/project-interop.js",
+      "sha256": "eea3238b654a55fe811d159b7930e58f4500cad3048783c3c82e1ec9b4ea32f5"
+    },
+    {
+      "path": "dist/samples/Primary_School_1.ev3lab",
+      "sha256": "3b28d6fddfebc6e16515542bfb895f8b7e1643106faeae362bf8dac81e85220f"
+    },
+    {
+      "path": "dist/samples/Primary_School_2.ev3lab",
+      "sha256": "d6fc6733017bee96b96e6ce9cc24d1f6ce688a7f01041b20a060ca35ece61995"
+    },
+    {
+      "path": "docs/README.md",
+      "sha256": "4812b784ad6898885d29ccdfbbb183a65cb628457049e50eb8714334cd79c3b6"
+    },
+    {
+      "path": "docs/manual-v0.26.0/EV3-Block-Lab-ブロック命令マニュアル-v0.26.0.html",
+      "sha256": "8958b87040cb78743cbdd0dfa8ddf40e297c46ce47537557237c3d831ce7fb4d"
+    },
+    {
+      "path": "docs/manual-v0.26.0/EV3-Block-Lab-ブロック命令マニュアル-v0.26.0.pdf",
+      "sha256": "00d4ca96975c9676d830f8cb831519f392b05bd191d6bdb9b60812fc1b1c9cb3"
+    },
+    {
+      "path": "docs/manual-v0.26.0/README.md",
+      "sha256": "bbbc4f312c44cb8d75f25be0130808eda3f90732e7dda01e4aa258fe54792e9c"
+    },
+    {
+      "path": "docs/project-interop-20261128.md",
+      "sha256": "12d7724b6bbd0c96b9d483cc3e8be8d9771070812e9a3ecd7b3dd3caf23251a6"
+    },
+    {
+      "path": "package.json",
+      "sha256": "20a3bee567a323cdcfba71d271e40065c01e9c59d019493ff7273fd047030887"
+    },
+    {
+      "path": "tests/editor.test.mjs",
+      "sha256": "7ad4ea34740bb3d17acac8414b35dfa516af608421ed71c4844ed3ae8b3f5a43"
+    },
+    {
+      "path": "tests/helpers/interop-editor.mjs",
+      "sha256": "200d382dfe3a183766d3a09ef3d15bdd54e306ea2feb6f183cae3ce84b07c6f6"
+    },
+    {
+      "path": "tests/project-interop-fixtures.js",
+      "sha256": "1e31d1cfbe7063e3a6382bdfa3538fd907bdb4bb906407d874fd54f8ed492553"
+    },
+    {
+      "path": "tests/project-interop.test.mjs",
+      "sha256": "a98485573d66474f3f615469ac3a9d25127faa692492dff67d016005bf5a10ef"
+    }
+  ],
+  "tests": "325 passed, 1 external/hardware test skipped",
+  "hardware": "unverified",
+  "scope": "EBL Web only; RT and Windows source snapshots retained"
+}

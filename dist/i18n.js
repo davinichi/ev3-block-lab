@@ -87,14 +87,14 @@ export function installI18n({Blockly,jaMessages,enMessages,catalog,document,stor
   for(const section of document.querySelectorAll('[data-language]'))section.hidden=section.dataset.language!==language;
   const select=document.getElementById('uiLanguage');if(select)select.value=language;
   const pdf=document.getElementById('manualDownload'),html=document.getElementById('manualHtml');
-  if(pdf){const stem=language==='en'?'EV3-Block-Lab-Manual-v0.25.6-en':'EV3-Block-Lab-ブロック命令マニュアル-v0.25.6';pdf.href='manual/'+stem+'.pdf';pdf.download=stem+'.pdf';}
+  if(pdf){const stem=language==='en'?'EV3-Block-Lab-Manual-v0.26.0-en':'EV3-Block-Lab-ブロック命令マニュアル-v0.25.6';pdf.href='manual/'+stem+'.pdf';pdf.download=stem+'.pdf';}
   if(pdf){const title=language==='en'?'Manual v0.25.8 · 20 chapters · 31 pages':'最新版マニュアル v0.25.8・全20章・50ページ';if(pdf.title!==title)pdf.title=title;}
-  if(html)html.href='manual/'+(language==='en'?'EV3-Block-Lab-Manual-v0.25.6-en':'EV3-Block-Lab-ブロック命令マニュアル-v0.25.6')+'.html';
+  if(html)html.href='manual/'+(language==='en'?'EV3-Block-Lab-Manual-v0.26.0-en':'EV3-Block-Lab-ブロック命令マニュアル-v0.25.6')+'.html';
   const guideChapters={'v019-guide.html':5,'v018-guide.html':4,'v017-guide.html':13,'pid-battery-guide.html':10,'gyro-guide.html':7,'display-guide.html':11,'classroom-ui-guide.html':'classroom-ui-guide.html#english'};
   for(const link of document.querySelectorAll('a[href]')){
    const source=guideLinks.get(link)??link.getAttribute('href');
    if(!guideChapters[source])continue;guideLinks.set(link,source);
-   const chapter=guideChapters[source],target=language==='en'?(typeof chapter==='string'?chapter:'manual/EV3-Block-Lab-Manual-v0.25.6-en.html#chapter-'+chapter):source;
+   const chapter=guideChapters[source],target=language==='en'?(typeof chapter==='string'?chapter:'manual/EV3-Block-Lab-Manual-v0.26.0-en.html#chapter-'+chapter):source;
    if(link.getAttribute('href')!==target)link.setAttribute('href',target);
   }
  }

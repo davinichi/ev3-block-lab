@@ -1,0 +1,779 @@
+{
+  "format": "ev3-block-lab",
+  "version": 1,
+  "appVersion": "0.25.9",
+  "name": "Primary_School_2",
+  "programName": "Primary_School_2",
+  "ev3ProjectName": "EV3Lab",
+  "pairMode": "independent",
+  "workspace": {
+    "blocks": {
+      "languageVersion": 0,
+      "blocks": [
+        {
+          "type": "ev3_start",
+          "id": "(`nWv1sI.au.v*:/Ry%{",
+          "x": -2214,
+          "y": 324,
+          "next": {
+            "block": {
+              "type": "procedures_callnoreturn",
+              "id": "?`I!_m7x*|}CT1FWgn!x",
+              "extraState": {
+                "name": "00_初期設定"
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defnoreturn",
+          "id": "U]T_r3Ot|vvQ_D+*U~qT",
+          "x": 69,
+          "y": 124,
+          "icons": {
+            "comment": {
+              "text": "この関数の説明…",
+              "pinned": false,
+              "height": 80,
+              "width": 160
+            }
+          },
+          "fields": {
+            "NAME": "00_初期設定"
+          },
+          "inputs": {
+            "STACK": {
+              "block": {
+                "type": "ev3_movement_setup",
+                "id": "#Z=B#O8*e/Q,h-6@f}@T",
+                "fields": {
+                  "LEFT_PORT": "2",
+                  "RIGHT_PORT": "4"
+                },
+                "next": {
+                  "block": {
+                    "type": "ev3_wheel",
+                    "id": "#eNG(D(iKDp!FhOimVwV",
+                    "fields": {
+                      "DIAMETER": 56
+                    },
+                    "next": {
+                      "block": {
+                        "type": "ev3_tread",
+                        "id": "Zt}ddqe@7?CV9_t;n@tf",
+                        "fields": {
+                          "TREAD": 130
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defnoreturn",
+          "id": "+!)wbSr-FXvJ-N-J!tY-",
+          "x": 60,
+          "y": 448,
+          "extraState": {
+            "params": [
+              {
+                "name": "スピード(%)",
+                "id": "vTj^eH.m%p*@_(wRiAJ^"
+              },
+              {
+                "name": "距離(cm)",
+                "id": "kB_tLz(L(%q,sBaTtPtq"
+              }
+            ]
+          },
+          "icons": {
+            "comment": {
+              "text": "この関数の説明…",
+              "pinned": false,
+              "height": 80,
+              "width": 160
+            }
+          },
+          "fields": {
+            "NAME": "01_直進"
+          },
+          "inputs": {
+            "STACK": {
+              "block": {
+                "type": "ev3_drive_forward",
+                "id": "ouwP{u0SX;Do+dHL-rS7",
+                "inputs": {
+                  "SPEED": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": ".u-SOWV9g?Yh{Jk04__2",
+                      "fields": {
+                        "NUM": 20
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": ")I*=;9jk$CrY`2u9~SH@",
+                      "extraState": {
+                        "parameterId": "vTj^eH.m%p*@_(wRiAJ^",
+                        "name": "スピード(%)"
+                      },
+                      "fields": {
+                        "ARG_NAME": "スピード(%)"
+                      }
+                    }
+                  },
+                  "CM": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": "Q%I[V0Io}X=V*yaDC`SJ",
+                      "fields": {
+                        "NUM": 20
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": "2td%WJl,bGu(HLNY5$%d",
+                      "extraState": {
+                        "parameterId": "kB_tLz(L(%q,sBaTtPtq",
+                        "name": "距離(cm)"
+                      },
+                      "fields": {
+                        "ARG_NAME": "距離(cm)"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defnoreturn",
+          "id": "VMEfWMKrf[W}Um|:u0G`",
+          "x": 60,
+          "y": 614,
+          "extraState": {
+            "params": [
+              {
+                "name": "スピード(%)",
+                "id": "vTj^eH.m%p*@_(wRiAJ^"
+              },
+              {
+                "name": "角度(  ° )",
+                "id": "49=qMFO[{vI/wdQXor~L"
+              }
+            ]
+          },
+          "icons": {
+            "comment": {
+              "text": "この関数の説明…",
+              "pinned": false,
+              "height": 80,
+              "width": 160
+            }
+          },
+          "fields": {
+            "NAME": "02_右旋回"
+          },
+          "inputs": {
+            "STACK": {
+              "block": {
+                "type": "ev3_spin_right",
+                "id": "4R.UXn+l7?,[o=Y2*Si8",
+                "inputs": {
+                  "SPEED": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": "ksOVGENMid{8}|~b)0av",
+                      "fields": {
+                        "NUM": 20
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": "(t#k-q9fIBg5Z]by.7`X",
+                      "extraState": {
+                        "parameterId": "vTj^eH.m%p*@_(wRiAJ^",
+                        "name": "スピード(%)"
+                      },
+                      "fields": {
+                        "ARG_NAME": "スピード(%)"
+                      }
+                    }
+                  },
+                  "ANGLE": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": "i[.E/la+t(;qmnCcr2Wf",
+                      "fields": {
+                        "NUM": 90
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": "5P`xlW/nrt~W~?E-%;d~",
+                      "extraState": {
+                        "parameterId": "49=qMFO[{vI/wdQXor~L",
+                        "name": "角度(  ° )"
+                      },
+                      "fields": {
+                        "ARG_NAME": "角度(  ° )"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defnoreturn",
+          "id": "b^Cx)Hex05*U.@5PA-`6",
+          "x": 60,
+          "y": 780,
+          "extraState": {
+            "params": [
+              {
+                "name": "スピード(%)",
+                "id": "vTj^eH.m%p*@_(wRiAJ^"
+              },
+              {
+                "name": "角度(  ° )",
+                "id": "49=qMFO[{vI/wdQXor~L"
+              }
+            ]
+          },
+          "icons": {
+            "comment": {
+              "text": "この関数の説明…",
+              "pinned": false,
+              "height": 80,
+              "width": 160
+            }
+          },
+          "fields": {
+            "NAME": "03_左旋回"
+          },
+          "inputs": {
+            "STACK": {
+              "block": {
+                "type": "ev3_spin_left",
+                "id": "SB^_i%EUqG|8sBQ?Yi{~",
+                "inputs": {
+                  "SPEED": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": "WMUzz}xOg(W:bT9^rzO8",
+                      "fields": {
+                        "NUM": 20
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": "3A:A05Mn/1=)](X;$7)o",
+                      "extraState": {
+                        "parameterId": "vTj^eH.m%p*@_(wRiAJ^",
+                        "name": "スピード(%)"
+                      },
+                      "fields": {
+                        "ARG_NAME": "スピード(%)"
+                      }
+                    }
+                  },
+                  "ANGLE": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": "6kw5FZ?]eXnI(_A@K+0Q",
+                      "fields": {
+                        "NUM": 90
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": "0Or}G502WGq-SrRYaB*|",
+                      "extraState": {
+                        "parameterId": "49=qMFO[{vI/wdQXor~L",
+                        "name": "角度(  ° )"
+                      },
+                      "fields": {
+                        "ARG_NAME": "角度(  ° )"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defnoreturn",
+          "id": "-CwHS`-A5u0!jfrdB})/",
+          "x": 60,
+          "y": 946,
+          "extraState": {
+            "params": [
+              {
+                "name": "スピード(%)",
+                "id": "vTj^eH.m%p*@_(wRiAJ^"
+              },
+              {
+                "name": "角度(  ° )",
+                "id": "49=qMFO[{vI/wdQXor~L"
+              }
+            ]
+          },
+          "icons": {
+            "comment": {
+              "text": "この関数の説明…",
+              "pinned": false,
+              "height": 80,
+              "width": 160
+            }
+          },
+          "fields": {
+            "NAME": "04_右P旋回"
+          },
+          "inputs": {
+            "STACK": {
+              "block": {
+                "type": "ev3_pivot_right",
+                "id": "vY~_78DYA=(P2AQuEppL",
+                "inputs": {
+                  "SPEED": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": "=3*:[p_|LAXFM!9Kxz/U",
+                      "fields": {
+                        "NUM": 20
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": ",cf/xI;;yctLQQTJ%|`}",
+                      "extraState": {
+                        "parameterId": "vTj^eH.m%p*@_(wRiAJ^",
+                        "name": "スピード(%)"
+                      },
+                      "fields": {
+                        "ARG_NAME": "スピード(%)"
+                      }
+                    }
+                  },
+                  "ANGLE": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": "S#Dcb5[7E-TE7,OTe@jC",
+                      "fields": {
+                        "NUM": 90
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": "n/(]j{XA:-AO~?]y@I+e",
+                      "extraState": {
+                        "parameterId": "49=qMFO[{vI/wdQXor~L",
+                        "name": "角度(  ° )"
+                      },
+                      "fields": {
+                        "ARG_NAME": "角度(  ° )"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defnoreturn",
+          "id": "W2,*NBx:pU$VNa%P=U_0",
+          "x": 60,
+          "y": 1112,
+          "extraState": {
+            "params": [
+              {
+                "name": "スピード(%)",
+                "id": "vTj^eH.m%p*@_(wRiAJ^"
+              },
+              {
+                "name": "角度(  ° )",
+                "id": "49=qMFO[{vI/wdQXor~L"
+              }
+            ]
+          },
+          "icons": {
+            "comment": {
+              "text": "この関数の説明…",
+              "pinned": false,
+              "height": 80,
+              "width": 160
+            }
+          },
+          "fields": {
+            "NAME": "05_左P旋回"
+          },
+          "inputs": {
+            "STACK": {
+              "block": {
+                "type": "ev3_pivot_left",
+                "id": "PAP5L=yl4Nz@fcJY%xiq",
+                "inputs": {
+                  "SPEED": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": "lRAU(q{@[HyQa;kYK}LU",
+                      "fields": {
+                        "NUM": 20
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": "vk71ElHl{EEu:f}0/5j9",
+                      "extraState": {
+                        "parameterId": "vTj^eH.m%p*@_(wRiAJ^",
+                        "name": "スピード(%)"
+                      },
+                      "fields": {
+                        "ARG_NAME": "スピード(%)"
+                      }
+                    }
+                  },
+                  "ANGLE": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": "B-y@ZFL)eGo5/DwP@L=V",
+                      "fields": {
+                        "NUM": 90
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": "QKekveCUTX5A$52vIoz1",
+                      "extraState": {
+                        "parameterId": "49=qMFO[{vI/wdQXor~L",
+                        "name": "角度(  ° )"
+                      },
+                      "fields": {
+                        "ARG_NAME": "角度(  ° )"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defnoreturn",
+          "id": "}e+-@F4k@f],b!T,a(g:",
+          "x": 60,
+          "y": 1278,
+          "extraState": {
+            "params": [
+              {
+                "name": "スピード(%)",
+                "id": "vTj^eH.m%p*@_(wRiAJ^"
+              },
+              {
+                "name": "時間(秒)",
+                "id": "?9ovnvg]EPk#,M~ic5LO"
+              }
+            ]
+          },
+          "icons": {
+            "comment": {
+              "text": "この関数の説明…",
+              "pinned": false,
+              "height": 80,
+              "width": 160
+            }
+          },
+          "fields": {
+            "NAME": "06_アーム（時間)"
+          },
+          "inputs": {
+            "STACK": {
+              "block": {
+                "type": "ev3_motor_m_single_time",
+                "id": "VXz/^M*`VCDq-yw,tMCK",
+                "fields": {
+                  "PORTS": "8"
+                },
+                "inputs": {
+                  "SPEED": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": "BT.F*,CutXq-Rp%WX=JG",
+                      "fields": {
+                        "NUM": 20
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": "vY!)tkQMGwJmi5vzOsa]",
+                      "extraState": {
+                        "parameterId": "vTj^eH.m%p*@_(wRiAJ^",
+                        "name": "スピード(%)"
+                      },
+                      "fields": {
+                        "ARG_NAME": "スピード(%)"
+                      }
+                    }
+                  },
+                  "SECONDS": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": "]6%z$m[EcZB_T8Q9Zk@U",
+                      "fields": {
+                        "NUM": 1
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": "#l62}s06r)nybmY~B7aY",
+                      "extraState": {
+                        "parameterId": "?9ovnvg]EPk#,M~ic5LO",
+                        "name": "時間(秒)"
+                      },
+                      "fields": {
+                        "ARG_NAME": "時間(秒)"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defnoreturn",
+          "id": "ro)m0n|:Un(].Y8Yu?W`",
+          "x": 66,
+          "y": 1437,
+          "extraState": {
+            "params": [
+              {
+                "name": "時間(秒)",
+                "id": "?9ovnvg]EPk#,M~ic5LO"
+              }
+            ]
+          },
+          "icons": {
+            "comment": {
+              "text": "この関数の説明…",
+              "pinned": false,
+              "height": 80,
+              "width": 160
+            }
+          },
+          "fields": {
+            "NAME": "08_待機"
+          },
+          "inputs": {
+            "STACK": {
+              "block": {
+                "type": "ev3_wait_seconds",
+                "id": "lAF!FC@2?4P8Jogzza1d",
+                "inputs": {
+                  "SECONDS": {
+                    "shadow": {
+                      "type": "math_number",
+                      "id": "OooecnFT=+F2xD{!f~i9",
+                      "fields": {
+                        "NUM": 1
+                      }
+                    },
+                    "block": {
+                      "type": "ev3_argument",
+                      "id": ";l;0nF]-i[#!UfI0eSh*",
+                      "extraState": {
+                        "parameterId": "?9ovnvg]EPk#,M~ic5LO",
+                        "name": "時間(秒)"
+                      },
+                      "fields": {
+                        "ARG_NAME": "時間(秒)"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defnoreturn",
+          "id": "{`8h+$=M5.%=Bcm,J!SO",
+          "x": 60,
+          "y": 1610,
+          "extraState": {
+            "params": [
+              {
+                "name": "スピード(%)",
+                "id": "vTj^eH.m%p*@_(wRiAJ^"
+              },
+              {
+                "name": "距離(cm)",
+                "id": "kB_tLz(L(%q,sBaTtPtq"
+              }
+            ]
+          },
+          "icons": {
+            "comment": {
+              "text": "この関数の説明…",
+              "pinned": false,
+              "height": 80,
+              "width": 160
+            }
+          },
+          "fields": {
+            "NAME": "09_距離センサ"
+          },
+          "inputs": {
+            "STACK": {
+              "block": {
+                "type": "controls_whileUntil",
+                "id": "v-YsgjC@;3rzyx9]U/J-",
+                "fields": {
+                  "MODE": "WHILE"
+                },
+                "inputs": {
+                  "BOOL": {
+                    "block": {
+                      "type": "ev3_distance_compare",
+                      "id": "k?P,)rkj%TE?AnkElsuo",
+                      "fields": {
+                        "PORT": "2",
+                        "OP": "gt"
+                      },
+                      "inputs": {
+                        "VALUE": {
+                          "shadow": {
+                            "type": "math_number",
+                            "id": "PS-wWG6(8UA5x,NiTiV.",
+                            "fields": {
+                              "NUM": 15
+                            }
+                          },
+                          "block": {
+                            "type": "ev3_argument",
+                            "id": "9rK(5BS=e+rx3_/)qk+q",
+                            "extraState": {
+                              "parameterId": "kB_tLz(L(%q,sBaTtPtq",
+                              "name": "距離(cm)"
+                            },
+                            "fields": {
+                              "ARG_NAME": "距離(cm)"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "DO": {
+                    "block": {
+                      "type": "ev3_steering_run",
+                      "id": "GN[%W%#hCc1AE=vca/J6",
+                      "inputs": {
+                        "TURN": {
+                          "shadow": {
+                            "type": "math_number",
+                            "id": "1vAh:+|2U:7U[jhr;+5g",
+                            "fields": {
+                              "NUM": 0
+                            }
+                          }
+                        },
+                        "SPEED": {
+                          "shadow": {
+                            "type": "math_number",
+                            "id": "yd/`h*D`eh8x~$Mqy8O{",
+                            "fields": {
+                              "NUM": 20
+                            }
+                          },
+                          "block": {
+                            "type": "ev3_argument",
+                            "id": "oK43fR$Me(%$?^7|=~EI",
+                            "extraState": {
+                              "parameterId": "vTj^eH.m%p*@_(wRiAJ^",
+                              "name": "スピード(%)"
+                            },
+                            "fields": {
+                              "ARG_NAME": "スピード(%)"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "next": {
+                  "block": {
+                    "type": "ev3_movement_stop",
+                    "id": "f7Vw|J^,.$)f[_u~)TvG"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_defnoreturn",
+          "id": "lfhx|TK:@?3.g#bsjN__",
+          "x": 50,
+          "y": 1970,
+          "icons": {
+            "comment": {
+              "text": "この関数の説明…",
+              "pinned": false,
+              "height": 80,
+              "width": 160
+            }
+          },
+          "fields": {
+            "NAME": "99_終了"
+          },
+          "inputs": {
+            "STACK": {
+              "block": {
+                "type": "ev3_program_end",
+                "id": "pw0r)jTv6XX[;G=@MJA="
+              }
+            }
+          }
+        },
+        {
+          "type": "procedures_callnoreturn",
+          "id": "P!ie1FK(S2TAS!B:OnY%",
+          "x": -2169,
+          "y": 891,
+          "extraState": {
+            "name": "99_終了"
+          }
+        }
+      ]
+    },
+    "variables": [
+      {
+        "name": "スピード(%)",
+        "id": "vTj^eH.m%p*@_(wRiAJ^"
+      },
+      {
+        "name": "距離(cm)",
+        "id": "kB_tLz(L(%q,sBaTtPtq"
+      },
+      {
+        "name": "角度(  ° )",
+        "id": "49=qMFO[{vI/wdQXor~L"
+      },
+      {
+        "name": "時間(秒)",
+        "id": "?9ovnvg]EPk#,M~ic5LO"
+      }
+    ]
+  }
+}
